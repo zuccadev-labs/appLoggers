@@ -156,6 +156,7 @@ jobs:
           category: /language:java-kotlin
 
       - name: Dependency Submission
+        continue-on-error: true
         uses: mikepenz/gradle-dependency-submission@v1
         with:
           gradle-project-path: sdk
