@@ -159,5 +159,5 @@ jobs:
         uses: mikepenz/gradle-dependency-submission@v1
         with:
           gradle-project-path: sdk
-          gradle-build-module: ':'
-          gradle-build-configuration: 'compileClasspath'
+          gradle-build-module: ':logger-core'
+          gradle-build-configuration: 'jvmCompileClasspath'
