@@ -1,0 +1,39 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config (contiene secrets)
+local.properties
+
+# Kotlin
+*.class
+
+# Build outputs
+*.aar
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Secrets
+.env
+*.pem
+*.gpg
+*.keystore
+
+# KMP / iOS
+*.xcodeproj/
+*.xcworkspace/
+Pods/
+*.framework/

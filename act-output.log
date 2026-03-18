@@ -1,0 +1,59 @@
+time="2026-03-17T20:45:39-04:00" level=info msg="Using docker host 'npipe:////./pipe/docker_engine', and daemon socket 'npipe:////./pipe/docker_engine'"
+time="2026-03-17T20:45:39-04:00" level=error msg="pathD:\\zuccadev\\Documentos\\Programacion\\labs-packages\\appLoggersnot located inside a git repository" error="repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=warning msg="unable to get git ref: repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=error msg="pathD:\\zuccadev\\Documentos\\Programacion\\labs-packages\\appLoggersnot located inside a git repository" error="repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=warning msg="unable to get git revision: repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=error msg="pathD:\\zuccadev\\Documentos\\Programacion\\labs-packages\\appLoggersnot located inside a git repository" error="repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=warning msg="unable to get git ref: repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=error msg="pathD:\\zuccadev\\Documentos\\Programacion\\labs-packages\\appLoggersnot located inside a git repository" error="repository does not exist"
+time="2026-03-17T20:45:39-04:00" level=warning msg="unable to get git revision: repository does not exist"
+[CI/test                  ] ⭐ Run Set up job
+[Release/Pre-Release Tests] ⭐ Run Set up job
+[Release/Pre-Release Tests] 🚀  Start image=catthehacker/ubuntu:act-latest
+[CI/test                  ] 🚀  Start image=catthehacker/ubuntu:act-latest
+[Release/Pre-Release Tests]   🐳  docker pull image=catthehacker/ubuntu:act-latest platform=linux/amd64 username= forcePull=true
+[CI/test                  ]   🐳  docker pull image=catthehacker/ubuntu:act-latest platform=linux/amd64 username= forcePull=true
+[CI/test                  ]   🐳  docker create image=catthehacker/ubuntu:act-latest platform=linux/amd64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[CI/test                  ]   🐳  docker run image=catthehacker/ubuntu:act-latest platform=linux/amd64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[Release/Pre-Release Tests]   🐳  docker create image=catthehacker/ubuntu:act-latest platform=linux/amd64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[Release/Pre-Release Tests]   🐳  docker run image=catthehacker/ubuntu:act-latest platform=linux/amd64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[CI/test                  ]   🐳  docker exec cmd=[node --no-warnings -e console.log(process.execPath)] user= workdir=
+[CI/test                  ]   ✅  Success - Set up job
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git ref: repository does not exist
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git revision: repository does not exist
+[Release/Pre-Release Tests]   🐳  docker exec cmd=[node --no-warnings -e console.log(process.execPath)] user= workdir=
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git ref: repository does not exist
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git revision: repository does not exist
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git ref: repository does not exist
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git revision: repository does not exist
+[CI/test                  ]   ☁  git clone 'https://github.com/actions/setup-java' # ref=v4
+[Release/Pre-Release Tests]   ✅  Success - Set up job
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git ref: repository does not exist
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git revision: repository does not exist
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git ref: repository does not exist
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git revision: repository does not exist
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git ref: repository does not exist
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git revision: repository does not exist
+[Release/Pre-Release Tests]   ☁  git clone 'https://github.com/actions/setup-java' # ref=v4
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git ref: repository does not exist
+[CI/test                  ] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[CI/test                  ] unable to get git revision: repository does not exist
+[CI/test                  ]   ☁  git clone 'https://github.com/gradle/actions' # ref=v4
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git ref: repository does not exist
+[Release/Pre-Release Tests] pathD:\zuccadev\Documentos\Programacion\labs-packages\appLoggersnot located inside a git repository
+[Release/Pre-Release Tests] unable to get git revision: repository does not exist
+[Release/Pre-Release Tests]   ☁  git clone 'https://github.com/gradle/actions' # ref=v4
