@@ -336,7 +336,7 @@ El proyecto tiene automatización completa. **Cada push ejecuta el pipeline auto
 | Evento | Pipeline | Jobs que se ejecutan |
 |---|---|---|
 | **Push a `main`** | CI completo | `lint` → `test` → `e2e` → `security` |
-| **Push a `develop`** | CI sin E2E | `lint` → `test` → `security` |
+| **Push a `dev`** | CI sin E2E | `lint` → `test` → `security` |
 | **Pull Request** | CI sin E2E | `lint` → `test` → `security` |
 | **Push tag `v*`** | Release | `test` → `publish` → GitHub Release |
 
@@ -368,8 +368,8 @@ Para que el pipeline funcione al 100%, configurá estos secrets en **GitHub → 
 ## Flujo de Ramas (Branching)
 
 ```
-main          ← Código estable. Releases se tagean desde acá.
-  └── develop ← Desarrollo activo. CI corre en cada push.
+main      ← Código estable. Releases se tagean desde acá.
+  └── dev ← Desarrollo activo. CI corre en cada push.
        ├── feature/nueva-funcionalidad
        ├── fix/corregir-bug
        └── docs/mejorar-readme
@@ -377,20 +377,20 @@ main          ← Código estable. Releases se tagean desde acá.
 
 | Rama | Propósito | Push directo | CI |
 |---|---|:---:|---|
-| `main` | Producción / releases | ❌ Solo vía PR desde `develop` | Completo (lint + test + e2e + security) |
-| `develop` | Desarrollo activo | ✅ | lint + test + security |
-| `feature/*` | Nuevas funcionalidades | ✅ | CI al abrir PR contra `develop` |
-| `fix/*` | Correcciones | ✅ | CI al abrir PR contra `develop` |
+| `main` | Producción / releases | ❌ Solo vía PR desde `dev` | Completo (lint + test + e2e + security) |
+| `dev` | Desarrollo activo | ✅ | lint + test + security |
+| `feature/*` | Nuevas funcionalidades | ✅ | CI al abrir PR contra `dev` |
+| `fix/*` | Correcciones | ✅ | CI al abrir PR contra `dev` |
 
 ### Flujo de release
 
 ```bash
-# 1. Trabajo diario en develop
-git checkout develop
-git push origin develop          # → CI: lint + test + security
+# 1. Trabajo diario en dev
+git checkout dev
+git push origin dev              # → CI: lint + test + security
 
-# 2. Cuando develop esté estable → PR a main
-# GitHub → New Pull Request → develop → main
+# 2. Cuando dev esté estable → PR a main
+# GitHub → New Pull Request → dev → main
 
 # 3. Después del merge → crear tag para release
 git checkout main
