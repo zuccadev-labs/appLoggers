@@ -27,7 +27,7 @@ class FakeTransport(
         sendCallCount++
 
         if (throwException) {
-            throw RuntimeException("FakeTransport simulated exception")
+            error("FakeTransport simulated exception")
         }
 
         return if (shouldSucceed) {

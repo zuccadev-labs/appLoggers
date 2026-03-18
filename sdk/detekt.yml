@@ -29,8 +29,17 @@ style:
       - '2'
       - '5'
       - '10'
+      - '20'
+      - '30'
+      - '60'
       - '100'
+      - '120'
+      - '200'
+      - '299'
+      - '300'
       - '1000'
+      - '10000'
+      - '60000'
     ignoreHashCodeFunction: true
     ignorePropertyDeclaration: true
     ignoreAnnotation: true
@@ -42,8 +51,17 @@ style:
     excludeImports:
       - 'kotlinx.coroutines.*'
       - 'com.applogger.core.internal.*'
+      - 'com.applogger.core.*'
+      - 'com.applogger.core.model.*'
+      - 'io.ktor.client.*'
+      - 'io.ktor.client.plugins.contentnegotiation.*'
+      - 'io.ktor.client.request.*'
+      - 'io.ktor.client.statement.*'
+      - 'io.ktor.http.*'
+      - 'io.ktor.serialization.kotlinx.json.*'
   ReturnCount:
     max: 4
+    excludedFunctions: ['equals']
   ForbiddenComment:
     active: false
 

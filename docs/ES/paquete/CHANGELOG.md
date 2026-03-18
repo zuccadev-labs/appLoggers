@@ -16,7 +16,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y el p
 
 ---
 
-## [0.1.1] — 2026-03-17
+## [0.1.0-alpha.1] — 2026-03-17
 
 ### Added
 - **`AppLogger` trait** — contrato público unificado de logging para Kotlin (Android / JVM).
@@ -96,5 +96,5 @@ Para versiones futuras, cada entrada de cambio debe seguir este formato:
 
 ---
 
-[Unreleased]: https://github.com/TuOrganizacion/app-logger/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/TuOrganizacion/app-logger/releases/tag/v0.1.1
+[Unreleased]: https://github.com/devzucca/appLoggers/compare/v0.1.0-alpha.1...HEAD
+[0.1.0-alpha.1]: https://github.com/devzucca/appLoggers/releases/tag/v0.1.0-alpha.1

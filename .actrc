@@ -1,0 +1,26 @@
+# .actrc — Configuración de act para el proyecto AppLogger
+# Ref: https://nektosact.com/usage/index.html#configuration-file
+#
+# act ejecuta GitHub Actions localmente usando Docker.
+# USO HABITUAL (desde la raíz del repo):
+#   act push -W .github/workflows/ci.yml --job lint
+#   act push -W .github/workflows/ci.yml --job test
+#
+# NOTA: Las acciones compuestas (setup-java, setup-gradle) pueden
+# requerir acceso a internet la primera vez. Después quedan en caché.
+
+# Imagen Docker para ubuntu-latest
+# - catthehacker/ubuntu:act-latest (~500MB) incluye las herramientas
+#   necesarias para bootstrap de la mayoría de actions.
+# - Alternativa full (~17GB): ghcr.io/catthehacker/ubuntu:full-latest
+#   (incluye Android SDK, Java, etc. sin necesidad de setup-java)
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+-P ubuntu-20.04=catthehacker/ubuntu:act-20.04
+
+# Secrets — archivo local con variables de entorno para el CI local
+# Crear el archivo: cp .act.secrets.example .act.secrets  (NO commitear)
+--secret-file .act.secrets
+
+# Usar la working directory correcta del monorepo
+--env GRADLE_OPTS=-Xmx2g

@@ -10,7 +10,9 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /**
@@ -65,6 +67,7 @@ class SupabaseTransport(
 
     private val restUrl get() = "${endpoint.trimEnd('/')}/rest/v1"
 
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun send(events: List<LogEvent>): TransportResult {
         return try {
             val (metrics, logs) = events.partition { it.level == LogLevel.METRIC }
@@ -93,10 +96,11 @@ class SupabaseTransport(
             header("Authorization", "Bearer $apiKey")
             header("Prefer", "return=minimal")
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(kotlinx.serialization.builtins.ListSerializer(SupabaseLogEntry.serializer()), payload))
+            val body = json.encodeToString(ListSerializer(SupabaseLogEntry.serializer()), payload)
+            setBody(body)
         }
         if (response.status.value !in 200..299) {
-            throw RuntimeException("Supabase insert failed: ${response.status} - ${response.bodyAsText()}")
+            error("Supabase insert failed: ${response.status} - ${response.bodyAsText()}")
         }
     }
 
@@ -107,10 +111,11 @@ class SupabaseTransport(
             header("Authorization", "Bearer $apiKey")
             header("Prefer", "return=minimal")
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(kotlinx.serialization.builtins.ListSerializer(SupabaseMetricEntry.serializer()), payload))
+            val body = json.encodeToString(ListSerializer(SupabaseMetricEntry.serializer()), payload)
+            setBody(body)
         }
         if (response.status.value !in 200..299) {
-            throw RuntimeException("Supabase metrics insert failed: ${response.status} - ${response.bodyAsText()}")
+            error("Supabase metrics insert failed: ${response.status} - ${response.bodyAsText()}")
         }
     }
 
@@ -126,14 +131,14 @@ internal data class SupabaseLogEntry(
     val level: String,
     val tag: String,
     val message: String,
-    val throwable_type: String? = null,
-    val throwable_msg: String? = null,
-    val stack_trace: List<String>? = null,
-    val device_info: Map<String, String>,
-    val api_level: Int,
-    val sdk_version: String,
-    val session_id: String,
-    val user_id: String? = null,
+    @SerialName("throwable_type") val throwableType: String? = null,
+    @SerialName("throwable_msg") val throwableMsg: String? = null,
+    @SerialName("stack_trace") val stackTrace: List<String>? = null,
+    @SerialName("device_info") val deviceInfo: Map<String, String>,
+    @SerialName("api_level") val apiLevel: Int,
+    @SerialName("sdk_version") val sdkVersion: String,
+    @SerialName("session_id") val sessionId: String,
+    @SerialName("user_id") val userId: String? = null,
     val extra: Map<String, String>? = null
 )
 
@@ -143,18 +148,18 @@ internal data class SupabaseMetricEntry(
     val value: Double,
     val unit: String,
     val tags: Map<String, String>,
-    val session_id: String,
-    val sdk_version: String
+    @SerialName("session_id") val sessionId: String,
+    @SerialName("sdk_version") val sdkVersion: String
 )
 
 private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
     level = level.name,
     tag = tag,
     message = message,
-    throwable_type = throwableInfo?.type,
-    throwable_msg = throwableInfo?.message,
-    stack_trace = throwableInfo?.stackTrace,
-    device_info = mapOf(
+    throwableType = throwableInfo?.type,
+    throwableMsg = throwableInfo?.message,
+    stackTrace = throwableInfo?.stackTrace,
+    deviceInfo = mapOf(
         "brand" to deviceInfo.brand,
         "model" to deviceInfo.model,
         "os_version" to deviceInfo.osVersion,
@@ -166,10 +171,10 @@ private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
         "is_tv" to deviceInfo.isTV.toString(),
         "connection_type" to deviceInfo.connectionType
     ),
-    api_level = deviceInfo.apiLevel,
-    sdk_version = sdkVersion,
-    session_id = sessionId,
-    user_id = userId,
+    apiLevel = deviceInfo.apiLevel,
+    sdkVersion = sdkVersion,
+    sessionId = sessionId,
+    userId = userId,
     extra = extra
 )
 
@@ -185,7 +190,7 @@ private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
         value = metricValue,
         unit = metricUnit,
         tags = metricTags + mapOf("platform" to deviceInfo.platform),
-        session_id = sessionId,
-        sdk_version = sdkVersion
+        sessionId = sessionId,
+        sdkVersion = sdkVersion
     )
 }

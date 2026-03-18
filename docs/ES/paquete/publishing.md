@@ -1,6 +1,6 @@
 # AppLogger — Guía de Publicación del Paquete
 
-**Versión:** 0.1.1  
+**Versión:** 0.1.0-alpha.1  
 **Fecha:** 2026-03-17  
 **Plataformas de publicación:** JitPack · GitHub Packages · Maven Central · Swift Package Manager (iOS consumo)
 
@@ -33,18 +33,18 @@ cat gradle/libs.versions.toml
 
 ```properties
 # gradle.properties
-GROUP=com.github.TuOrganizacion
-POM_ARTIFACT_ID=app-logger
-VERSION_NAME=0.1.1
+GROUP=com.github.devzucca
+POM_ARTIFACT_ID=appLoggers
+VERSION_NAME=0.1.0-alpha.1
 
 POM_NAME=AppLogger
 POM_DESCRIPTION=Kotlin Multiplatform SDK for structured technical telemetry on Android/TV/iOS/JVM
-POM_URL=https://github.com/TuOrganizacion/app-logger
+POM_URL=https://github.com/devzucca/appLoggers
 POM_LICENCE_NAME=MIT License
 POM_LICENCE_URL=https://opensource.org/licenses/MIT
-POM_DEVELOPER_ID=tu-github-username
-POM_DEVELOPER_NAME=Tu Nombre
-POM_SCM_URL=https://github.com/TuOrganizacion/app-logger
+POM_DEVELOPER_ID=devzucca
+POM_DEVELOPER_NAME=DevZucca
+POM_SCM_URL=https://github.com/devzucca/appLoggers
 ```
 
 ---
@@ -108,7 +108,7 @@ afterEvaluate {
             // GitHub Packages
             maven {
                 name = "GitHubPackages"
-                url  = uri("https://maven.pkg.github.com/TuOrganizacion/app-logger")
+                url  = uri("https://maven.pkg.github.com/devzucca/appLoggers")
                 credentials {
                     username = System.getenv("GITHUB_ACTOR")
                     password = System.getenv("GITHUB_TOKEN")
@@ -192,15 +192,15 @@ JitPack construye el artefacto directamente desde el repositorio de GitHub. No r
 ### 3.1 Crear un release en GitHub
 
 ```bash
-git tag -a v0.1.1 -m "Release 0.1.1"
-git push origin v0.1.1
+git tag -a v0.1.0-alpha.1 -m "Release 0.1.0-alpha.1"
+git push origin v0.1.0-alpha.1
 ```
 
 ### 3.2 Activar la build en JitPack
 
 1. Ir a [jitpack.io](https://jitpack.io)
-2. Buscar `TuOrganizacion/app-logger`
-3. Hacer clic en **Get it** junto al tag `v0.1.1`
+2. Buscar `devzucca/appLoggers`
+3. Hacer clic en **Get it** junto al tag `v0.1.0-alpha.1`
 4. JitPack construye el artefacto automáticamente
 
 ### 3.3 Consumo desde la app
@@ -215,14 +215,14 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.TuOrganizacion:app-logger:v0.1.1")
+    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")
 }
 ```
 
 ### 3.4 Badge en README
 
 ```markdown
-[![](https://jitpack.io/v/TuOrganizacion/app-logger.svg)](https://jitpack.io/#TuOrganizacion/app-logger)
+[![](https://jitpack.io/v/devzucca/appLoggers.svg)](https://jitpack.io/#devzucca/appLoggers)
 ```
 
 ---
@@ -246,7 +246,7 @@ export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 dependencyResolutionManagement {
     repositories {
         maven {
-            url = uri("https://maven.pkg.github.com/TuOrganizacion/app-logger")
+            url = uri("https://maven.pkg.github.com/devzucca/appLoggers")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
@@ -294,7 +294,7 @@ repositories {
 
 ```bash
 # Estable
-git tag -a v0.1.1 -m "Initial alpha release"
+git tag -a v0.1.0-alpha.1 -m "Initial alpha release"
 
 # Alpha (API puede cambiar)
 git tag -a v0.2.0-alpha.1 -m "New transport trait alpha"
@@ -381,7 +381,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, dev ]
 
 jobs:
   test:

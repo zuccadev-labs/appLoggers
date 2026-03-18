@@ -1,6 +1,6 @@
 # AppLogger — Arquitectura del Paquete
 
-**Versión:** 0.1.1  
+**Versión:** 0.1.0-alpha.1  
 **Fecha:** 2026-03-17  
 **Paradigma:** Trait-based design · Clean Architecture · SOLID  
 **Lenguaje:** Kotlin Multiplatform 2.0 — Android (Mobile + TV) · iOS · JVM
@@ -60,7 +60,7 @@ La app que consume el SDK no escribe `if (isTV) { ... } else { ... }`. El SDK ad
 El proyecto usa Kotlin Multiplatform con un módulo `logger-core` que contiene toda la lógica compartida y sourceSets de plataforma para las implementaciones nativas.
 
 ```
-app-logger/
+appLoggers/
 ├── logger-core/                         ← Módulo KMP principal
 │   └── src/
 │       ├── commonMain/kotlin/
@@ -904,6 +904,6 @@ object AppLoggerSDK {
 
 | Consumidor | Artefacto | Cómo incluirlo |
 |---|---|---|
-| Android (Gradle) | `.aar` via maven-publish | `implementation("com.applogger:logger-core-android:0.1.1")` |
+| Android (Gradle) | `.aar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")` |
 | iOS (Swift) | XCFramework | Swift Package Manager (`Package.swift`) |
-| JVM (Gradle) | `.jar` via maven-publish | `implementation("com.applogger:logger-core-jvm:0.1.1")` |
+| JVM (Gradle) | `.jar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")` |

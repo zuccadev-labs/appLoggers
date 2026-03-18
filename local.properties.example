@@ -1,0 +1,24 @@
+# ============================================================================
+# AppLoggers — Configuración Local
+# ============================================================================
+# Copiar este archivo a local.properties y completar los valores.
+# NUNCA commitear local.properties — contiene secrets.
+#
+#   cp local.properties.example local.properties
+#
+# ============================================================================
+
+# ── Android SDK ──────────────────────────────────────────────────────────────
+# Path al Android SDK. Android Studio lo configura automáticamente.
+# Solo cambiar si usás una instalación custom.
+sdk.dir=C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
+
+# ── Supabase (backend de logs) ──────────────────────────────────────────────
+# Obtener de: https://supabase.com/dashboard → Settings → API
+appLogger.url=https://TU-PROYECTO.supabase.co
+appLogger.anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# ── Modo Debug ──────────────────────────────────────────────────────────────
+# true  → logs en Logcat + envío al backend (desarrollo)
+# false → solo envío al backend, sin output local (producción)
+appLogger.debug=true

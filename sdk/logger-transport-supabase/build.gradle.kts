@@ -31,7 +31,7 @@ kotlin {
             implementation(project(":logger-core"))
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.ktor.client.core)
+            api(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.json)
         }

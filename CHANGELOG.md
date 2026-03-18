@@ -8,27 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ## [Unreleased]
 
-### Added
-- **Exponential backoff with jitter** — transport retries use `base * 2^attempt` capped at 30s.
-- **Dead Letter Queue** — events that exhaust retries are preserved for inspection.
-- **Health Check API** — `AppLoggerHealth.snapshot()` returns SDK internal state.
-- **Certificate pinning support** — `SupabaseTransport` accepts a custom `HttpClient`.
-- **KDoc** — comprehensive English documentation on all 19 public API files.
-- **iOS distribution** — `Package.swift` (SPM) and `AppLogger.podspec` (CocoaPods).
-- **XCFramework** task in `sdk/logger-core/build.gradle.kts`.
-- **Dokka** — API docs generation configured with CI upload.
-- **Conventional Commits** — git hook enforcer in `.githooks/commit-msg`.
-- **CodeQL security scanning** in CI workflow.
-- **Dependency submission** to GitHub for vulnerability alerts.
-- **Detekt** static analysis with SARIF reports.
-- **JaCoCo** code coverage with Codecov integration.
-- **Dependabot** for Gradle and GitHub Actions dependencies.
-- **ProGuard/R8 consumer rules** for `logger-core` and `logger-transport-supabase`.
-- **`.editorconfig`** for consistent code formatting.
+### Planned
+- `logger-transport-firebase` module — transport to Firebase Realtime Database
+- Support for `logger-transport-grpc` — direct delivery via gRPC to a custom server
+- Wear OS support in `PlatformDetector`
+- Web dashboard for real-time log visualization
 
 ---
 
-## [0.1.1] — 2026-03-17
+## [0.1.0-alpha.1] — 2026-03-17
 
 ### Added
 - **`AppLogger` interface** — unified logging contract for Kotlin (Android / JVM / iOS).
@@ -58,8 +46,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 - **Complete documentation**: `docs/ES/desarrollo/`, `docs/ES/paquete/`.
 - **SQL migrations**: `docs/ES/migraciones/001` a `docs/ES/migraciones/005` for PostgreSQL / Supabase.
 - **CI/CD with GitHub Actions**: test workflows on PRs and automated release on tags.
+- **Monorepo structure**: `sdk/`, `docs/ES/`, `docs/EN/`, `frontend/`, `cli/`.
+- **JitPack publication**: all 3 modules with 6 KMP platform variants.
+- **GitHub Packages publication**: automated via `release.yml` workflow on `v*` tags.
+- **Professional README**: configuration guide, CI/CD docs, branching model.
+- **`local.properties.example`**: onboarding template for new contributors.
 
 ### Security
 - API keys never hardcoded: injected via `BuildConfig` from `local.properties` or CI env vars.
 - Row Level Security in Supabase: `anon` role only has `INSERT` permission on `app_logs`.
 - Production endpoint requires `https://` — validated at `Config` build time.
+- **CodeQL security scanning** in CI workflow.
+- **Dependency submission** to GitHub for vulnerability alerts.

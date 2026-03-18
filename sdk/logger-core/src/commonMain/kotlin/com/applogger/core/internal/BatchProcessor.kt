@@ -15,6 +15,7 @@ import kotlin.random.Random
 internal class BatchProcessor(
     private val buffer: LogBuffer,
     private val transport: LogTransport,
+    @Suppress("UnusedPrivateProperty")
     private val formatter: LogFormatter,
     private val config: AppLoggerConfig,
     private val maxRetries: Int = 5,
@@ -72,31 +73,30 @@ internal class BatchProcessor(
             .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
 
         when (result) {
-            is TransportResult.Success -> {
-                consecutiveFailures = 0
+            is TransportResult.Success -> consecutiveFailures = 0
+            is TransportResult.Failure -> handleFailure(batch, result)
+        }
+    }
+
+    private suspend fun handleFailure(batch: List<LogEvent>, result: TransportResult.Failure) {
+        if (config.verboseTransportLogging) {
+            platformLog("AppLogger", "Transport failed: ${result.reason}")
+        }
+        if (!result.retryable) return
+        consecutiveFailures++
+        if (consecutiveFailures <= maxRetries) {
+            batch.forEach { buffer.push(it) }
+            val delayMs = backoffWithJitter(consecutiveFailures)
+            if (config.verboseTransportLogging) {
+                platformLog("AppLogger", "Retry #$consecutiveFailures in ${delayMs}ms")
             }
-            is TransportResult.Failure -> {
-                if (result.retryable) {
-                    consecutiveFailures++
-                    if (consecutiveFailures <= maxRetries) {
-                        batch.forEach { buffer.push(it) }
-                        val delayMs = backoffWithJitter(consecutiveFailures)
-                        if (config.verboseTransportLogging) {
-                            platformLog("AppLogger", "Retry #$consecutiveFailures in ${delayMs}ms")
-                        }
-                        delay(delayMs)
-                    } else {
-                        deadLetterQueue.enqueue(batch, result.reason)
-                        if (config.verboseTransportLogging) {
-                            platformLog("AppLogger", "Max retries exhausted, ${batch.size} events moved to DLQ")
-                        }
-                        consecutiveFailures = 0
-                    }
-                }
-                if (config.verboseTransportLogging) {
-                    platformLog("AppLogger", "Transport failed: ${result.reason}")
-                }
+            delay(delayMs)
+        } else {
+            deadLetterQueue.enqueue(batch, result.reason)
+            if (config.verboseTransportLogging) {
+                platformLog("AppLogger", "Max retries exhausted, ${batch.size} events moved to DLQ")
             }
+            consecutiveFailures = 0
         }
     }
 

@@ -8,10 +8,10 @@ Pod::Spec.new do |s|
     with automatic batching, offline buffering, and crash capture.
   DESC
 
-  s.homepage         = 'https://github.com/zuccadev/app-logger'
+  s.homepage         = 'https://github.com/devzucca/appLoggers'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
-  s.author           = { 'ZuccaDev' => 'zuccadev@github.com' }
-  s.source           = { :http => "https://github.com/zuccadev/app-logger/releases/download/#{s.version}/AppLogger.xcframework.zip" }
+  s.author           = { 'DevZucca' => 'devzucca@github.com' }
+  s.source           = { :http => "https://github.com/devzucca/appLoggers/releases/download/v#{s.version}/AppLogger.xcframework.zip" }
 
   s.ios.deployment_target  = '14.0'
   s.tvos.deployment_target = '14.0'

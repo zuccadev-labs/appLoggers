@@ -50,6 +50,7 @@ internal class AndroidDeviceInfoProvider(
         )
     }
 
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     private fun getConnectionType(): String {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: return "none"

@@ -1,9 +1,9 @@
 # AppLogger
 
-[![JitPack](https://jitpack.io/v/TuOrganizacion/app-logger.svg)](https://jitpack.io/#TuOrganizacion/app-logger)
+[![JitPack](https://jitpack.io/v/devzucca/appLoggers.svg)](https://jitpack.io/#devzucca/appLoggers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0+-purple.svg)](https://kotlinlang.org)
-[![API](https://img.shields.io/badge/API-22+-brightgreen.svg)](https://android-arsenal.com/api?level=22)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1+-purple.svg)](https://kotlinlang.org)
+[![API](https://img.shields.io/badge/API-23+-brightgreen.svg)](https://developer.android.com/about/versions/marshmallow)
 
 SDK de telemetría técnica estructurada para Kotlin — Android Mobile · Android TV · JVM.
 
