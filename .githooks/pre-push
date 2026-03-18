@@ -1,71 +1,64 @@
 #!/bin/sh
-# pre-push hook — AppLogger SDK
+# pre-push hook - AppLogger SDK
 #
 # Ejecuta verificaciones locales antes de hacer push a origin.
-# Bloquea el push si alguna verificación falla, evitando que
-# el CI remoto rechace el cambio.
+# Bloquea el push si alguna verificacion falla.
 #
-# Verificaciones que ejecuta:
-#   1. Detekt (lint estático) — replica CI job: lint
-#   2. Tests unitarios JVM    — replica CI job: test
-#
-# Para saltear en casos de emergencia (NO recomendado):
-#   git push --no-verify
-#
+# Para saltear: git push --no-verify
 # Para instalar: git config core.hooksPath .githooks
-# (ya configurado si seguiste la guía de entorno de desarrollo)
 
 set -e
 
-CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 RESET='\033[0m'
 
 SDK_DIR="sdk"
 
-# Verificar que estamos en la raíz del repo
+# On Windows Git Bash (MINGW), JAVA_HOME may not be set in bash env.
+# Use cygpath to convert the Windows JAVA_HOME to a Unix-style path.
+if [ -z "$JAVA_HOME" ]; then
+  WIN_JAVA_HOME=$(cmd.exe /c 'echo %JAVA_HOME%' 2>/dev/null | tr -d '\r\n')
+  if [ -n "$WIN_JAVA_HOME" ]; then
+    export JAVA_HOME="$(cygpath -u "$WIN_JAVA_HOME" 2>/dev/null || echo "$WIN_JAVA_HOME")"
+    export PATH="$JAVA_HOME/bin:$PATH"
+  fi
+fi
+
 if [ ! -d "$SDK_DIR" ]; then
-  echo "${RED}ERROR: No se encontró el directorio sdk/. Ejecuta este hook desde la raíz del repo.${RESET}"
+  echo "${RED}ERROR: ejecuta este hook desde la raiz del repo.${RESET}"
   exit 1
 fi
 
-echo ""
-echo "${CYAN}╔══════════════════════════════════════════════╗${RESET}"
-echo "${CYAN}║   AppLogger — Pre-Push Checks                ║${RESET}"
-echo "${CYAN}╚══════════════════════════════════════════════╝${RESET}"
-echo ""
-
-# ── 1. Detekt ────────────────────────────────────────────────
-echo "${YELLOW}[1/2] Ejecutando Detekt (análisis estático)...${RESET}"
-
-if ! (cd "$SDK_DIR" && sh gradlew detekt --quiet); then
-  echo ""
-  echo "${RED}✖ Detekt falló. Corrige los errores antes de hacer push.${RESET}"
-  echo "${RED}  Para ver el reporte completo:${RESET}"
-  echo "${RED}    cd sdk && ./gradlew detekt${RESET}"
-  exit 1
+# Read ANDROID_HOME from sdk/local.properties if not already set
+if [ -z "$ANDROID_HOME" ] && [ -f "$SDK_DIR/local.properties" ]; then
+  SDK_LOCATION=$(grep '^sdk.dir=' "$SDK_DIR/local.properties" | cut -d'=' -f2- | tr -d '\r')
+  if [ -n "$SDK_LOCATION" ]; then
+    export ANDROID_HOME="$SDK_LOCATION"
+  fi
 fi
 
-echo "${GREEN}✔ Detekt: OK${RESET}"
+echo ""
+echo "${CYAN}AppLogger - Pre-Push Checks${RESET}"
 echo ""
 
-# ── 2. Tests unitarios JVM ───────────────────────────────────
-echo "${YELLOW}[2/2] Ejecutando tests unitarios (JVM)...${RESET}"
-
-if ! (cd "$SDK_DIR" && sh gradlew :logger-core:jvmTest :logger-test:jvmTest --quiet); then
-  echo ""
-  echo "${RED}✖ Tests fallaron. Corrige los tests antes de hacer push.${RESET}"
-  echo "${RED}  Para ver el reporte completo:${RESET}"
-  echo "${RED}    cd sdk && ./gradlew :logger-core:jvmTest :logger-test:jvmTest${RESET}"
+# 1. Detekt
+echo "${YELLOW}[1/2] Detekt (analisis estatico)...${RESET}"
+if ! (cd "$SDK_DIR" && ./gradlew detekt --quiet); then
+  echo "${RED}x Detekt fallo. Corrige los errores antes de hacer push.${RESET}"
   exit 1
 fi
-
-echo "${GREEN}✔ Tests: OK${RESET}"
+echo "${GREEN}OK Detekt: OK${RESET}"
 echo ""
-echo "${GREEN}╔══════════════════════════════════════════════╗${RESET}"
-echo "${GREEN}║   ✔ Todas las verificaciones pasaron         ║${RESET}"
-echo "${GREEN}║   Push permitido.                            ║${RESET}"
-echo "${GREEN}╚══════════════════════════════════════════════╝${RESET}"
+
+# 2. Tests JVM
+echo "${YELLOW}[2/2] Tests unitarios JVM...${RESET}"
+if ! (cd "$SDK_DIR" && ./gradlew :logger-core:jvmTest :logger-test:jvmTest --quiet); then
+  echo "${RED}x Tests fallaron. Corrige antes de hacer push.${RESET}"
+  exit 1
+fi
+echo "${GREEN}OK Tests: OK${RESET}"
+echo "${GREEN}Todas las verificaciones pasaron. Push permitido.${RESET}"
 echo ""
