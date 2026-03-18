@@ -3,6 +3,24 @@ package com.applogger.core.model
 import com.applogger.core.AppLoggerVersion
 import kotlinx.serialization.Serializable
 
+/**
+ * Immutable representation of a single log event or metric.
+ *
+ * Created internally by [com.applogger.core.internal.AppLoggerImpl] and queued
+ * for transport delivery. All fields are serializable for offline buffering.
+ *
+ * @property id         Unique event identifier (UUID v4).
+ * @property timestamp  Unix epoch millis when the event was created.
+ * @property level      Severity level.
+ * @property tag        Short source identifier (e.g. class or screen name).
+ * @property message    Human-readable description.
+ * @property throwableInfo Captured exception info, if any.
+ * @property deviceInfo Device metadata snapshot.
+ * @property sessionId  UUID of the current session.
+ * @property userId     Optional anonymous user identifier.
+ * @property extra      Optional key-value metadata.
+ * @property sdkVersion SDK semver at event creation time.
+ */
 @Serializable
 data class LogEvent(
     val id: String,

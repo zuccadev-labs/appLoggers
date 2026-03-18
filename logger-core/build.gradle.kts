@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
@@ -14,6 +16,9 @@ kotlin {
         publishLibraryVariants("release")
     }
 
+    // XCFramework for SPM / CocoaPods distribution
+    val xcf = XCFramework("AppLogger")
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -22,6 +27,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "AppLogger"
             isStatic = true
+            xcf.add(this)
         }
     }
 
@@ -73,6 +79,7 @@ android {
 
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     compileOptions {

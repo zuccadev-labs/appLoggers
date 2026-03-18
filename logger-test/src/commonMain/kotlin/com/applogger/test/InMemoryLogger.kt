@@ -4,7 +4,16 @@ import com.applogger.core.AppLogger
 import com.applogger.core.model.LogLevel
 
 /**
- * Logger que guarda en memoria todos los eventos para hacer assertions en tests.
+ * In-memory [AppLogger] that records every event for test assertions.
+ *
+ * Provides convenience counters ([debugCount], [errorCount], etc.) and
+ * assertion helpers ([assertLogged], [assertNotLogged]).
+ *
+ * ```kotlin
+ * val logger = InMemoryLogger()
+ * sut.doWork(logger)
+ * logger.assertLogged(LogLevel.ERROR, tag = "Network")
+ * ```
  */
 class InMemoryLogger : AppLogger {
 

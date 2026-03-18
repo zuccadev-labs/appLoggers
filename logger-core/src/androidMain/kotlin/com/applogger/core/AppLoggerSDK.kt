@@ -7,8 +7,24 @@ import kotlin.concurrent.Volatile
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Entry point público del SDK para Android.
- * Singleton thread-safe con inicialización idempotente.
+ * Android entry point for the AppLogger SDK.
+ *
+ * Thread-safe singleton with idempotent initialization. Delegates all calls
+ * to [com.applogger.core.internal.AppLoggerImpl] once [initialize] succeeds;
+ * before that, all calls are no-ops.
+ *
+ * ## Quick start
+ * ```kotlin
+ * // In Application.onCreate()
+ * val transport = SupabaseTransport(url, key)
+ * AppLoggerSDK.initialize(this, config, transport)
+ *
+ * // Anywhere in the app
+ * AppLoggerSDK.info("Cart", "Item added", mapOf("sku" to "A123"))
+ * ```
+ *
+ * @see AppLoggerConfig for configuration options.
+ * @see com.applogger.transport.supabase.SupabaseTransport for the Supabase transport.
  */
 object AppLoggerSDK : AppLogger {
 
@@ -20,8 +36,12 @@ object AppLoggerSDK : AppLogger {
     private var implRef: AppLoggerImpl? = null
 
     /**
-     * Inicializa el SDK. Debe llamarse exactamente una vez, en Application.onCreate().
-     * Llamadas subsiguientes son ignoradas (idempotente).
+     * Initializes the SDK. Must be called exactly once, in `Application.onCreate()`.
+     * Subsequent calls are silently ignored (idempotent).
+     *
+     * @param context   Android [Context]; the application context will be extracted.
+     * @param config    SDK configuration built via [AppLoggerConfig.Builder].
+     * @param transport Optional [LogTransport]; defaults to no-op if omitted.
      */
     fun initialize(
         context: Context,
@@ -62,6 +82,12 @@ object AppLoggerSDK : AppLogger {
         instance = impl
         implRef = impl
 
+        // Wire up health check API
+        AppLoggerHealth.processor = processor
+        AppLoggerHealth.transport = resolvedTransport
+        AppLoggerHealth.buffer = buffer
+        AppLoggerHealth.initialized = true
+
         if (!resolvedConfig.isDebugMode) {
             val crashHandler = AndroidCrashHandler(impl)
             crashHandler.install()
@@ -101,9 +127,7 @@ object AppLoggerSDK : AppLogger {
     }
 }
 
-/**
- * Transporte vacío para modo debug o cuando no se configura backend.
- */
+/** No-op transport used when no backend is configured. */
 internal class NoOpTransport : LogTransport {
     override suspend fun send(events: List<com.applogger.core.model.LogEvent>): TransportResult =
         TransportResult.Success

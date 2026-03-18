@@ -4,7 +4,19 @@ import com.applogger.core.internal.*
 import com.applogger.core.model.LogEvent
 
 /**
- * Entry point público del SDK para iOS. Expuesto a Swift vía KMP framework.
+ * iOS entry point for the AppLogger SDK, exported to Swift via KMP framework.
+ *
+ * Access via the [shared] singleton. Thread-safe after [initialize].
+ *
+ * ## Swift usage
+ * ```swift
+ * let transport = SupabaseTransport(endpoint: url, apiKey: key)
+ * AppLoggerIos.shared.initialize(config: config, transport: transport)
+ *
+ * AppLoggerIos.shared.info(tag: "Cart", message: "Item added", extra: nil)
+ * ```
+ *
+ * @see AppLoggerConfig for configuration options.
  */
 class AppLoggerIos private constructor() : AppLogger {
 
@@ -48,6 +60,11 @@ class AppLoggerIos private constructor() : AppLogger {
 
         instance = impl
         implRef = impl
+
+        AppLoggerHealth.processor = processor
+        AppLoggerHealth.transport = resolvedTransport
+        AppLoggerHealth.buffer = buffer
+        AppLoggerHealth.initialized = true
 
         if (!config.isDebugMode) {
             IosCrashHandler(impl).install()

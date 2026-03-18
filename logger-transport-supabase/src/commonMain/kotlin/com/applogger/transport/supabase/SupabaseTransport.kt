@@ -14,14 +14,42 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Transporte a Supabase (PostgreSQL) via REST API.
- * Usa Ktor client KMP para ser multiplataforma.
+ * [LogTransport] implementation that delivers events to Supabase (PostgreSQL)
+ * via the PostgREST API.
+ *
+ * Events are partitioned internally:
+ * - Regular logs → `app_logs` table.
+ * - [com.applogger.core.model.LogLevel.METRIC] events → `app_metrics` table.
+ *
+ * Uses a Ktor [HttpClient] for multiplatform HTTP.
+ *
+ * ## Certificate pinning
+ * Pass a pre-configured [HttpClient] with engine-level TLS pinning:
+ * ```kotlin
+ * val pinned = HttpClient(OkHttp) {
+ *     engine {
+ *         config {
+ *             certificatePinner(CertificatePinner.Builder()
+ *                 .add("*.supabase.co", "sha256/AAAA...")
+ *                 .build())
+ *         }
+ *     }
+ * }
+ * SupabaseTransport(url, key, httpClient = pinned)
+ * ```
+ *
+ * @param endpoint          Supabase project URL (e.g. `https://xyz.supabase.co`).
+ * @param apiKey            Supabase anon key.
+ * @param tableName         Target table for log events (default: `"app_logs"`).
+ * @param metricsTableName  Target table for metric events (default: `"app_metrics"`).
+ * @param httpClient        Optional pre-configured [HttpClient] (e.g. with cert pinning).
  */
 class SupabaseTransport(
     private val endpoint: String,
     private val apiKey: String,
     private val tableName: String = "app_logs",
-    private val metricsTableName: String = "app_metrics"
+    private val metricsTableName: String = "app_metrics",
+    httpClient: HttpClient? = null
 ) : LogTransport {
 
     private val json = Json {
@@ -29,7 +57,7 @@ class SupabaseTransport(
         ignoreUnknownKeys = true
     }
 
-    private val client = HttpClient {
+    private val client = httpClient ?: HttpClient {
         install(ContentNegotiation) {
             json(this@SupabaseTransport.json)
         }

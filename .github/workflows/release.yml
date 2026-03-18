@@ -21,6 +21,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Override local JDK path for CI
+        run: sed -i '/org.gradle.java.home/d' gradle.properties
+
       - name: Run All Tests
         run: ./gradlew check
 
@@ -50,11 +53,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Override local JDK path for CI
+        run: sed -i '/org.gradle.java.home/d' gradle.properties
+
       - name: Publish to GitHub Packages
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew publish
+
+      - name: Generate API Documentation
+        run: ./gradlew dokkaHtmlMultiModule
+
+      - name: Upload API Docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: build/dokka/htmlMultiModule/
+          retention-days: 90
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1

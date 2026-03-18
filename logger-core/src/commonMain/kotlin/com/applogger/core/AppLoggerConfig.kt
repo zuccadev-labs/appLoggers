@@ -1,7 +1,33 @@
 package com.applogger.core
 
 /**
- * Configuración del SDK. Inmutable tras creación.
+ * Immutable configuration for the AppLogger SDK.
+ *
+ * Created via [Builder]. Values are validated and coerced to safe ranges:
+ * - [batchSize]: 1–100 (default 20)
+ * - [flushIntervalSeconds]: 5–300 (default 30)
+ * - [maxStackTraceLines]: 1–100 (default 50)
+ *
+ * In production mode ([isDebugMode] = false), [endpoint] must use HTTPS.
+ *
+ * ## Example
+ * ```kotlin
+ * val config = AppLoggerConfig.Builder()
+ *     .endpoint("https://xyz.supabase.co")
+ *     .apiKey("eyJ...")
+ *     .batchSize(10)
+ *     .build()
+ * ```
+ *
+ * @property endpoint     Supabase project URL (HTTPS required in production).
+ * @property apiKey       Supabase anon key for authentication.
+ * @property isDebugMode  Enables debug logging and relaxes HTTPS requirement.
+ * @property consoleOutput Prints events to logcat/console when true.
+ * @property batchSize    Number of events per transport batch (1–100).
+ * @property flushIntervalSeconds Seconds between periodic flushes (5–300).
+ * @property maxStackTraceLines Maximum stack trace lines per event (1–100).
+ * @property flushOnlyWhenIdle Delays flush until the app is idle (Android TV optimization).
+ * @property verboseTransportLogging Logs transport-level debug info when true.
  */
 data class AppLoggerConfig(
     val endpoint: String,

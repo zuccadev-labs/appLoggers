@@ -3,13 +3,20 @@ package com.applogger.core
 import com.applogger.core.model.DeviceInfo
 
 /**
- * Provee metadatos técnicos del dispositivo.
+ * Provides technical device metadata attached to every [com.applogger.core.model.LogEvent].
  *
- * Contrato de privacidad:
- * - NUNCA incluir PII: nombre, email, número de teléfono, IMEI, Android ID.
- * - NUNCA incluir ubicación GPS.
- * - Solo metadatos técnicos: modelo, SO, versión de app, tipo de conexión.
+ * **Privacy contract (GDPR / CCPA / LGPD compliant):**
+ * - NEVER include PII: name, email, phone number, IMEI, Android ID.
+ * - NEVER include GPS location.
+ * - Only technical metadata: model, OS, app version, connection type.
+ *
+ * @see com.applogger.core.model.DeviceInfo for the data model.
  */
 interface DeviceInfoProvider {
+
+    /**
+     * Returns an immutable snapshot of the current device information.
+     * Called once during SDK initialization.
+     */
     fun get(): DeviceInfo
 }

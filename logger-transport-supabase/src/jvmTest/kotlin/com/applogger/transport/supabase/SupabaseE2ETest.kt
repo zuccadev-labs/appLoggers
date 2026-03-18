@@ -38,7 +38,7 @@ class SupabaseE2ETest {
         private val anonKey = System.getenv("APPLOGGER_SUPABASE_ANON_KEY") ?: ""
         private val serviceKey = System.getenv("APPLOGGER_SUPABASE_SERVICE_KEY") ?: ""
 
-        private val testSessionId = "e2e-test-${System.currentTimeMillis()}"
+        private val testSessionId = java.util.UUID.randomUUID().toString()
 
         private val testDeviceInfo = DeviceInfo(
             brand = "E2E-Test", model = "CI-Runner", osVersion = "test",

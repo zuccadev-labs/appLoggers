@@ -10,6 +10,8 @@ lifecycle         = "2.8.7"
 junit5            = "5.11.4"
 mockk             = "1.13.13"
 turbine           = "1.2.0"
+detekt            = "1.23.7"
+dokka             = "1.9.20"
 
 minSdk            = "23"
 targetSdk         = "35"
@@ -48,4 +50,6 @@ kotlin-android        = { id = "org.jetbrains.kotlin.android",             versi
 kotlin-serialization  = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 android-library       = { id = "com.android.library",                      version.ref = "agp" }
 sqldelight            = { id = "app.cash.sqldelight",                      version.ref = "sqldelight" }
+detekt                = { id = "io.gitlab.arturbosch.detekt",              version.ref = "detekt" }
+dokka                 = { id = "org.jetbrains.dokka",                       version.ref = "dokka" }
 maven-publish         = { id = "maven-publish" }

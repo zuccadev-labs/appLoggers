@@ -3,8 +3,10 @@ package com.applogger.test
 import com.applogger.core.AppLogger
 
 /**
- * Logger que descarta todos los eventos. Útil para tests donde
- * el logger es un parámetro requerido pero no es el foco del test.
+ * [AppLogger] that silently discards all events.
+ *
+ * Use this in tests where a logger is a required dependency but is not
+ * the subject under test.
  */
 class NoOpTestLogger : AppLogger {
     override fun debug(tag: String, message: String, extra: Map<String, Any>?) = Unit

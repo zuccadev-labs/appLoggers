@@ -5,7 +5,11 @@ import com.applogger.core.TransportResult
 import com.applogger.core.model.LogEvent
 
 /**
- * Mock de transporte con control total para tests.
+ * Configurable fake [LogTransport] for unit testing transport behavior.
+ *
+ * @param shouldSucceed  If `true`, [send] returns [TransportResult.Success].
+ * @param retryable      Included in [TransportResult.Failure] when `shouldSucceed` is `false`.
+ * @param throwException If `true`, [send] throws a [RuntimeException] instead of returning a result.
  */
 class FakeTransport(
     private val shouldSucceed: Boolean = true,

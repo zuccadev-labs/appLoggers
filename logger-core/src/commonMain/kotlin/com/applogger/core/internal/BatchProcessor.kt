@@ -5,21 +5,29 @@ import com.applogger.core.model.LogEvent
 import com.applogger.core.model.LogLevel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlin.math.min
+import kotlin.random.Random
 
 /**
- * Corazón del pipeline: acumula eventos y los envía en batches.
+ * Core pipeline: buffers events and delivers them in batches with
+ * exponential backoff + jitter on transport failure.
  */
 internal class BatchProcessor(
     private val buffer: LogBuffer,
     private val transport: LogTransport,
     private val formatter: LogFormatter,
-    private val config: AppLoggerConfig
+    private val config: AppLoggerConfig,
+    private val maxRetries: Int = 5,
+    private val baseDelayMs: Long = 1_000L,
+    private val maxDelayMs: Long = 30_000L
 ) {
     private val scope = CoroutineScope(
         Dispatchers.Default + SupervisorJob() + CoroutineName("AppLogger-Processor")
     )
 
     private val eventChannel = Channel<LogEvent>(capacity = Channel.BUFFERED)
+    private var consecutiveFailures = 0
+    internal val deadLetterQueue = DeadLetterQueue()
 
     init {
         scope.launch { startConsuming() }
@@ -56,7 +64,6 @@ internal class BatchProcessor(
         if (batch.isEmpty()) return
 
         if (!transport.isAvailable()) {
-            // Sin red — reinsertar en el buffer
             batch.forEach { buffer.push(it) }
             return
         }
@@ -65,17 +72,39 @@ internal class BatchProcessor(
             .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
 
         when (result) {
-            is TransportResult.Success -> { /* batch enviado correctamente */ }
+            is TransportResult.Success -> {
+                consecutiveFailures = 0
+            }
             is TransportResult.Failure -> {
                 if (result.retryable) {
-                    // Reinsertar en buffer para reenvío posterior
-                    batch.forEach { buffer.push(it) }
+                    consecutiveFailures++
+                    if (consecutiveFailures <= maxRetries) {
+                        batch.forEach { buffer.push(it) }
+                        val delayMs = backoffWithJitter(consecutiveFailures)
+                        if (config.verboseTransportLogging) {
+                            platformLog("AppLogger", "Retry #$consecutiveFailures in ${delayMs}ms")
+                        }
+                        delay(delayMs)
+                    } else {
+                        deadLetterQueue.enqueue(batch, result.reason)
+                        if (config.verboseTransportLogging) {
+                            platformLog("AppLogger", "Max retries exhausted, ${batch.size} events moved to DLQ")
+                        }
+                        consecutiveFailures = 0
+                    }
                 }
                 if (config.verboseTransportLogging) {
                     platformLog("AppLogger", "Transport failed: ${result.reason}")
                 }
             }
         }
+    }
+
+    /** Exponential backoff with full jitter: random(0, min(cap, base * 2^attempt)). */
+    private fun backoffWithJitter(attempt: Int): Long {
+        val exponential = baseDelayMs * (1L shl min(attempt, 20))
+        val capped = min(exponential, maxDelayMs)
+        return Random.nextLong(capped / 2, capped)
     }
 
     fun flush() {

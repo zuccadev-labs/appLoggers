@@ -3,15 +3,29 @@ package com.applogger.core
 import com.applogger.core.model.LogEvent
 
 /**
- * Decide si un LogEvent debe ser procesado o descartado.
- * Los filtros son componibles mediante [ChainedLogFilter].
+ * Decides whether a [LogEvent] should be processed or discarded.
+ *
+ * Filters are composable via [ChainedLogFilter].
+ *
+ * Implement this to add custom filtering logic (e.g. tag-based, sampling).
+ *
+ * @see com.applogger.core.internal.RateLimitFilter for the built-in rate limiter.
+ * @see ChainedLogFilter for composing multiple filters.
  */
 interface LogFilter {
+
+    /**
+     * @param event The candidate event.
+     * @return `true` to process the event, `false` to discard it.
+     */
     fun passes(event: LogEvent): Boolean
 }
 
 /**
- * Compone múltiples filtros: un evento pasa solo si pasa TODOS los filtros.
+ * Composes multiple [LogFilter]s with AND logic: an event passes only
+ * if **all** filters return `true`.
+ *
+ * @property filters Ordered list of filters to apply.
  */
 class ChainedLogFilter(private val filters: List<LogFilter>) : LogFilter {
     override fun passes(event: LogEvent): Boolean =
