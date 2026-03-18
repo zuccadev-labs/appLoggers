@@ -1,10 +1,31 @@
 # AppLoggers
 
-Monorepo de herramientas de telemetría técnica — SDK · Frontend · CLI.
+Monorepo de telemetría técnica — **SDK** · Frontend · CLI.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/devzucca/appLoggers/actions/workflows/ci.yml/badge.svg)](https://github.com/devzucca/appLoggers/actions/workflows/ci.yml)
+[![JitPack](https://jitpack.io/v/devzucca/appLoggers.svg)](https://jitpack.io/#devzucca/appLoggers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1+-purple.svg)](https://kotlinlang.org)
-[![API](https://img.shields.io/badge/API-23+-brightgreen.svg)](https://android-arsenal.com/api?level=23)
+[![API](https://img.shields.io/badge/Android_API-23+-brightgreen.svg)](https://developer.android.com/about/versions/marshmallow)
+
+---
+
+## Índice
+
+- [Estructura del Repositorio](#estructura-del-repositorio)
+- [Características](#características)
+- [⚙️ Configuración del Entorno](#️-configuración-del-entorno)
+- [Instalación](#instalación)
+- [Inicio Rápido](#inicio-rápido)
+- [Backend — Supabase Setup](#backend--supabase-setup)
+- [CI/CD — Automatización](#cicd--automatización)
+- [Flujo de Ramas (Branching)](#flujo-de-ramas-branching)
+- [Testing](#testing)
+- [Publicar el SDK](#publicar-el-sdk)
+- [Documentación](#documentación)
+- [Plataformas Soportadas](#plataformas-soportadas)
+- [Dependencias](#dependencias)
+- [Licencia](#licencia)
 
 ---
 
@@ -13,33 +34,25 @@ Monorepo de herramientas de telemetría técnica — SDK · Frontend · CLI.
 ```
 appLoggers/
 ├── sdk/                            ← SDK Kotlin Multiplatform (Android · iOS · JVM)
-│   ├── logger-core/                ← Módulo KMP principal
+│   ├── logger-core/                ← Módulo principal
 │   ├── logger-transport-supabase/  ← Transporte a Supabase
 │   ├── logger-test/                ← Utilidades de testing
 │   ├── sample/                     ← App Android de ejemplo
-│   ├── scripts/                    ← Scripts de publicación y migraciones
-│   ├── build.gradle.kts            ← Build raíz del SDK
-│   └── gradlew / gradlew.bat      ← Gradle wrapper
+│   └── build.gradle.kts            ← Build raíz del SDK
 ├── docs/
 │   ├── ES/                         ← Documentación en español
 │   │   ├── desarrollo/             ← Guías de integración
 │   │   ├── paquete/                ← Arquitectura, testing, publicación
 │   │   └── migraciones/            ← Scripts SQL para Supabase/PostgreSQL
 │   └── EN/                         ← (Próximamente) Documentación en inglés
-├── .github/workflows/              ← CI/CD (test en PRs, release en tags)
+├── .github/workflows/              ← CI/CD (lint · test · e2e · security · release)
 ├── frontend/                       ← (Próximamente) Dashboard de monitoreo
 └── cli/                            ← (Próximamente) Herramienta de línea de comandos
 ```
 
 ---
 
-## SDK — AppLogger
-
-SDK de telemetría técnica estructurada para Kotlin Multiplatform — Android Mobile · Android TV · iOS · JVM.
-
-Captura errores, crashes y métricas de performance de forma segura, sin impactar la UI ni comprometer la privacidad de los usuarios.
-
-### Características
+## Características
 
 - **Kotlin Multiplatform** — un codebase para Android, iOS y JVM
 - **Trait-based architecture** — interfaces intercambiables, Clean Code, SOLID
@@ -52,9 +65,99 @@ Captura errores, crashes y métricas de performance de forma segura, sin impacta
 
 ---
 
+## ⚙️ Configuración del Entorno
+
+> **Esta sección es obligatoria antes de compilar o contribuir al proyecto.**
+
+### Prerrequisitos
+
+| Herramienta | Versión mínima | Verificar con |
+|---|---|---|
+| JDK | 17 (Temurin recomendado) | `java -version` |
+| Android SDK | API 35 (compileSdk) | Android Studio → SDK Manager |
+| Gradle | 8.10.2 (usa el wrapper) | `cd sdk && ./gradlew --version` |
+| Git | 2.30+ | `git --version` |
+
+### Paso 1 — Clonar el repositorio
+
+```bash
+git clone https://github.com/devzucca/appLoggers.git
+cd appLoggers
+```
+
+### Paso 2 — Crear `local.properties`
+
+El archivo `local.properties` contiene configuración local y **secrets** que nunca deben commitearse.  
+Un template está incluido en el repositorio:
+
+```bash
+cp local.properties.example local.properties
+```
+
+Luego abrí `local.properties` y completá los valores:
+
+```properties
+# ── Android SDK ──────────────────────────────────────────────────────────
+# Android Studio lo configura automáticamente.
+# Solo modificar si tu SDK está en una ruta custom.
+sdk.dir=C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
+
+# ── Supabase (backend de logs) ──────────────────────────────────────────
+# Obtener de: https://supabase.com/dashboard → Settings → API
+appLogger.url=https://TU-PROYECTO.supabase.co
+appLogger.anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# ── Modo Debug ──────────────────────────────────────────────────────────
+# true  → logs en Logcat + envío al backend (desarrollo)
+# false → solo envío al backend, sin output local (producción)
+appLogger.debug=true
+```
+
+| Variable | Obligatoria | Dónde obtenerla |
+|---|:---:|---|
+| `sdk.dir` | ✅ | Android Studio lo autocompleta, o ver `ANDROID_HOME` |
+| `appLogger.url` | ✅ | [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API → Project URL |
+| `appLogger.anonKey` | ✅ | Supabase Dashboard → Settings → API → `anon` `public` key |
+| `appLogger.debug` | ❌ | `true` para desarrollo, `false` para producción (default: `false`) |
+
+> ⚠️ **`local.properties` está en `.gitignore`** — nunca se sube al repositorio.  
+> Si clonás el repo y no existe, copiá desde `local.properties.example`.
+
+### Paso 3 — Compilar y verificar
+
+```bash
+cd sdk
+./gradlew check      # Lint (Detekt) + Tests unitarios
+./gradlew assemble   # Compilar todos los módulos
+```
+
+### Mapear secrets a BuildConfig (para apps Android)
+
+Si usás el SDK en tu propia app, mapeá las variables de `local.properties` a `BuildConfig`:
+
+```kotlin
+// app/build.gradle.kts
+import java.util.Properties
+
+android {
+    buildFeatures { buildConfig = true }
+    defaultConfig {
+        val props = Properties().apply {
+            val file = rootProject.file("local.properties")
+            if (file.exists()) load(file.inputStream())
+        }
+        buildConfigField("String",  "LOGGER_URL",  "\"${props["appLogger.url"] ?: ""}\"")
+        buildConfigField("String",  "LOGGER_KEY",  "\"${props["appLogger.anonKey"] ?: ""}\"")
+        buildConfigField("Boolean", "LOGGER_DEBUG", "${props["appLogger.debug"] ?: false}")
+    }
+}
+```
+
+---
+
 ## Instalación
 
-### Opción 1: JitPack (recomendado para comenzar)
+### Opción 1: JitPack (recomendado)
 
 ```kotlin
 // settings.gradle.kts
@@ -69,13 +172,13 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.devzucca.appLoggers:logger-core:0.1.0-alpha.1")
+    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")
 
-    // Transporte Supabase (opcional — usar si tu backend es Supabase)
-    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:0.1.0-alpha.1")
+    // Transporte Supabase (opcional — si tu backend es Supabase)
+    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:v0.1.0-alpha.1")
 
     // Utilidades de testing (solo para tests)
-    testImplementation("com.github.devzucca.appLoggers:logger-test:0.1.0-alpha.1")
+    testImplementation("com.github.devzucca.appLoggers:logger-test:v0.1.0-alpha.1")
 }
 ```
 
@@ -104,14 +207,11 @@ dependencies {
 
 ### iOS (Swift Package Manager)
 
-El módulo `logger-core` genera un XCFramework (`AppLogger.framework`) que se puede distribuir vía:
-- GitHub Releases (descargar el .xcframework del release)
-- Repositorio SPM dedicado
+`logger-core` genera un XCFramework (`AppLogger.framework`) distribuible vía GitHub Releases o repositorio SPM.
 
 ```swift
 import AppLogger
 
-// Inicialización en Swift
 AppLoggerIos.shared.initialize(
     config: AppLoggerConfig.Builder()
         .endpoint(endpoint: "https://tu-proyecto.supabase.co")
@@ -124,7 +224,7 @@ AppLoggerIos.shared.initialize(
 ### Permisos Android
 
 ```xml
-<!-- AndroidManifest.xml — ya incluidos en el SDK, solo verificar merge -->
+<!-- Ya incluidos en el SDK — solo verificar que el manifest merge funcione -->
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 ```
@@ -176,10 +276,8 @@ AppLoggerSDK.debug("TAG", "Solo visible en debug")
 ```swift
 import AppLogger
 
-// En tu AppDelegate o @main struct
 AppLoggerIos.shared.initialize(config: ...)
 
-// Uso
 AppLoggerIos.shared.error(tag: "PLAYER", message: "Playback failed")
 AppLoggerIos.shared.metric(name: "buffer_time", value: 420.0, unit: "ms")
 ```
@@ -212,105 +310,100 @@ okHttpClient.newWebSocket(request, loggingListener)
 
 ---
 
-## Configuración
-
-```properties
-# local.properties (NO commitear)
-appLogger.url=https://tu-proyecto.supabase.co
-appLogger.anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-appLogger.debug=true
-appLogger.logToConsole=true
-appLogger.batchSize=20
-appLogger.flushIntervalSeconds=30
-appLogger.maxStackTraceLines=50
-appLogger.lowStorageMode=false
-```
-
-### Mapear a BuildConfig
-
-```kotlin
-// app/build.gradle.kts
-import java.util.Properties
-
-android {
-    buildFeatures { buildConfig = true }
-    defaultConfig {
-        val props = Properties().apply {
-            val file = rootProject.file("local.properties")
-            if (file.exists()) load(file.inputStream())
-        }
-        buildConfigField("String",  "LOGGER_URL",  "\"${props["appLogger.url"] ?: ""}\"")
-        buildConfigField("String",  "LOGGER_KEY",  "\"${props["appLogger.anonKey"] ?: ""}\"")
-        buildConfigField("Boolean", "LOGGER_DEBUG", "${props["appLogger.debug"] ?: false}")
-    }
-}
-```
-
----
-
 ## Backend — Supabase Setup
 
-1. Crea un proyecto en [supabase.com](https://supabase.com)
-2. Ejecuta las migraciones SQL en orden:
+1. Creá un proyecto en [supabase.com](https://supabase.com)
+2. Ejecutá las migraciones SQL en orden desde el **SQL Editor**:
 
-```bash
-# En el SQL Editor de Supabase, ejecutar en orden:
-# Los archivos están en docs/ES/migraciones/
-docs/ES/migraciones/001_create_app_logs.sql
-docs/ES/migraciones/002_create_app_metrics.sql
-docs/ES/migraciones/003_create_indexes.sql
-docs/ES/migraciones/004_rls_policies.sql
-docs/ES/migraciones/005_retention_policy.sql
-```
+| Orden | Archivo | Descripción |
+|:---:|---|---|
+| 1 | `docs/ES/migraciones/001_create_app_logs.sql` | Tabla principal de logs |
+| 2 | `docs/ES/migraciones/002_create_app_metrics.sql` | Tabla de métricas |
+| 3 | `docs/ES/migraciones/003_create_indexes.sql` | Índices de performance |
+| 4 | `docs/ES/migraciones/004_rls_policies.sql` | Políticas de seguridad (RLS) |
+| 5 | `docs/ES/migraciones/005_retention_policy.sql` | Retención automática de datos |
 
-3. Copia la **URL del proyecto** y la **anon key** a tu `local.properties`
+3. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`
 
 ---
 
-## Publicar el SDK
+## CI/CD — Automatización
 
-### Paso 1: Crear un release tag
+El proyecto tiene automatización completa. **Cada push ejecuta el pipeline automáticamente.**
 
-```bash
-git tag -a v0.1.0-alpha.1 -m "Release 0.1.0-alpha.1"
-git push origin v0.1.0-alpha.1
+### ¿Qué pasa cuando hago `git push`?
+
+| Evento | Pipeline | Jobs que se ejecutan |
+|---|---|---|
+| **Push a `main`** | CI completo | `lint` → `test` → `e2e` → `security` |
+| **Push a `develop`** | CI sin E2E | `lint` → `test` → `security` |
+| **Pull Request** | CI sin E2E | `lint` → `test` → `security` |
+| **Push tag `v*`** | Release | `test` → `publish` → GitHub Release |
+
+### Detalle de cada job
+
+| Job | Qué hace | Duración aprox. |
+|---|---|---|
+| **lint** | Detekt — análisis estático de código | ~2 min |
+| **test** | Tests unitarios + cobertura (JaCoCo + Codecov) + build | ~5 min |
+| **e2e** | Tests de integración contra Supabase real | ~3 min |
+| **security** | CodeQL + análisis de dependencias | ~4 min |
+| **publish** | Publica a GitHub Packages + genera Dokka docs + crea Release | ~5 min |
+
+### GitHub Secrets requeridos
+
+Para que el pipeline funcione al 100%, configurá estos secrets en **GitHub → Settings → Secrets and variables → Actions**:
+
+| Secret | Requerido por | Dónde obtenerlo |
+|---|---|---|
+| `APPLOGGER_SUPABASE_URL` | Job `e2e` | Supabase Dashboard → Settings → API → Project URL |
+| `APPLOGGER_SUPABASE_ANON_KEY` | Job `e2e` | Supabase Dashboard → Settings → API → `anon` `public` key |
+| `APPLOGGER_SUPABASE_SERVICE_KEY` | Job `e2e` | Supabase Dashboard → Settings → API → `service_role` key |
+| `CODECOV_TOKEN` | Job `test` (opcional) | [codecov.io](https://codecov.io) → Settings → Token |
+
+> Si los secrets de Supabase no están configurados, los jobs `lint`, `test` y `security` pasan normalmente — solo `e2e` fallará.
+
+---
+
+## Flujo de Ramas (Branching)
+
+```
+main          ← Código estable. Releases se tagean desde acá.
+  └── develop ← Desarrollo activo. CI corre en cada push.
+       ├── feature/nueva-funcionalidad
+       ├── fix/corregir-bug
+       └── docs/mejorar-readme
 ```
 
-### Paso 2: JitPack (automático)
+| Rama | Propósito | Push directo | CI |
+|---|---|:---:|---|
+| `main` | Producción / releases | ❌ Solo vía PR desde `develop` | Completo (lint + test + e2e + security) |
+| `develop` | Desarrollo activo | ✅ | lint + test + security |
+| `feature/*` | Nuevas funcionalidades | ✅ | CI al abrir PR contra `develop` |
+| `fix/*` | Correcciones | ✅ | CI al abrir PR contra `develop` |
 
-1. Ve a [jitpack.io](https://jitpack.io)
-2. Busca `devzucca/appLoggers`
-3. Haz clic en **Get it** junto al tag `v0.1.0-alpha.1`
-4. JitPack construye el artefacto automáticamente
-
-### Paso 3: GitHub Packages (CI/CD)
-
-El workflow `.github/workflows/release.yml` publica automáticamente al crear un tag `v*`:
+### Flujo de release
 
 ```bash
-git tag -a v0.1.0-alpha.1 -m "Release 0.1.0-alpha.1"
-git push origin v0.1.0-alpha.1
-# → GitHub Actions ejecuta tests + publica a GitHub Packages
-```
+# 1. Trabajo diario en develop
+git checkout develop
+git push origin develop          # → CI: lint + test + security
 
-### Paso 4: Maven Central (cuando esté estable)
+# 2. Cuando develop esté estable → PR a main
+# GitHub → New Pull Request → develop → main
 
-```bash
-# Requiere cuenta en Sonatype + claves GPG
-export OSSRH_USERNAME="tu-usuario"
-export OSSRH_PASSWORD="tu-password"
-export GPG_SIGNING_KEY="tu-clave-gpg"
-export GPG_SIGNING_PASSWD="tu-passphrase"
-
-cd sdk
-./gradlew publish
+# 3. Después del merge → crear tag para release
+git checkout main
+git pull
+git tag -a v0.2.0 -m "Release 0.2.0"
+git push origin v0.2.0          # → Release pipeline: test + publish + GitHub Release
 ```
 
 ---
 
 ## Testing
 
-El módulo `logger-test` provee utilidades para testeo sin red ni dispositivo real.
+El módulo `logger-test` provee utilidades para testing sin red ni dispositivo real.
 
 ```kotlin
 // Verificar que un componente loguea correctamente
@@ -318,11 +411,10 @@ val logger = InMemoryLogger()
 myComponent.doSomething()
 assertEquals(1, logger.errorCount)
 logger.assertLogged(LogLevel.ERROR, tag = "PAYMENT")
-logger.assertNotLogged(LogLevel.DEBUG) // debug no se envía en producción
+logger.assertNotLogged(LogLevel.DEBUG)
 
 // FakeTransport para verificar envíos al backend
 val transport = FakeTransport(shouldSucceed = true)
-// ... usar transport en configuración de tests ...
 assertEquals(3, transport.sentEvents.size)
 
 // Simular fallo de red
@@ -335,19 +427,43 @@ val logger = NoOpTestLogger()
 ### Correr tests
 
 ```bash
-# Desde la raíz del repo
 cd sdk
 
 # Tests unitarios (sin red ni dispositivo)
 ./gradlew check
 
-# Solo tests de integración (requiere Supabase staging)
-./gradlew jvmTest -Pintegration \
-  -PSUPABASE_STAGING_URL="https://staging.supabase.co" \
-  -PSUPABASE_STAGING_ANON_KEY="eyJ..."
+# Solo E2E (requiere Supabase configurado en local.properties o env vars)
+./gradlew :logger-transport-supabase:jvmTest
 ```
 
-Ver documentación completa de testing en [docs/ES/paquete/testing.md](docs/ES/paquete/testing.md).
+Ver documentación completa en [docs/ES/paquete/testing.md](docs/ES/paquete/testing.md).
+
+---
+
+## Publicar el SDK
+
+### JitPack (automático con tags)
+
+JitPack construye automáticamente cuando se crea un tag o cuando alguien solicita el artefacto:
+
+```kotlin
+// Usar en cualquier proyecto
+implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")
+```
+
+### GitHub Packages (CI/CD)
+
+El workflow `release.yml` publica automáticamente al crear un tag `v*`:
+
+```bash
+git tag -a v0.1.0-alpha.1 -m "Release 0.1.0-alpha.1"
+git push origin v0.1.0-alpha.1
+# → GitHub Actions: tests + publish + GitHub Release
+```
+
+### Maven Central (futuro)
+
+Cuando el SDK esté estable, se publicará a Maven Central para distribución sin repositorios custom.
 
 ---
 
@@ -362,18 +478,22 @@ Ver documentación completa de testing en [docs/ES/paquete/testing.md](docs/ES/p
 | [Testing](docs/ES/paquete/testing.md) | Estrategia de tests, FakeTransport |
 | [Publicación](docs/ES/paquete/publishing.md) | JitPack, GitHub Packages, Maven Central |
 | [Contribuir](docs/ES/paquete/CONTRIBUTING.md) | Guía para contribuir al proyecto |
-| [Changelog](docs/ES/paquete/CHANGELOG.md) | Historial de versiones |
+| [Changelog](CHANGELOG.md) | Historial de versiones |
+
+---
 
 ## Plataformas Soportadas
 
-| Plataforma | Mínimo | Compilación KMP | Estado |
+| Plataforma | Mínimo | Target KMP | Estado |
 |---|---|---|---|
-| Android Mobile | API 23 (6.0) | `androidMain` | ✅ Soportado |
-| Android TV | API 23 (6.0) | `androidMain` | ✅ Soportado |
-| iOS | iOS 15 | `iosMain` → XCFramework | ✅ Soportado |
-| JVM | JDK 11 | `jvmMain` | ✅ Soportado |
+| Android Mobile | API 23 (6.0) | `androidMain` | ✅ |
+| Android TV | API 23 (6.0) | `androidMain` | ✅ |
+| iOS | iOS 15+ | `iosMain` → XCFramework | ✅ |
+| JVM | JDK 11+ | `jvmMain` | ✅ |
 
-## Versiones de Dependencias
+---
+
+## Dependencias
 
 | Dependencia | Versión | Notas |
 |---|---|---|
@@ -383,11 +503,13 @@ Ver documentación completa de testing en [docs/ES/paquete/testing.md](docs/ES/p
 | Serialization | 1.7.3 | kotlinx.serialization.json |
 | Ktor | 2.3.12 | HTTP client multiplataforma |
 | SQLDelight | 2.0.2 | SQLite multiplataforma |
-| Lifecycle | 2.8.7 | ProcessLifecycleOwner (flush en background) |
-| Gradle | 8.10.2 | Wrapper distribuido |
+| Lifecycle | 2.8.7 | ProcessLifecycleOwner |
+| Gradle | 8.10.2 | Wrapper incluido |
 
-Ver todas las versiones en [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+Ver catálogo completo en [`sdk/gradle/libs.versions.toml`](sdk/gradle/libs.versions.toml).
+
+---
 
 ## Licencia
 
-[MIT](LICENSE)
+[MIT](LICENSE) — DevZucca
