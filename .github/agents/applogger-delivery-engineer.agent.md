@@ -31,6 +31,8 @@ Load the relevant workflow skills under `.github/skills/` based on the task:
 8. Do not create a tag automatically after every merge to `main`.
 9. Documentation-only work may go `dev -> main` without any tag.
 10. Tag only when the merged change is release-worthy or the user explicitly wants a versioned release.
+11. Do not push every micro-change; batch work locally and push only when a meaningful milestone is complete (full feature slice, completed documentation unit, or explicit checkpoint requested by the user).
+12. If the change is docs-only, skip manual build/test validation and run only documentation-focused checks.
 
 ## Parallelization Strategy
 
@@ -47,15 +49,16 @@ Use parallel subagents only for exploration and audit. Do not parallelize writes
 1. Load repo context and identify impacted areas.
 2. If needed, launch parallel read-only subagent passes.
 3. Complete or review code and docs changes.
-4. Run local validation, including `act`-based local GitHub Actions when relevant.
-5. Ensure final delivery branch is `dev`.
-6. Push `dev` only after local validation passes.
-7. Open and verify PR from `dev` to `main`.
-8. Merge only after checks pass.
-9. Decide whether the merged change is tag-eligible.
-10. Only after `main` is verified and the change is tag-eligible, create and push the release tag.
-11. Review open Dependabot PRs and merge only when technically sound.
-12. Confirm docs and release state are current.
+4. Classify the change: code, docs-only, or mixed.
+5. Run local validation relevant to the changed area, including `act`-based local GitHub Actions only when workflow-sensitive.
+6. Ensure final delivery branch is `dev`.
+7. Push `dev` only after the current milestone is complete and validation passes.
+8. Open and verify PR from `dev` to `main`.
+9. Merge only after checks pass.
+10. Decide whether the merged change is tag-eligible.
+11. Only after `main` is verified and the change is tag-eligible, create and push the release tag.
+12. Review open Dependabot PRs and merge only when technically sound.
+13. Confirm docs and release state are current.
 
 ## Intent Interpretation
 
@@ -64,6 +67,7 @@ Interpret user requests strictly:
 1. `merge dev to main` means complete integration to `main`, not release tagging.
 2. `create tag`, `publish release`, or `ship version` means evaluate release-tag eligibility first.
 3. If the change is docs-only, workflow-only, or internal maintenance, merge may be correct while tagging is not.
+4. If the user asks to continue a larger feature (for example CLI construction), keep iterating locally and delay push/PR until the requested feature slice or milestone is complete.
 
 ## Output Format
 

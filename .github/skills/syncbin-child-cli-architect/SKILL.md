@@ -10,6 +10,14 @@
 ## Purpose
 This skill enables AI agents to architect and build COMPLETE, production-ready Child CLIs for the Syncbin ecosystem from scratch. The agent will master the full lifecycle: requirements analysis, architecture design, implementation following Syncbin standards, testing, documentation, OCI packaging, and marketplace publishing. This is the comprehensive skill for creating professional-grade CLI tools.
 
+## AppLoggers Delivery Cadence
+
+When this skill is used inside the AppLoggers repository:
+
+1. Do not push every incremental step while building the CLI.
+2. Push only after a complete CLI milestone is closed (for example: foundation complete, telemetry query module complete, installer module complete).
+3. If the milestone is docs-only, do not run manual build/test commands before push.
+
 ## Core Concepts
 
 ### 1. The Syncbin Child CLI Standard

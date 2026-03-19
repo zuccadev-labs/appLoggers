@@ -1,6 +1,6 @@
 # AppLogger — Arquitectura del Paquete
 
-**Versión:** 0.1.0-alpha.1  
+**Versión:** 0.1.1-alpha.2  
 **Fecha:** 2026-03-17  
 **Paradigma:** Trait-based design · Clean Architecture · SOLID  
 **Lenguaje:** Kotlin Multiplatform 2.0 — Android (Mobile + TV) · iOS · JVM
@@ -897,6 +897,6 @@ object AppLoggerSDK {
 
 | Consumidor | Artefacto | Cómo incluirlo |
 |---|---|---|
-| Android (Gradle) | `.aar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")` |
+| Android (Gradle) | `.aar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")` |
 | iOS (KMP puro) | XCFramework | Build con Gradle KMP desde `iosMain` |
-| JVM (Gradle) | `.jar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")` |
+| JVM (Gradle) | `.jar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")` |

@@ -1,15 +1,18 @@
 # Agents — Paquetes de Agent Skills para AppLogger
 
-Este directorio contiene **paquetes de skills portables** para que otra persona los copie manualmente a su propio proyecto Kotlin o Kotlin Multiplatform.
+Este directorio contiene **paquetes de skills portables** para agentes IA y automatización:
 
-Estos skills **no deben estar activos dentro de este repositorio del SDK**. Por eso ya no viven en `.github/skills/` de este repo.
+- **SDK Skills**: Portables para copiar a otros proyectos Kotlin/Multiplatform
+- **Operacional Skills**: Directivas para operar las herramientas AppLogger (CLI, frontend, etc.)
 
 Cada carpeta sigue el formato estándar de Agent Skills:
 
-1. `SKILL.md`
-2. `references/`
+1. `SKILL.md` — Instrucciones detalladas para agentes
+2. `references/` — Documentación de apoyo
 
-## Skills disponibles
+## Skills Disponibles
+
+### SDK Integration Skills (Portables)
 
 | Skill | Objetivo | Carpeta |
 | --- | --- | --- |
@@ -19,6 +22,15 @@ Cada carpeta sigue el formato estándar de Agent Skills:
 | Production hardening | Endurecer seguridad, privacidad y parametros para release | [applogger-production-hardening](applogger-production-hardening) |
 | Instrumentation design | Definir estrategia de eventos, tags y metricas de alto valor | [applogger-instrumentation-design](applogger-instrumentation-design) |
 | Integration validation | Ejecutar smoke checks y criterios de aceptacion de la integracion | [applogger-integration-validation](applogger-integration-validation) |
+
+### Operacional Skills (In-Repository)
+
+| Skill | Objetivo | Carpeta |
+| --- | --- | --- |
+| **CLI Agent Operator** ⭐ | Operar el CLI para consultas, health checks y automatización desde agentes IA | [applogger-cli-agent-operator](applogger-cli-agent-operator) |
+| **Supabase MCP Configuration** | Configurar backend Supabase (migraciones, RLS, validación) para SDK y CLI vía MCP | [applogger-supabase-mcp-configuration](applogger-supabase-mcp-configuration) |
+| **SDK Live Configuration** | Configurar SDK en vivo leyendo `local.properties`, completando claves faltantes y validando integración | [applogger-sdk-live-configuration](applogger-sdk-live-configuration) |
+| **CLI Live Configuration** | Instalar y configurar CLI en vivo con variables de entorno, service_role y validación operativa | [applogger-cli-live-configuration](applogger-cli-live-configuration) |
 
 ## Cómo usar estos paquetes en otro proyecto
 
@@ -79,7 +91,7 @@ Usa este skill para validar si la integracion ya esta lista, por ejemplo:
 
 ## Alcance
 
-Los ejemplos y flujos estan alineados con AppLogger `v0.1.1-alpha.1` y con la politica actual de iOS KMP-only.
+Los ejemplos y flujos estan alineados con AppLogger `v0.1.1-alpha.2` y con la politica actual de iOS KMP-only.
 
 ## Regla clave de configuracion
 

@@ -20,3 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_app_metrics_name_created
 -- Índice para métricas por sesión
 CREATE INDEX IF NOT EXISTS idx_app_metrics_session
     ON app_metrics (session_id, created_at DESC);
+
+-- Índice para filtrado por tag en logs (CLI --tag filter, previene full table scan)
+CREATE INDEX IF NOT EXISTS idx_app_logs_tag
+    ON app_logs (tag, created_at DESC);

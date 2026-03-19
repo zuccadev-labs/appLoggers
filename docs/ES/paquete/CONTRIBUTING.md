@@ -177,7 +177,7 @@ Al abrir un PR, el template pedirá:
 
 Usar el template de issue "Bug Report" en GitHub. Incluir:
 
-1. **Versión del SDK** (`AppLogger 0.1.0-alpha.1`).
+1. **Versión del SDK** (`AppLogger 0.1.1-alpha.2`).
 2. **Plataforma** (Android Mobile / Android TV / JVM).
 3. **Versión de Android** y modelo del dispositivo.
 4. **Pasos para reproducir** el problema.

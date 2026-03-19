@@ -1,6 +1,6 @@
 # AppLogger — App de Monitoreo Externo
 
-**Versión:** 0.1.0-alpha.1  
+**Versión:** 0.1.1-alpha.2  
 **Fecha:** 2026-03-17  
 **Tipo:** Aplicación externa (no parte del SDK)
 

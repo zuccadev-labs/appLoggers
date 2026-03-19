@@ -12,20 +12,23 @@ Monorepo de telemetría técnica — **SDK** · Frontend · CLI.
 
 ## Índice
 
-- [Estructura del Repositorio](#estructura-del-repositorio)
-- [Características](#características)
+- [🗂️ Estructura del Repositorio](#estructura-del-repositorio)
+- [✨ Características](#características)
+- [🖥️ AppLogger CLI (Operaciones)](#applogger-cli-operaciones)
+- [📦 AppLogger SDK (Instrumentación)](#applogger-sdk-instrumentación)
+- [🤖 Programas de Agentes IA](#programas-de-agentes-ia)
 - [⚙️ Configuración del Entorno](#configuración-del-entorno)
-- [Instalación](#instalación)
-- [Inicio Rápido](#inicio-rápido)
-- [Backend — Supabase Setup](#backend--supabase-setup)
-- [CI/CD — Automatización](#cicd--automatización)
-- [Flujo de Ramas (Branching)](#flujo-de-ramas-branching)
-- [Testing](#testing)
-- [Publicar el SDK](#publicar-el-sdk)
-- [Documentación](#documentación)
-- [Plataformas Soportadas](#plataformas-soportadas)
-- [Dependencias](#dependencias)
-- [Licencia](#licencia)
+- [🚀 Instalación](#instalación)
+- [⚡ Inicio Rápido](#inicio-rápido)
+- [🗄️ Backend — Supabase Setup](#backend--supabase-setup)
+- [🔄 CI/CD — Automatización](#cicd--automatización)
+- [🔀 Flujo de Ramas (Branching)](#flujo-de-ramas-branching)
+- [🧪 Testing](#testing)
+- [📤 Publicar el SDK](#publicar-el-sdk)
+- [📚 Documentación](#documentación)
+- [🌍 Plataformas Soportadas](#plataformas-soportadas)
+- [🔩 Dependencias](#dependencias)
+- [⚖️ Licencia](#licencia)
 
 ---
 
@@ -39,15 +42,29 @@ appLoggers/
 │   ├── logger-test/                ← Utilidades de testing
 │   ├── sample/                     ← App Android de ejemplo
 │   └── build.gradle.kts            ← Build raíz del SDK
+├── cli/                            ← ✅ CLI para Operaciones (v0.1.0-alpha.0)
+│   ├── cmd/                        ← Entrypoint
+│   ├── internal/cli/               ← Comandos y lógica
+│   ├── tests/                      ← Pruebas de integración
+│   ├── .golangci.yaml              ← Linting
+│   ├── plugin-metadata.yaml        ← Syncbin contract
+│   └── README.md                   ← Guía de desarrollo
 ├── docs/
 │   ├── ES/                         ← Documentación en español
-│   │   ├── desarrollo/             ← Guías de integración
-│   │   ├── paquete/                ← Arquitectura, testing, publicación
+│   │   ├── cli/                    ← Guía CLI + Instalación
+│   │   ├── desarrollo/             ← Guías de integración SDK
+│   │   ├── agents/                 ← Skills para agentes IA
+│   │   ├── paquete/                ← Arquitectura SDK, testing, publicación
 │   │   └── migraciones/            ← Scripts SQL para Supabase/PostgreSQL
 │   └── EN/                         ← (Próximamente) Documentación en inglés
-├── .github/workflows/              ← CI/CD (lint · test · e2e · security · release)
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                  ← SDK CI/CD
+│   │   ├── applogger-cli.yml       ← CLI CI/CD (build, test, release)
+│   │   └── ...
+│   └── skills/                     ← Delivery + contexto skills
 ├── frontend/                       ← (Próximamente) Dashboard de monitoreo
-└── cli/                            ← (Próximamente) Herramienta de línea de comandos
+└── LICENSE, README.md, etc.
 ```
 
 ---
@@ -64,6 +81,109 @@ appLoggers/
 
 ---
 
+## AppLogger CLI (Operaciones)
+
+**applogger-cli** es la herramienta para consultar telemetría, validar salud, y automatizar operaciones.
+
+### Instalación Rápida (3 minutos)
+
+```bash
+# Linux / macOS
+curl -L https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
+  -o /usr/local/bin/applogger-cli
+chmod +x /usr/local/bin/applogger-cli
+
+# Windows (PowerShell)
+$url = "https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-windows-amd64.exe"
+Invoke-WebRequest -Uri $url -OutFile "$env:ProgramFiles\applogger-cli.exe"
+
+# Verificar
+applogger-cli --version
+```
+
+### Primeros Comandos
+
+```bash
+# Consultar logs de error (últimas 24h)
+applogger-cli telemetry query \
+  --source logs \
+  --severity error \
+  --limit 50 \
+  --output json
+
+# Salida compacta para agentes (TOON format)
+applogger-cli telemetry agent-response \
+  --source logs \
+  --aggregate severity \
+  --preview-limit 3 \
+  --output agent
+
+# Validar salud del backend
+applogger-cli health --output json
+```
+
+### Documentación CLI
+
+| Documento | Propósito |
+|---|---|
+| [docs/ES/cli/INSTALLATION.md](docs/ES/cli/INSTALLATION.md) | Windows · macOS · Linux · Docker · Compilar desde fuente |
+| [docs/ES/cli/SUPABASE_CONFIGURATION.md](docs/ES/cli/SUPABASE_CONFIGURATION.md) | Configuración detallada de Supabase + usuario operativo del CLI |
+| [docs/ES/cli/README.md](docs/ES/cli/README.md) | Referencia completa de comandos, ejemplos, casos corporativos |
+| [cli/README.md](cli/README.md) | Guía de desarrollo del CLI |
+
+---
+
+## AppLogger SDK (Instrumentación)
+
+**logger-core** + **logger-transport-supabase** para instrumentar aplicaciones Kotlin Multiplatform.
+
+Consulta la sección [Instalación](#instalación) y [Inicio Rápido](#inicio-rápido) más abajo.
+
+---
+
+## Programas de Agentes IA
+
+Tenemos **skills especializados** para agentes IA. Úsalos cuando necesites automatización de operaciones o integración de SDK:
+
+| Skill | Caso de Uso | Ubicación |
+|---|---|---|
+| **CLI Agent Operator** ⭐ | Agentes ejecutan CLI para telemetría, health checks, incident response | [docs/ES/agents/applogger-cli-agent-operator/SKILL.md](docs/ES/agents/applogger-cli-agent-operator/SKILL.md) |
+| **Supabase MCP Configuration** | Configuración backend completa vía MCP (migraciones, RLS, validación) para SDK y CLI | [docs/ES/agents/applogger-supabase-mcp-configuration/SKILL.md](docs/ES/agents/applogger-supabase-mcp-configuration/SKILL.md) |
+| **SDK Live Configuration** | Configuración en vivo del SDK leyendo `local.properties` y completando claves faltantes | [docs/ES/agents/applogger-sdk-live-configuration/SKILL.md](docs/ES/agents/applogger-sdk-live-configuration/SKILL.md) |
+| **CLI Live Configuration** | Instalación + export de variables + validación en vivo del CLI operativo | [docs/ES/agents/applogger-cli-live-configuration/SKILL.md](docs/ES/agents/applogger-cli-live-configuration/SKILL.md) |
+| Guided setup | Instalación asistida del SDK paso a paso | [docs/ES/agents/applogger-guided-setup/](docs/ES/agents/applogger-guided-setup/) |
+| Project integration | Agents analizan tu app e integran AppLogger automáticamente | [docs/ES/agents/applogger-project-integration/](docs/ES/agents/applogger-project-integration/) |
+| Runtime troubleshooting | Diagnosticar fallos (no llegan eventos, buffer lleno, etc.) | [docs/ES/agents/applogger-runtime-troubleshooting/](docs/ES/agents/applogger-runtime-troubleshooting/) |
+| Production hardening | Preparar configuración segura para release | [docs/ES/agents/applogger-production-hardening/](docs/ES/agents/applogger-production-hardening/) |
+| Instrumentation design | Definir estrategia de qué loguear y cómo | [docs/ES/agents/applogger-instrumentation-design/](docs/ES/agents/applogger-instrumentation-design/) |
+| Integration validation | Ejecutar smoke tests y QA checks | [docs/ES/agents/applogger-integration-validation/](docs/ES/agents/applogger-integration-validation/) |
+
+### Ejemplo: Agente Consulta Telemetría
+
+```bash
+# Instrucción para un agente:
+# "consulta los logs de error de las últimas 24 horas y resúmelo por severidad"
+
+applogger-cli telemetry agent-response \
+  --source logs \
+  --severity error \
+  --aggregate severity \
+  --from 2026-03-18T10:00:00Z \
+  --to 2026-03-19T10:00:00Z \
+  --preview-limit 3 \
+  --output agent
+
+# Salida (TOON - compact, optimizado para máquinas):
+# kind: telemetry_agent_response
+# ok: true
+# count: 1200
+# summary: {by: severity, buckets: [{key: error, count: 1200}]}
+# rows_preview: [...]
+# hints: [use_from_to_for_date_range]
+```
+
+---
+
 ## ⚙️ Configuración del Entorno
 
 > **Esta sección es obligatoria antes de compilar o contribuir al proyecto.**
@@ -76,6 +196,7 @@ appLoggers/
 | Android SDK | API 35 (compileSdk) | Android Studio → SDK Manager |
 | Gradle | 8.10.2 (usa el wrapper) | `cd sdk && ./gradlew --version` |
 | Git | 2.30+ | `git --version` |
+| Go | 1.25+ (solo si editas el CLI) | `go version` |
 
 ### Paso 1 — Clonar el repositorio
 
@@ -171,13 +292,13 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")
+    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")
 
     // Transporte Supabase (opcional — si tu backend es Supabase)
-    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:v0.1.0-alpha.1")
+    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:v0.1.1-alpha.2")
 
     // Utilidades de testing (solo para tests)
-    testImplementation("com.github.devzucca.appLoggers:logger-test:v0.1.0-alpha.1")
+    testImplementation("com.github.devzucca.appLoggers:logger-test:v0.1.1-alpha.2")
 }
 ```
 
@@ -199,8 +320,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.devzucca:logger-core:0.1.0-alpha.1")
-    implementation("com.github.devzucca:logger-transport-supabase:0.1.0-alpha.1")
+    implementation("com.github.devzucca:logger-core:0.1.1-alpha.2")
+    implementation("com.github.devzucca:logger-transport-supabase:0.1.1-alpha.2")
 }
 ```
 
@@ -418,7 +539,7 @@ JitPack construye automáticamente cuando se crea un tag o cuando alguien solici
 
 ```kotlin
 // Usar en cualquier proyecto
-implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")
+implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")
 ```
 
 ### GitHub Packages (CI/CD)
@@ -426,8 +547,8 @@ implementation("com.github.devzucca.appLoggers:logger-core:v0.1.0-alpha.1")
 El workflow `release.yml` publica automáticamente al crear un tag `v*`:
 
 ```bash
-git tag -a v0.1.0-alpha.1 -m "Release 0.1.0-alpha.1"
-git push origin v0.1.0-alpha.1
+git tag -a v0.1.1-alpha.2 -m "Release 0.1.1-alpha.2"
+git push origin v0.1.1-alpha.2
 # → GitHub Actions: tests + publish + GitHub Release
 ```
 
@@ -439,7 +560,18 @@ Cuando el SDK esté estable, se publicará a Maven Central para distribución si
 
 ## Documentación
 
-| Documento | Descripción |
+### 📖 CLI (Operaciones & Automatización)
+
+| Documento | Propósito |
+|---|---|
+| [docs/ES/cli/INSTALLATION.md](docs/ES/cli/INSTALLATION.md) | Instalar en Windows, macOS, Linux, Docker, compile desde fuente |
+| [docs/ES/cli/SUPABASE_CONFIGURATION.md](docs/ES/cli/SUPABASE_CONFIGURATION.md) | Configuración detallada de Supabase + usuario operativo del CLI |
+| [docs/ES/cli/README.md](docs/ES/cli/README.md) | Referencia CLI: comandos, ejemplos, casos de uso corporativos |
+| [cli/README.md](cli/README.md) | Desarrollo del CLI, estructura Syncbin, pipeline |
+
+### 💾 SDK (Instrumentación)
+
+| Documento | Propósito |
 |---|---|
 | [Guía de Integración](docs/ES/desarrollo/integration-guide.md) | Cómo integrar el SDK en Android e iOS |
 | [App de Monitoreo](docs/ES/desarrollo/monitoring-app.md) | App externa para visualizar logs |
@@ -447,6 +579,34 @@ Cuando el SDK esté estable, se publicará a Maven Central para distribución si
 | [Arquitectura](docs/ES/paquete/architecture.md) | Traits, módulos KMP, pipeline |
 | [Testing](docs/ES/paquete/testing.md) | Estrategia de tests, FakeTransport |
 | [Publicación](docs/ES/paquete/publishing.md) | JitPack, GitHub Packages, Maven Central |
+
+### 🤖 Agentes IA (Skills)
+
+| Documento | Propósito |
+|---|---|
+| [CLI Agent Operator](docs/ES/agents/applogger-cli-agent-operator/SKILL.md) ⭐ | Operar CLI para agentes: telemetry, health, automation |
+| [Guided Setup](docs/ES/agents/applogger-guided-setup/SKILL.md) | Instalar y configurar SDK asistidamente |
+| [Project Integration](docs/ES/agents/applogger-project-integration/SKILL.md) | Agents integran AppLogger en apps existentes |
+| [Runtime Troubleshooting](docs/ES/agents/applogger-runtime-troubleshooting/SKILL.md) | Diagnosticar problemas en runtime |
+| [Production Hardening](docs/ES/agents/applogger-production-hardening/SKILL.md) | Endurecer para release |
+| [Instrumentation Design](docs/ES/agents/applogger-instrumentation-design/SKILL.md) | Diseñar qué loguear |
+| [Integration Validation](docs/ES/agents/applogger-integration-validation/SKILL.md) | Smoke tests y QA |
+
+### 📡 Backend (Supabase)
+
+| Script | Propósito |
+|---|---|
+| [001 - Crear tabla app_logs](docs/ES/migraciones/001_create_app_logs.sql) | Tabla principal de logs |
+| [002 - Crear tabla app_metrics](docs/ES/migraciones/002_create_app_metrics.sql) | Tabla de métricas |
+| [003 - Crear índices](docs/ES/migraciones/003_create_indexes.sql) | Índices de performance |
+| [004 - RLS Policies](docs/ES/migraciones/004_rls_policies.sql) | Políticas de seguridad |
+| [005 - Retention Policy](docs/ES/migraciones/005_retention_policy.sql) | Retención automática |
+| [006 - Harden Authenticated Read](docs/ES/migraciones/006_harden_authenticated_read_policies.sql) | Endurecimiento RLS para evitar lectura global authenticated |
+
+### 📋 Procesos
+
+| Documento | Propósito |
+|---|---|
 | [Contribuir](docs/ES/paquete/CONTRIBUTING.md) | Guía para contribuir al proyecto |
 | [Changelog](CHANGELOG.md) | Historial de versiones |
 

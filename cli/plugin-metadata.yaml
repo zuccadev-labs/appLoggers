@@ -1,0 +1,87 @@
+name: applogger-cli
+version: 0.1.0-alpha.0
+description: AppLoggers telemetry CLI for operational queries, health checks, and AI agent automation
+author: devzucca
+license: MIT
+homepage: https://github.com/devzucca/appLoggers
+repository: https://github.com/devzucca/appLoggers
+documentation: https://github.com/devzucca/appLoggers/tree/main/docs/ES/cli
+entrypoint: applogger-cli
+
+# Syncbin Universal Contract
+syncbin_metadata:
+  version: "1.0"
+  contract: "POSIX exit codes (0=success, 1=error, 2=usage), structured output (text/json/agent)"
+
+output_modes:
+  - text        # Human-readable
+  - json        # Strict JSON
+  - agent       # TOON compact format (machine-native)
+
+capabilities:
+  - syncbin-metadata      # Plugin metadata discovery
+  - version               # CLI version
+  - capabilities          # Available commands
+  - health                # Backend health check
+  - agent-schema          # Data schema for agents
+  - telemetry-query       # Query logs/metrics with filtering
+  - telemetry-agent-response  # Compact agent-optimized response
+
+platforms:
+  - windows-amd64
+  - linux-amd64
+  - darwin-amd64      # macOS Intel
+  - linux-arm64       # Linux ARM (Raspberry Pi, AWS Graviton)
+  - darwin-arm64      # macOS Apple Silicon
+
+dependencies:
+  runtime:
+    - name: Supabase
+      version: "latest"
+      required: true
+      notes: "PostgreSQL backend for telemetry storage"
+
+config:
+  environment_variables:
+    required:
+      - APPLOGGER_SUPABASE_URL
+      - APPLOGGER_SUPABASE_KEY
+    optional:
+      - APPLOGGER_SUPABASE_SCHEMA
+      - APPLOGGER_SUPABASE_LOG_TABLE
+      - APPLOGGER_SUPABASE_METRIC_TABLE
+      - APPLOGGER_SUPABASE_TIMEOUT_SECONDS
+  flags:
+    global:
+      - name: "--output"
+        values: [text, json, agent]
+        default: "text"
+      - name: "--verbose"
+        description: "Enable verbose output"
+      - name: "--syncbin-metadata"
+        hidden: true
+        description: "Print Syncbin metadata"
+
+exit_codes:
+  success: 0
+  runtime_error: 1
+  usage_error: 2
+
+build_info:
+  language: Go
+  minimum_version: "1.25"
+  cicd_system: "GitHub Actions"
+  test_framework: "Go testing + integration tests"
+  linter: "golangci-lint"
+  
+release_policy:
+  versioning: "Semantic Versioning (v0.1.0-alpha.0+)"
+  channels:
+    - alpha
+    - beta
+    - stable
+  distribution:
+    - GitHub Releases (binaries)
+    - JitPack (source)
+  platforms_built: 5
+  build_time: "~5 minutes (all platforms)"

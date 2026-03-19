@@ -32,8 +32,8 @@ dependencies {
     implementation(project(":logger-transport-supabase"))
 
     // En una app real que consume el SDK publicado:
-    // implementation("com.github.devzucca.appLoggers:logger-core:0.1.0-alpha.1")
-    // implementation("com.github.devzucca.appLoggers:logger-transport-supabase:0.1.0-alpha.1")
+    // implementation("com.github.devzucca.appLoggers:logger-core:0.1.1-alpha.2")
+    // implementation("com.github.devzucca.appLoggers:logger-transport-supabase:0.1.1-alpha.2")
 
     // Test utilities
     testImplementation(project(":logger-test"))

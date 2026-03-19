@@ -1,0 +1,207 @@
+name: AppLogger CLI - Build & Test
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'cli/**'
+      - '.github/workflows/applogger-cli.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'cli/**'
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.runners }}
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            runners: ubuntu-latest
+            go: 1.25.x
+          - os: macos
+            runners: macos-latest
+            go: 1.25.x
+          - os: windows
+            runners: windows-latest
+            go: 1.25.x
+    env:
+      GOFLAGS: -mod=readonly
+      APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL }}
+      APPLOGGER_SUPABASE_KEY: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Download dependencies
+        working-directory: cli
+        run: go mod download
+
+      - name: Run tests with coverage
+        working-directory: cli
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        continue-on-error: ${{ matrix.os == 'macos' || matrix.os == 'windows' }}
+
+      - name: Upload coverage to CodeCov
+        if: matrix.os == 'linux'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./cli/coverage.out
+          flags: cli-${{ matrix.os }}
+          name: cli-coverage-${{ matrix.os }}
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.x
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: cli
+          args: --timeout=5m
+
+  build:
+    name: Build ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runners }}
+    needs: [test, lint]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            runners: ubuntu-latest
+            ldflags: "-s -w"
+          - os: linux
+            arch: arm64
+            runners: ubuntu-latest
+            ldflags: "-s -w"
+          - os: darwin
+            arch: amd64
+            runners: macos-latest
+            ldflags: "-s -w"
+          - os: darwin
+            arch: arm64
+            runners: macos-latest
+            ldflags: "-s -w"
+          - os: windows
+            arch: amd64
+            runners: windows-latest
+            ldflags: "-s -w"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.x
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Set version info
+        working-directory: cli
+        run: |
+          echo "VERSION=$(git describe --tags --always)" >> $GITHUB_ENV
+          echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Build
+        working-directory: cli
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go build \
+            -ldflags="-s -w -X github.com/devzucca/appLoggers/cli/internal/cli.version=${{ env.VERSION }} -X github.com/devzucca/appLoggers/cli/internal/cli.commit=${{ env.COMMIT }} -X github.com/devzucca/appLoggers/cli/internal/cli.buildTime=${{ env.BUILD_TIME }}" \
+            -o applogger-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }} \
+            ./cmd/applogger-cli
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: applogger-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: cli/applogger-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}
+          retention-days: 5
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.x
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Run gosec
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail ./cli/...'
+
+  release:
+    name: Create Release (on tag)
+    runs-on: ubuntu-latest
+    needs: [test, lint, build, security]
+    if: startsWith(github.ref, 'refs/tags/applogger-cli-v')
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          for file in */*; do
+            sha256sum "$file" > "$file.sha256"
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          body_path: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

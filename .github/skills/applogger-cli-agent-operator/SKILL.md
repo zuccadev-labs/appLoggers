@@ -1,0 +1,67 @@
+---
+name: applogger-cli-agent-operator
+description: 'Operate the AppLoggers CLI as a deterministic interface for AI agents and automation. Use this when an agent must query CLI metadata, capabilities, health, and telemetry output in machine-readable form.'
+argument-hint: 'Describe what automation or agent task should be executed through applogger-cli and which output contract is required.'
+user-invocable: true
+---
+
+# AppLogger CLI Agent Operator
+
+## Purpose
+
+Use this skill when a Copilot agent or automation needs to interact with AppLoggers through the CLI contract in a stable and parseable way.
+
+## Hard Rules
+
+1. Prefer `--output agent` for machine consumption (TOON compact encoding via toon-go).
+2. Use `--output json` when downstream systems require JSON strictly.
+2. Treat exit code 0 as success, 1 as runtime failure, 2 as usage error.
+3. Run `agent schema` and `capabilities` before implementing new automation assumptions.
+4. Do not parse free-form text when JSON is available.
+
+## Standard Command Set
+
+1. Metadata discovery:
+   - `applogger-cli --syncbin-metadata --output json`
+2. Version/build discovery:
+   - `applogger-cli version --output json`
+3. Capability discovery:
+   - `applogger-cli capabilities --output agent`
+4. Agent contract discovery:
+   - `applogger-cli agent schema --output agent`
+5. Runtime readiness probe:
+   - `applogger-cli health --output agent`
+6. Telemetry query endpoint:
+   - `applogger-cli telemetry query --output agent`
+7. Dedicated compact orchestration response:
+   - `applogger-cli telemetry agent-response --source logs --aggregate severity --preview-limit 5`
+
+## Supabase Environment Setup
+
+Before `telemetry query`, ensure environment is configured:
+
+1. Required:
+   - `APPLOGGER_SUPABASE_URL`
+   - `APPLOGGER_SUPABASE_KEY` (service_role key)
+2. Optional:
+   - `APPLOGGER_SUPABASE_SCHEMA`
+   - `APPLOGGER_SUPABASE_LOG_TABLE`
+   - `APPLOGGER_SUPABASE_METRIC_TABLE`
+   - `APPLOGGER_SUPABASE_TIMEOUT_SECONDS`
+3. If operating with Supabase MCP available, retrieve:
+   - project URL from `mcp_supabase_get_project_url`
+4. Provision `APPLOGGER_SUPABASE_KEY` from secure secret storage (service_role).
+   - Do not use publishable/anon keys for CLI read operations.
+
+## Error Handling Contract
+
+1. If exit code is 2, the caller should correct arguments and retry.
+2. If exit code is 1, treat as runtime error and escalate with captured stderr JSON envelope.
+3. Always store command, args, exit code, and full JSON response in agent logs for traceability.
+
+## Output Standard
+
+1. Report executed commands.
+2. Report parsed JSON fields used for decisions.
+3. Report retries and final status.
+4. Report remaining uncertainty if command is preview status.

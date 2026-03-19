@@ -12,3 +12,4 @@ Commit policy:
 
 1. Do not create the final delivery commit for partial work.
 2. Use one clear commit or a clean, intentional set of commits for the completed unit.
+3. Avoid micro-commits for every small step; commit and push when a milestone is complete.
