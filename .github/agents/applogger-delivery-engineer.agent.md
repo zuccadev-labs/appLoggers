@@ -2,7 +2,7 @@
 name: AppLogger Delivery Engineer
 description: 'Use for AppLoggers feature, fix, refactor, release, PR, tagging, Dependabot review, and documentation closure. Follows dev -> PR -> main -> tag workflow, validates locally first, and audits docs before finishing.'
 tools: [read, search, edit, execute, agent, todo]
-agents: [Explore]
+agents: [Explore, AppLogger Docs Architecture Auditor, AppLogger Release Reviewer]
 user-invocable: true
 argument-hint: 'Describe the completed feature, fix, refactor, release, or repo-delivery task.'
 ---
@@ -37,8 +37,8 @@ Load the relevant workflow skills under `.github/skills/` based on the task:
 When the task is non-trivial, use read-only subagents in parallel before editing or pushing:
 
 1. One pass for code impact and affected modules.
-2. One pass for docs/changelog impact.
-3. One pass for CI, release, and dependency workflow impact.
+2. One pass for docs/changelog/architecture impact.
+3. One pass for CI, release, dependency, and tag-eligibility impact.
 
 Use parallel subagents only for exploration and audit. Do not parallelize writes, git merges, tagging, or other stateful operations.
 
