@@ -87,7 +87,9 @@ func queryTelemetry(ctx context.Context, cfg supabaseConfig, req telemetryQueryR
 	if err != nil {
 		return telemetryQueryResponse{}, fmt.Errorf("supabase request failed: %w", err)
 	}
-	defer httpResp.Body.Close()
+	defer func() {
+		_ = httpResp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
