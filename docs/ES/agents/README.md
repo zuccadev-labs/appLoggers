@@ -1,26 +1,46 @@
-# Agents — Skills de Integración AppLogger
+# Agents — Paquetes de Agent Skills para AppLogger
 
-Este directorio contiene **guías de dominio** para agentes de IA y desarrolladores que necesitan integrar AppLogger en proyectos externos.
+Este directorio contiene **paquetes de skills portables** para que otra persona los copie manualmente a su propio proyecto Kotlin o Kotlin Multiplatform.
 
-El skill canónico para discovery estándar de Agent Skills está en:
-`.github/skills/applogger-kmp-integration/SKILL.md`
+Estos skills **no deben estar activos dentro de este repositorio del SDK**. Por eso ya no viven en `.github/skills/` de este repo.
 
-El archivo `docs/ES/agents/SKILL.md` se conserva como referencia documental en esta sección.
+Cada carpeta sigue el formato estándar de Agent Skills:
 
-| Skill | Plataforma | Archivo |
-|---|---|---|
-| Skill principal compatible Agent Skills | Android + iOS (KMP) | [../../../.github/skills/applogger-kmp-integration/SKILL.md](../../../.github/skills/applogger-kmp-integration/SKILL.md) |
-| Integrar AppLogger en app Android (Kotlin) | Android Mobile + TV | [android-integration.md](android-integration.md) |
-| Integrar AppLogger en iOS (KMP puro) | iOS 14+ | [ios-integration.md](ios-integration.md) |
+1. `SKILL.md`
+2. `references/`
 
----
+## Skills disponibles
 
-## Cómo usar estos skills
+| Skill | Objetivo | Carpeta |
+| --- | --- | --- |
+| Guided setup | Guiar paso a paso la instalación y configuración del SDK | [applogger-guided-setup](applogger-guided-setup) |
+| Project integration | Leer una app existente, decidir puntos de integración y cablear AppLogger correctamente | [applogger-project-integration](applogger-project-integration) |
 
-Cada skill contiene:
-1. **Checklist de prerrequisitos** — lo que la app destino necesita antes de empezar.
-2. **Pasos de integración** — código exacto, verificado contra el source del SDK.
-3. **Patrones de uso** — ejemplos reales de logging por nivel.
-4. **Errores comunes** — problemas conocidos y cómo resolverlos.
+## Cómo usar estos paquetes en otro proyecto
 
-Los ejemplos de código están verificados contra el SDK versión `0.1.0-alpha.1`.
+1. Copia la carpeta del skill deseado al repo destino.
+2. Pégala en `.github/skills/<nombre-del-skill>/`.
+3. Conserva `SKILL.md` y la carpeta `references/`.
+4. En el chat del agente, pide la tarea usando frases afines al `description` del skill.
+
+## Cuándo usar cada skill
+
+### Guided setup
+
+Usa este skill cuando la persona quiera una guía paso a paso, por ejemplo:
+
+1. "Guíame para configurar el SDK"
+2. "Ayúdame a instalar AppLogger"
+3. "Configura el logger en mi proyecto KMP"
+
+### Project integration
+
+Usa este skill cuando la persona quiera que el agente analice la app e integre AppLogger en los puntos correctos, por ejemplo:
+
+1. "Lee la app e integra el SDK"
+2. "Analiza el proyecto y dime dónde inicializar el logger"
+3. "Revisa mi arquitectura y agrega AppLogger de forma segura"
+
+## Alcance
+
+Los ejemplos y flujos están alineados con AppLogger `v0.1.1-alpha.1` y con la política actual de iOS KMP-only.
