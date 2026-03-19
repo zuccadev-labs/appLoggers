@@ -22,5 +22,5 @@ sample/
 
 ## Nota
 
-Este módulo es solo de referencia. No se compila como parte del CI del SDK.
-Para compilarlo, añade `include(":sample")` a `settings.gradle.kts`.
+Este módulo es solo de referencia, pero sí forma parte de la validación del CI del SDK mediante `:sample:testDebugUnitTest`.
+Para compilarlo localmente, asegúrate de tener Android SDK configurado en `sdk/local.properties`.

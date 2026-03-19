@@ -100,3 +100,11 @@ sqldelight {
         }
     }
 }
+
+val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+
+if (isWindowsHost) {
+    tasks.matching { it.name.contains("AppLoggerDatabaseMigration") }.configureEach {
+        enabled = false
+    }
+}

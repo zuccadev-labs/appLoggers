@@ -13,6 +13,8 @@ import com.applogger.core.internal.BatchProcessor
  * @property deadLetterCount   Number of events in the dead letter queue.
  * @property consecutiveFailures Current consecutive transport failure count.
  * @property sdkVersion        Embedded SDK version string.
+ * @property eventsDroppedDueToBufferOverflow Total count of events discarded due to buffer overflow.
+ * @property bufferUtilizationPercentage Current buffer fill percentage (0-100).
  */
 data class HealthStatus(
     val isInitialized: Boolean,
@@ -20,7 +22,9 @@ data class HealthStatus(
     val bufferedEvents: Int,
     val deadLetterCount: Int,
     val consecutiveFailures: Int,
-    val sdkVersion: String = AppLoggerVersion.NAME
+    val sdkVersion: String = AppLoggerVersion.NAME,
+    val eventsDroppedDueToBufferOverflow: Long = 0,
+    val bufferUtilizationPercentage: Float = 0f
 )
 
 /**
@@ -35,7 +39,8 @@ object AppLoggerHealth {
 
     internal var processor: BatchProcessor? = null
     internal var transport: LogTransport? = null
-    internal var buffer: LogBuffer? = null
+    internal var buffer: com.applogger.core.internal.InMemoryBuffer? = null
+    internal var bufferCapacity: Int = 1000
     internal var initialized: Boolean = false
 
     /**
@@ -48,6 +53,8 @@ object AppLoggerHealth {
         bufferedEvents = buffer?.size() ?: 0,
         deadLetterCount = processor?.deadLetterQueue?.size() ?: 0,
         consecutiveFailures = 0,
-        sdkVersion = AppLoggerVersion.NAME
+        sdkVersion = AppLoggerVersion.NAME,
+        eventsDroppedDueToBufferOverflow = buffer?.getOverflowCount() ?: 0,
+        bufferUtilizationPercentage = if (bufferCapacity > 0) (buffer?.size()?.toFloat() ?: 0f) / bufferCapacity * 100f else 0f
     )
 }

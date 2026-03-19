@@ -60,7 +60,30 @@ object AppLoggerSDK : AppLogger {
         val filter = ChainedLogFilter(
             listOf(RateLimitFilter(if (platform.isLowResource) 30 else 120))
         )
-        val buffer = InMemoryBuffer(if (platform.isLowResource) 100 else 1000)
+
+        // Determinar capacidad del buffer según estrategia
+        val bufferCapacity = when (resolvedConfig.bufferSizeStrategy) {
+            AppLoggerConfig.BufferSizeStrategy.FIXED -> if (platform.isLowResource) 100 else 1000
+            AppLoggerConfig.BufferSizeStrategy.ADAPTIVE_TO_RAM -> {
+                // Ejemplo: 0.1% de RAM, con mínimo 50 y máximo 5000
+                val activityManager = appContext.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val memoryInfo = android.app.ActivityManager.MemoryInfo()
+                activityManager.getMemoryInfo(memoryInfo)
+                val totalRam = memoryInfo.totalMem
+                val target = (totalRam * 0.001).toInt() // 0.1%
+                target.coerceIn(50, 5000)
+            }
+            AppLoggerConfig.BufferSizeStrategy.ADAPTIVE_TO_LOG_RATE -> {
+                // Por ahora usamos el valor por defecto; en futura versión se ajustaría dinámicamente
+                if (platform.isLowResource) 100 else 1000
+            }
+        }
+
+        val buffer = InMemoryBuffer(
+            maxCapacity = bufferCapacity,
+            overflowPolicy = resolvedConfig.bufferOverflowPolicy
+        )
+
         val resolvedTransport = transport ?: NoOpTransport()
         val formatter = JsonLogFormatter()
 
@@ -86,6 +109,7 @@ object AppLoggerSDK : AppLogger {
         AppLoggerHealth.processor = processor
         AppLoggerHealth.transport = resolvedTransport
         AppLoggerHealth.buffer = buffer
+        AppLoggerHealth.bufferCapacity = bufferCapacity
         AppLoggerHealth.initialized = true
 
         if (!resolvedConfig.isDebugMode) {

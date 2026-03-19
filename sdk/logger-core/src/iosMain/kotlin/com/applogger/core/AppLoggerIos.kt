@@ -64,6 +64,7 @@ class AppLoggerIos private constructor() : AppLogger {
         AppLoggerHealth.processor = processor
         AppLoggerHealth.transport = resolvedTransport
         AppLoggerHealth.buffer = buffer
+        AppLoggerHealth.bufferCapacity = 1000
         AppLoggerHealth.initialized = true
 
         if (!config.isDebugMode) {
