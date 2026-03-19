@@ -20,7 +20,7 @@ let package = Package(
             name: "AppLogger",
             // After building the XCFramework, update this path or URL:
             // Local:  path: "build/AppLogger.xcframework"
-            // Remote: url:  "https://github.com/devzucca/appLoggers/releases/download/v0.1.1-alpha.2/AppLogger.xcframework.zip",
+            // Remote: url:  "https://github.com/devzucca/appLoggers/releases/download/v0.1.1-alpha.3/AppLogger.xcframework.zip",
             //         checksum: "<sha256>"
             path: "build/AppLogger.xcframework"
         )

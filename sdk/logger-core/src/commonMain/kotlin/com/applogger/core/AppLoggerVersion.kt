@@ -8,5 +8,5 @@ package com.applogger.core
  */
 object AppLoggerVersion {
     /** Semantic version string following [semver.org](https://semver.org). */
-    const val NAME = "0.1.1-alpha.2"
+    const val NAME = "0.1.1-alpha.3"
 }

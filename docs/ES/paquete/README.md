@@ -34,7 +34,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.devzucca.appLoggers:logger-core:0.1.1-alpha.2")
+    implementation("com.github.devzucca.appLoggers:logger-core:0.1.1-alpha.3")
 }
 ```
 

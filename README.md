@@ -292,13 +292,13 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")
+    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")
 
     // Transporte Supabase (opcional — si tu backend es Supabase)
-    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:v0.1.1-alpha.2")
+    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:v0.1.1-alpha.3")
 
     // Utilidades de testing (solo para tests)
-    testImplementation("com.github.devzucca.appLoggers:logger-test:v0.1.1-alpha.2")
+    testImplementation("com.github.devzucca.appLoggers:logger-test:v0.1.1-alpha.3")
 }
 ```
 
@@ -320,8 +320,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.devzucca:logger-core:0.1.1-alpha.2")
-    implementation("com.github.devzucca:logger-transport-supabase:0.1.1-alpha.2")
+    implementation("com.github.devzucca:logger-core:0.1.1-alpha.3")
+    implementation("com.github.devzucca:logger-transport-supabase:0.1.1-alpha.3")
 }
 ```
 
@@ -539,7 +539,7 @@ JitPack construye automáticamente cuando se crea un tag o cuando alguien solici
 
 ```kotlin
 // Usar en cualquier proyecto
-implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")
+implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")
 ```
 
 ### GitHub Packages (CI/CD)
@@ -547,8 +547,8 @@ implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.2")
 El workflow `release.yml` publica automáticamente al crear un tag `v*`:
 
 ```bash
-git tag -a v0.1.1-alpha.2 -m "Release 0.1.1-alpha.2"
-git push origin v0.1.1-alpha.2
+git tag -a v0.1.1-alpha.3 -m "Release 0.1.1-alpha.3"
+git push origin v0.1.1-alpha.3
 # → GitHub Actions: tests + publish + GitHub Release
 ```
 
