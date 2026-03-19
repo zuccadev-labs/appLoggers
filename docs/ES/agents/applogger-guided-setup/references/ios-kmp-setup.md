@@ -54,6 +54,22 @@ AppLoggerIos.shared.initialize(
 )
 ```
 
+## local.properties policy
+
+If `local.properties` is present:
+
+1. Verify AppLogger keys first.
+2. Add only missing AppLogger keys.
+3. Keep all unrelated variables untouched.
+
+Suggested keys:
+
+```properties
+appLogger.url=https://YOUR-PROJECT.supabase.co
+appLogger.anonKey=YOUR_ANON_KEY
+appLogger.debug=false
+```
+
 ## Minimal verification
 
 ```kotlin

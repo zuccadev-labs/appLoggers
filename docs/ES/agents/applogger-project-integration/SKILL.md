@@ -26,16 +26,20 @@ Do not use this skill when:
 2. Reuse the app's existing architecture patterns.
 3. Avoid broad invasive changes on the first pass.
 4. Keep iOS guidance KMP-only.
+5. If `local.properties` is used, verify required AppLogger keys first.
+6. Add only missing AppLogger keys and keep all existing unrelated variables untouched.
 
 ## Workflow
 
 1. Identify modules, entry points, and platform targets.
 2. Detect current logging, crash reporting, and configuration patterns.
-3. Choose the correct initialization point.
-4. Add AppLogger dependencies and bootstrap code.
-5. Add a small set of high-value logging points.
-6. Add a health check or smoke validation path.
-7. Run build/tests when available.
+3. Inspect `local.properties` usage and required AppLogger keys.
+4. Add only missing AppLogger keys without modifying unrelated variables.
+5. Choose the correct initialization point.
+6. Add AppLogger dependencies and bootstrap code.
+7. Add a small set of high-value logging points.
+8. Add a health check or smoke validation path.
+9. Run build/tests when available.
 
 ## References bundled with this skill
 

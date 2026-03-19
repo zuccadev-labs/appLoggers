@@ -26,16 +26,21 @@ Do not use this skill when:
 2. Treat iOS as KMP-only in this SDK.
 3. Never recommend hardcoding secrets in committed files.
 4. Keep the first integration minimal before adding advanced tuning.
+5. When handling configuration, verify `local.properties` keys first.
+6. If AppLogger keys are missing, add only missing keys directly.
+7. Never modify, rename, or delete unrelated existing variables in `local.properties`.
 
 ## Workflow
 
 1. Identify whether the target is Android, iOS KMP, or both.
 2. Ask for or inspect the relevant Gradle files.
 3. Add JitPack and the required AppLogger dependencies.
-4. Configure local secrets and runtime flags.
-5. Add initialization code in the correct app entry point.
-6. Add one or two logging calls and a health check.
-7. Explain how to verify the integration.
+4. Inspect `local.properties` and verify required AppLogger keys.
+5. Add only missing AppLogger keys to `local.properties` without changing other variables.
+6. Configure runtime flags.
+7. Add initialization code in the correct app entry point.
+8. Add one or two logging calls and a health check.
+9. Explain how to verify the integration.
 
 ## References bundled with this skill
 

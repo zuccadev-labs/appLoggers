@@ -22,6 +22,19 @@
 4. Add one network or error log.
 5. Add one health-check path.
 
+## local.properties handling rule
+
+1. Detect whether the project uses `local.properties` for runtime config.
+2. Verify required AppLogger keys.
+3. Add only missing AppLogger keys.
+4. Do not change unrelated keys, comments, ordering, or existing values.
+
+Required keys:
+
+1. `appLogger.url`
+2. `appLogger.anonKey`
+3. `appLogger.debug`
+
 ## What not to do on first pass
 
 1. Do not replace every existing logger call in the whole codebase.

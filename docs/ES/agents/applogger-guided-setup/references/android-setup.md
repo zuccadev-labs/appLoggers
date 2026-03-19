@@ -33,6 +33,22 @@ dependencies {
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 ```
 
+## local.properties policy
+
+If the project uses `local.properties`:
+
+1. Check whether these keys already exist: `appLogger.url`, `appLogger.anonKey`, `appLogger.debug`.
+2. Add only missing keys.
+3. Do not edit, remove, or rename any unrelated existing variable.
+
+Example append-only update:
+
+```properties
+appLogger.url=https://YOUR-PROJECT.supabase.co
+appLogger.anonKey=YOUR_ANON_KEY
+appLogger.debug=false
+```
+
 ## Initialization pattern
 
 Preferred initialization point: custom `Application`.
