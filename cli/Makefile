@@ -8,9 +8,9 @@ OUTPUT_DIR := bin
 VERSION := $(shell git describe --tags --always)
 COMMIT := $(shell git rev-parse --short HEAD)
 BUILD_TIME := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS := -s -w -X github.com/devzucca/appLoggers/cli/internal/cli.version=$(VERSION) \
-           -X github.com/devzucca/appLoggers/cli/internal/cli.commit=$(COMMIT) \
-           -X github.com/devzucca/appLoggers/cli/internal/cli.buildTime=$(BUILD_TIME)
+LDFLAGS := -s -w -X github.com/zuccadev-labs/appLoggers/cli/internal/cli.version=$(VERSION) \
+           -X github.com/zuccadev-labs/appLoggers/cli/internal/cli.commit=$(COMMIT) \
+           -X github.com/zuccadev-labs/appLoggers/cli/internal/cli.buildTime=$(BUILD_TIME)
 
 # Platforms for cross-compilation
 PLATFORMS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64

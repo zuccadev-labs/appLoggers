@@ -1,6 +1,6 @@
 # AppLogger
 
-[![JitPack](https://jitpack.io/v/devzucca/appLoggers.svg)](https://jitpack.io/#devzucca/appLoggers)
+[![JitPack](https://jitpack.io/v/zuccadev-labs/appLoggers.svg)](https://jitpack.io/#zuccadev-labs/appLoggers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1+-purple.svg)](https://kotlinlang.org)
 [![API](https://img.shields.io/badge/API-23+-brightgreen.svg)](https://developer.android.com/about/versions/marshmallow)
@@ -34,7 +34,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.devzucca.appLoggers:logger-core:0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:0.1.1-alpha.3")
 }
 ```
 

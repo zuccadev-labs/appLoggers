@@ -23,15 +23,15 @@
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
 # macOS (Intel y Apple Silicon)
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ```powershell
 # Windows PowerShell
-irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 ```
 
 Este flujo:
@@ -64,12 +64,12 @@ Parámetros de red (opcionales):
 Para fijar una versión específica:
 
 ```bash
-APPLOGGER_CLI_VERSION=applogger-cli-v0.1.0 curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+APPLOGGER_CLI_VERSION=applogger-cli-v0.1.0 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ```powershell
 $env:APPLOGGER_CLI_VERSION = 'applogger-cli-v0.1.0'
-irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 ```
 
 ### Opción 2: Descargar Binario (Manual)
@@ -77,13 +77,13 @@ irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/insta
 ```bash
 # Linux / macOS
 VERSION="applogger-cli-vX.Y.Z"
-curl -L "https://github.com/devzucca/appLoggers/releases/download/${VERSION}/applogger-cli-linux-amd64" -o applogger-cli
+curl -L "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/applogger-cli-linux-amd64" -o applogger-cli
 chmod +x applogger-cli
 sudo mv applogger-cli /usr/local/bin/
 
 # Windows (PowerShell)
 $version = "applogger-cli-vX.Y.Z"
-$url = "https://github.com/devzucca/appLoggers/releases/download/$version/applogger-cli-windows-amd64.exe"
+$url = "https://github.com/zuccadev-labs/appLoggers/releases/download/$version/applogger-cli-windows-amd64.exe"
 $output = "$env:ProgramFiles\applogger-cli.exe"
 Invoke-WebRequest -Uri $url -OutFile $output
 ```
@@ -91,7 +91,7 @@ Invoke-WebRequest -Uri $url -OutFile $output
 ### Opción 3: Compilar desde Fuente
 
 ```bash
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers/cli
 go build -o applogger-cli ./cmd/applogger-cli
 sudo mv applogger-cli /usr/local/bin/
@@ -119,7 +119,7 @@ Esto deja la publicación lista para:
 
 #### A. Descargar Binario Precompilado
 
-1. Ve a [GitHub Releases](https://github.com/devzucca/appLoggers/releases)
+1. Ve a [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases)
 2. Descarga `applogger-cli-windows-amd64.exe`
 3. Coloca el archivo en una carpeta dentro de `PATH` (ej: `C:\Program Files\applogger-cli\`)
 4. Abre **PowerShell** o **CMD** y verifica:
@@ -152,7 +152,7 @@ Copy-Item $downloadPath $installPath
 # Descargar desde https://golang.org/dl
 
 # 2. Clonar y compilar
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers\cli
 go build -o applogger-cli.exe .\cmd\applogger-cli
 
@@ -173,7 +173,7 @@ VERSION="applogger-cli-vX.Y.Z"
 
 # Descargar
 curl -L \
-  "https://github.com/devzucca/appLoggers/releases/download/${VERSION}/applogger-cli-darwin-${ARCH}" \
+  "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/applogger-cli-darwin-${ARCH}" \
   -o applogger-cli
 
 chmod +x applogger-cli
@@ -190,7 +190,7 @@ applogger-cli version --output json
 go version
 
 # 2. Clonar y compilar
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers/cli
 go build -o applogger-cli ./cmd/applogger-cli
 
@@ -228,7 +228,7 @@ VERSION="applogger-cli-vX.Y.Z"
 
 # Descargar
 curl -L \
-  "https://github.com/devzucca/appLoggers/releases/download/${VERSION}/applogger-cli-linux-${ARCH}" \
+  "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/applogger-cli-linux-${ARCH}" \
   -o applogger-cli
 
 chmod +x applogger-cli
@@ -246,7 +246,7 @@ sudo apt-get update
 sudo apt-get install -y golang        # O descargar desde golang.org/dl
 
 # 2. Clonar y compilar
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers/cli
 go build -o applogger-cli ./cmd/applogger-cli
 
@@ -293,7 +293,7 @@ docker run applogger-cli:latest --version
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers
 
 # 2. Descargar dependencias
@@ -453,7 +453,7 @@ ls -la /usr/local/bin/applogger-cli
 
 # Si no existe, descargarlo nuevamente
 VERSION="applogger-cli-vX.Y.Z"
-curl -L "https://github.com/devzucca/appLoggers/releases/download/${VERSION}/applogger-cli-linux-amd64" \
+curl -L "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/applogger-cli-linux-amd64" \
   -o /usr/local/bin/applogger-cli
 chmod +x /usr/local/bin/applogger-cli
 ```
@@ -515,4 +515,4 @@ service_role y usuario del CLI), consulta:
 - [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md)
 
 Para preguntas o issues:  
-→ [GitHub Issues](https://github.com/devzucca/appLoggers/issues)
+→ [GitHub Issues](https://github.com/zuccadev-labs/appLoggers/issues)

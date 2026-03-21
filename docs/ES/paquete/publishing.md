@@ -35,18 +35,18 @@ cat gradle/libs.versions.toml
 
 ```properties
 # gradle.properties
-GROUP=com.github.devzucca
+GROUP=com.github.zuccadev-labs
 POM_ARTIFACT_ID=appLoggers
 VERSION_NAME=0.1.1-alpha.3
 
 POM_NAME=AppLogger
 POM_DESCRIPTION=Kotlin Multiplatform SDK for structured technical telemetry on Android/TV/iOS/JVM
-POM_URL=https://github.com/devzucca/appLoggers
+POM_URL=https://github.com/zuccadev-labs/appLoggers
 POM_LICENCE_NAME=MIT License
 POM_LICENCE_URL=https://opensource.org/licenses/MIT
 POM_DEVELOPER_ID=devzucca
 POM_DEVELOPER_NAME=DevZucca
-POM_SCM_URL=https://github.com/devzucca/appLoggers
+POM_SCM_URL=https://github.com/zuccadev-labs/appLoggers
 ```
 
 ---
@@ -110,7 +110,7 @@ afterEvaluate {
             // GitHub Packages
             maven {
                 name = "GitHubPackages"
-                url  = uri("https://maven.pkg.github.com/devzucca/appLoggers")
+                url  = uri("https://maven.pkg.github.com/zuccadev-labs/appLoggers")
                 credentials {
                     username = System.getenv("GITHUB_ACTOR")
                     password = System.getenv("GITHUB_TOKEN")
@@ -201,7 +201,7 @@ git push origin v0.1.1-alpha.3
 ### 3.2 Activar la build en JitPack
 
 1. Ir a [jitpack.io](https://jitpack.io)
-2. Buscar `devzucca/appLoggers`
+2. Buscar `zuccadev-labs/appLoggers`
 3. Hacer clic en **Get it** junto al tag `v0.1.1-alpha.3`
 4. JitPack construye el artefacto automáticamente
 
@@ -217,14 +217,14 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.3")
 }
 ```
 
 ### 3.4 Badge en README
 
 ```markdown
-[![](https://jitpack.io/v/devzucca/appLoggers.svg)](https://jitpack.io/#devzucca/appLoggers)
+[![](https://jitpack.io/v/zuccadev-labs/appLoggers.svg)](https://jitpack.io/#zuccadev-labs/appLoggers)
 ```
 
 ---
@@ -248,7 +248,7 @@ export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 dependencyResolutionManagement {
     repositories {
         maven {
-            url = uri("https://maven.pkg.github.com/devzucca/appLoggers")
+            url = uri("https://maven.pkg.github.com/zuccadev-labs/appLoggers")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")

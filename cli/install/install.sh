@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO="devzucca/appLoggers"
+REPO="zuccadev-labs/appLoggers"
 INSTALL_DIR="${APPLOGGER_CLI_INSTALL_DIR:-}"
 REQUESTED_VERSION="${APPLOGGER_CLI_VERSION:-}"
 CURL_RETRY_MAX="${APPLOGGER_CLI_CURL_RETRY_MAX:-5}"

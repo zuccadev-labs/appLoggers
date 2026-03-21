@@ -106,5 +106,5 @@ Para versiones futuras, cada entrada de cambio debe seguir este formato:
 
 ---
 
-[Unreleased]: https://github.com/devzucca/appLoggers/compare/v0.1.0-alpha.1...HEAD
-[0.1.0-alpha.1]: https://github.com/devzucca/appLoggers/releases/tag/v0.1.0-alpha.1
+[Unreleased]: https://github.com/zuccadev-labs/appLoggers/compare/v0.1.0-alpha.1...HEAD
+[0.1.0-alpha.1]: https://github.com/zuccadev-labs/appLoggers/releases/tag/v0.1.0-alpha.1

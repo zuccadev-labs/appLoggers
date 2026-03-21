@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/devzucca/appLoggers/cli/internal/cli"
+	"github.com/zuccadev-labs/appLoggers/cli/internal/cli"
 )
 
 var (

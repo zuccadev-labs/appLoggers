@@ -941,6 +941,6 @@ object AppLoggerSDK {
 
 | Consumidor | Artefacto | Cómo incluirlo |
 |---|---|---|
-| Android (Gradle) | `.aar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")` |
+| Android (Gradle) | `.aar` via maven-publish | `implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.3")` |
 | iOS (KMP puro) | XCFramework | Build con Gradle KMP desde `iosMain` |
-| JVM (Gradle) | `.jar` via maven-publish | `implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")` |
+| JVM (Gradle) | `.jar` via maven-publish | `implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.3")` |

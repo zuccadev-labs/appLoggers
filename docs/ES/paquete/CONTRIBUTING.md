@@ -49,7 +49,7 @@ Este proyecto sigue el [Contributor Covenant v2.1](https://www.contributor-coven
 
 ```bash
 # 1. Clonar
-git clone https://github.com/devzucca/appLoggers.git && cd appLoggers
+git clone https://github.com/zuccadev-labs/appLoggers.git && cd appLoggers
 
 # 2. Registrar hooks (lint + tests antes de cada push)
 git config core.hooksPath .githooks

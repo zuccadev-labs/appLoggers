@@ -1,4 +1,4 @@
-module github.com/devzucca/appLoggers/cli
+module github.com/zuccadev-labs/appLoggers/cli
 
 go 1.24
 
