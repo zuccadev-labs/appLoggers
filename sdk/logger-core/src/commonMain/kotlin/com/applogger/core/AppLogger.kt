@@ -49,7 +49,13 @@ interface AppLogger {
      * @param anomalyType Optional classification of the anomaly (e.g. "slow_response").
      * @param extra Optional key-value metadata.
      */
-    fun warn(tag: String, message: String, throwable: Throwable? = null, anomalyType: String? = null, extra: Map<String, Any>? = null)
+    fun warn(
+        tag: String,
+        message: String,
+        throwable: Throwable? = null,
+        anomalyType: String? = null,
+        extra: Map<String, Any>? = null
+    )
 
     /**
      * Logs an error. Triggers immediate batch flush.

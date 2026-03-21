@@ -46,7 +46,13 @@ class InMemoryLogger : AppLogger {
         _logs.add(LogEntry(LogLevel.INFO, tag, message, throwable, extra))
     }
 
-    override fun warn(tag: String, message: String, throwable: Throwable?, anomalyType: String?, extra: Map<String, Any>?) {
+    override fun warn(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+        anomalyType: String?,
+        extra: Map<String, Any>?
+    ) {
         _logs.add(LogEntry(LogLevel.WARN, tag, message, throwable, extra))
     }
 

@@ -78,7 +78,13 @@ class AppLoggerIos private constructor() : AppLogger {
     override fun info(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) =
         instance.info(tag, message, throwable, extra)
 
-    override fun warn(tag: String, message: String, throwable: Throwable?, anomalyType: String?, extra: Map<String, Any>?) =
+    override fun warn(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+        anomalyType: String?,
+        extra: Map<String, Any>?
+    ) =
         instance.warn(tag, message, throwable, anomalyType, extra)
 
     override fun error(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) =

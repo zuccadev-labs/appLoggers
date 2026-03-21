@@ -10,7 +10,13 @@ import com.applogger.core.AppLogger
 internal class NoOpLogger : AppLogger {
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) = Unit
     override fun info(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) = Unit
-    override fun warn(tag: String, message: String, throwable: Throwable?, anomalyType: String?, extra: Map<String, Any>?) = Unit
+    override fun warn(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+        anomalyType: String?,
+        extra: Map<String, Any>?
+    ) = Unit
     override fun error(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) = Unit
     override fun critical(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) = Unit
     override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) = Unit

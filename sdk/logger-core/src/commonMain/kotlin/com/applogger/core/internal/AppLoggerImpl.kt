@@ -26,7 +26,13 @@ internal class AppLoggerImpl(
         process(LogLevel.INFO, tag, message, throwable, extra = extra)
     }
 
-    override fun warn(tag: String, message: String, throwable: Throwable?, anomalyType: String?, extra: Map<String, Any>?) {
+    override fun warn(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+        anomalyType: String?,
+        extra: Map<String, Any>?
+    ) {
         val mergedExtra = buildMap {
             extra?.forEach { (k, v) -> put(k, v.toString()) }
             anomalyType?.let { put("anomaly_type", it) }
