@@ -407,14 +407,18 @@ jobs:
     name: Publish Homebrew Tap
     runs-on: ubuntu-latest
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.HOMEBREW_TAP_REPO != '' && secrets.HOMEBREW_TAP_TOKEN != ''
+    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.HOMEBREW_TAP_REPO != ''
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - name: Download build artifacts
+        if: env.TAP_TOKEN != ''
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
       - name: Build Homebrew formula
+        if: env.TAP_TOKEN != ''
         run: |
           VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
@@ -450,9 +454,9 @@ jobs:
           EOF
 
       - name: Push formula to tap repository
+        if: env.TAP_TOKEN != ''
         env:
           TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" tap
           mkdir -p tap/Formula
@@ -468,14 +472,18 @@ jobs:
     name: Publish Scoop Bucket
     runs-on: ubuntu-latest
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.SCOOP_BUCKET_REPO != '' && secrets.SCOOP_BUCKET_TOKEN != ''
+    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.SCOOP_BUCKET_REPO != ''
+    env:
+      SCOOP_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
     steps:
       - name: Download build artifacts
+        if: env.SCOOP_TOKEN != ''
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
       - name: Build Scoop manifest
+        if: env.SCOOP_TOKEN != ''
         run: |
           VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
@@ -499,9 +507,9 @@ jobs:
           EOF
 
       - name: Push manifest to scoop bucket
+        if: env.SCOOP_TOKEN != ''
         env:
           SCOOP_REPO: ${{ vars.SCOOP_BUCKET_REPO }}
-          SCOOP_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
         run: |
           git clone "https://x-access-token:${SCOOP_TOKEN}@github.com/${SCOOP_REPO}.git" scoop
           cp applogger-cli.json scoop/applogger-cli.json
@@ -516,14 +524,18 @@ jobs:
     name: Publish Winget Manifests
     runs-on: ubuntu-latest
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.WINGET_REPO != '' && secrets.WINGET_REPO_TOKEN != ''
+    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.WINGET_REPO != ''
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_REPO_TOKEN }}
     steps:
       - name: Download build artifacts
+        if: env.WINGET_TOKEN != ''
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
       - name: Build Winget manifests
+        if: env.WINGET_TOKEN != ''
         run: |
           VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
           DOWNLOAD_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
@@ -566,9 +578,9 @@ jobs:
           EOF
 
       - name: Push manifests to winget repo
+        if: env.WINGET_TOKEN != ''
         env:
           WINGET_REPO: ${{ vars.WINGET_REPO }}
-          WINGET_TOKEN: ${{ secrets.WINGET_REPO_TOKEN }}
         run: |
           git clone "https://x-access-token:${WINGET_TOKEN}@github.com/${WINGET_REPO}.git" winget-repo
           mkdir -p "winget-repo/manifests/d/DevZucca/AppLoggerCLI"
