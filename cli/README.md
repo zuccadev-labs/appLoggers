@@ -96,7 +96,8 @@ Config file resolution:
 
 - `--config <path>`
 - `APPLOGGER_CONFIG`
-- Default path: `os.UserConfigDir()/applogger/cli.json`
+- Default path: `$HOME/.applogger-cli/cli.json`
+- Legacy fallback path: `os.UserConfigDir()/applogger/cli.json`
 
 Recommended JSON structure:
 
@@ -201,7 +202,13 @@ applogger-cli health --output json
 applogger-cli --project klinema telemetry query --source logs --severity error --output json
 
 # Workspace-based autodetection via APPLOGGER_CONFIG
-APPLOGGER_CONFIG="$HOME/.config/applogger/cli.json" applogger-cli telemetry query --source logs --limit 25 --output json
+APPLOGGER_CONFIG="$HOME/.applogger-cli/cli.json" applogger-cli telemetry query --source logs --limit 25 --output json
+
+# Upgrade CLI to latest published release
+applogger-cli upgrade
+
+# Upgrade to an explicit release tag
+applogger-cli upgrade --version applogger-cli-v0.1.1
 
 # Minimal telemetry query
 applogger-cli telemetry query
