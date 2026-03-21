@@ -109,6 +109,11 @@ tasks.matching { it.name.startsWith("compile") && it.name.contains("Kotlin") }
         dependsOn(generateAppLoggerVersion)
     }
 
+tasks.matching { it.name.contains("SourcesJar", ignoreCase = true) }
+    .configureEach {
+        dependsOn(generateAppLoggerVersion)
+    }
+
 android {
     namespace = "com.applogger.core"
     compileSdk = libs.versions.compileSdk.get().toInt()
