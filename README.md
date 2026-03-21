@@ -88,17 +88,14 @@ appLoggers/
 ### Instalación Rápida (3 minutos)
 
 ```bash
-# Linux / macOS
-curl -L https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
-  -o /usr/local/bin/applogger-cli
-chmod +x /usr/local/bin/applogger-cli
+# Linux / macOS (instala la ultima release del CLI)
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
 
 # Windows (PowerShell)
-$url = "https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-windows-amd64.exe"
-Invoke-WebRequest -Uri $url -OutFile "$env:ProgramFiles\applogger-cli.exe"
+irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
 
 # Verificar
-applogger-cli --version
+applogger-cli version --output json
 ```
 
 ### Primeros Comandos
@@ -196,7 +193,7 @@ applogger-cli telemetry agent-response \
 | Android SDK | API 35 (compileSdk) | Android Studio → SDK Manager |
 | Gradle | 8.10.2 (usa el wrapper) | `cd sdk && ./gradlew --version` |
 | Git | 2.30+ | `git --version` |
-| Go | 1.25+ (solo si editas el CLI) | `go version` |
+| Go | 1.24+ (solo si editas el CLI) | `go version` |
 
 ### Paso 1 — Clonar el repositorio
 

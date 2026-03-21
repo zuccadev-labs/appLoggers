@@ -35,6 +35,30 @@ go mod tidy
 go run ./cmd/applogger-cli --syncbin-metadata --output json
 ```
 
+## Standard Installation
+
+One-line installers for the latest published CLI release:
+
+```bash
+# Linux
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+
+# macOS
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+```
+
+```powershell
+# Windows PowerShell
+irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+```
+
+Notes:
+
+- The bash installer auto-detects Linux vs macOS and `amd64` vs `arm64`.
+- The PowerShell installer installs `applogger-cli.exe` into the user profile and adds it to the user `PATH`.
+- Both installers resolve the latest `applogger-cli-v*` GitHub Release automatically.
+- To pin a specific release, set `APPLOGGER_CLI_VERSION`, for example `APPLOGGER_CLI_VERSION=applogger-cli-v0.1.0`.
+
 ## Supabase Configuration (Environment Variables)
 
 The CLI reads Supabase configuration from environment variables:
@@ -166,3 +190,14 @@ go test ./...
 ## Plugin Metadata
 
 Syncbin plugin metadata lives in `plugin-metadata.yaml`.
+
+## Release Distribution Contract
+
+- Published binaries come from GitHub Releases tagged as `applogger-cli-v*`.
+- Current release assets:
+  - `applogger-cli-linux-amd64`
+  - `applogger-cli-linux-arm64`
+  - `applogger-cli-darwin-amd64`
+  - `applogger-cli-darwin-arm64`
+  - `applogger-cli-windows-amd64.exe`
+- Each asset is accompanied by a `.sha256` checksum file.

@@ -13,14 +13,35 @@ Use this skill when a Copilot agent or automation needs to interact with AppLogg
 
 ## Hard Rules
 
-1. Prefer `--output agent` for machine consumption (TOON compact encoding via toon-go).
-2. Use `--output json` when downstream systems require JSON strictly.
-2. Treat exit code 0 as success, 1 as runtime failure, 2 as usage error.
-3. Run `agent schema` and `capabilities` before implementing new automation assumptions.
-4. Do not parse free-form text when JSON is available.
+1. Before telemetry usage, ensure the CLI is installed and executable on the current host.
+2. Prefer `--output agent` for machine consumption (TOON compact encoding via toon-go).
+3. Use `--output json` when downstream systems require JSON strictly.
+4. Treat exit code 0 as success, 1 as runtime failure, 2 as usage error.
+5. Run `agent schema` and `capabilities` before implementing new automation assumptions.
+6. Do not parse free-form text when JSON is available.
+
+## Installation Bootstrap
+
+If `applogger-cli` is not yet available, install it using the host-native one-line bootstrap:
+
+1. Linux:
+   - `curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash`
+2. macOS:
+   - `curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash`
+3. Windows PowerShell:
+   - `irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex`
+
+Bootstrap rules:
+
+1. Verify install by running `applogger-cli version --output json`.
+2. If `PATH` changed during installation, start a new shell or invoke the installed binary by absolute path once.
+3. To pin a specific version, set `APPLOGGER_CLI_VERSION=applogger-cli-vX.Y.Z` before invoking the installer.
+4. On macOS/Linux, the bash installer validates SHA-256 checksums for release assets when verification tools are available.
 
 ## Standard Command Set
 
+0. Installation verification:
+   - `applogger-cli version --output json`
 1. Metadata discovery:
    - `applogger-cli --syncbin-metadata --output json`
 2. Version/build discovery:
@@ -73,3 +94,4 @@ Telemetry notes:
 3. If querying logs, state whether `extra` or `extra.anomaly_type` influenced the decision.
 4. Report retries and final status.
 5. Report remaining uncertainty if command is preview status.
+6. If installation was required, report install source, resolved version tag, detected OS/arch, and installed path.

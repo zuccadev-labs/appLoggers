@@ -53,13 +53,25 @@ usuario operativo del CLI, hardening y troubleshooting), ver:
 
 ```bash
 # Linux / macOS
-curl -L https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
-  -o /usr/local/bin/applogger-cli
-chmod +x /usr/local/bin/applogger-cli
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
 
 # Verificar
-applogger-cli --version
+applogger-cli version --output json
 ```
+
+```powershell
+# Windows PowerShell
+irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+
+# Verificar
+applogger-cli version --output json
+```
+
+Notas:
+
+- En macOS se usa el mismo instalador `bash`; detecta Intel vs Apple Silicon.
+- En Linux detecta `amd64` vs `arm64`.
+- En Windows instala en el perfil del usuario y actualiza `PATH`.
 
 ---
 

@@ -29,6 +29,35 @@ This skill enables AI agents and automation systems to **safely, predictably, an
 
 ## Core Concepts
 
+### 0. Instalacion bootstrap del CLI
+
+Si `applogger-cli` no existe aun en la maquina del agente, instalar primero:
+
+```bash
+# Linux
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+
+# macOS (Intel / Apple Silicon)
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+```
+
+```powershell
+# Windows PowerShell
+irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+```
+
+Despues verificar:
+
+```bash
+applogger-cli version --output json
+```
+
+Reglas:
+
+- Si el instalador cambia `PATH`, abrir una nueva shell o ejecutar por ruta absoluta una vez.
+- Para fijar version: definir `APPLOGGER_CLI_VERSION=applogger-cli-vX.Y.Z` antes de instalar.
+- En macOS y Linux el instalador valida checksums SHA-256 cuando las herramientas del sistema estan disponibles.
+
 ### 1. Agent Contract Discovery
 
 Before executing any command, **always** discover capabilities and schema:
@@ -634,9 +663,7 @@ jobs:
     steps:
       - name: Install CLI
         run: |
-          curl -L https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
-            -o /tmp/applogger-cli
-          chmod +x /tmp/applogger-cli
+          curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
 
       - name: Query errors (last 24h)
         env:
@@ -684,8 +711,7 @@ which applogger-cli
 echo $PATH
 
 # Reinstall
-curl -L https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
-  -o /usr/local/bin/applogger-cli && chmod +x /usr/local/bin/applogger-cli
+curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ### "backend health check failed"
@@ -742,7 +768,7 @@ A: No. Each `applogger-cli` call hits Supabase. Cache in your agent if needed.
 
 | CLI Version | Node Version | Go | Status |
 |---|---|---|---|
-| 0.1.0-alpha.0+ | N/A | 1.25+ | Current |
+| 0.1.0-alpha.0+ | N/A | 1.24+ | Current |
 | 0.2.0+ (planned) | N/A | 1.26+ | Future |
 
 ---
