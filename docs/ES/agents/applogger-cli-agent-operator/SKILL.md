@@ -93,7 +93,7 @@ Project config path precedence:
 
 1. `--config <path>`
 2. `APPLOGGER_CONFIG`
-3. Default user config path (`os.UserConfigDir()/applogger/cli.json`)
+3. Default user config path (`~/.applogger-cli/cli.json`; fallback legacy: `os.UserConfigDir()/applogger/cli.json`)
 
 Rules for agents:
 

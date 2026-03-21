@@ -1,6 +1,6 @@
 # AppLogger CLI — Guía de Instalación
 
-**Última actualización**: 2026-03-20  
+**Última actualización**: 2026-03-21  
 **Versión mínima**: Go 1.24+ (si compilas desde fuente)  
 **Plataformas soportadas**: Windows, macOS, Linux (x86_64, ARM64)
 
@@ -13,6 +13,7 @@
 - [Compilar desde Fuente](#compilar-desde-fuente)
 - [Configuración Inicial](#configuración-inicial)
 - [Verificación](#verificación)
+- [Upgrade en Sitio](#upgrade-en-sitio)
 - [Solución de Problemas](#solución-de-problemas)
 
 ---
@@ -64,12 +65,32 @@ Parámetros de red (opcionales):
 Para fijar una versión específica:
 
 ```bash
-APPLOGGER_CLI_VERSION=applogger-cli-v0.1.0 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
+APPLOGGER_CLI_VERSION=applogger-cli-v0.1.1 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ```powershell
-$env:APPLOGGER_CLI_VERSION = 'applogger-cli-v0.1.0'
+$env:APPLOGGER_CLI_VERSION = 'applogger-cli-v0.1.1'
 irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
+```
+
+## Upgrade en Sitio
+
+Con una version reciente del CLI puedes actualizar directamente desde el binario:
+
+```bash
+applogger-cli upgrade
+```
+
+Version especifica:
+
+```bash
+applogger-cli upgrade --version applogger-cli-v0.1.1
+```
+
+Forzar reinstalacion aunque ya coincida la version:
+
+```bash
+applogger-cli upgrade --force
 ```
 
 ### Opción 2: Descargar Binario (Manual)

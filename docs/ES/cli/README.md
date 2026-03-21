@@ -1,7 +1,7 @@
 # AppLogger CLI — Guía de Uso y Referencia
 
-**Última actualización**: 2026-03-19  
-**Versión**: v0.1.0-alpha.0  
+**Última actualización**: 2026-03-21  
+**Versión**: v0.1.1  
 **Status**: Production-ready (beta)
 
 ---
@@ -103,6 +103,27 @@ Notas:
 ---
 
 ## Comandos Principales
+
+### `applogger-cli upgrade`
+Actualiza el binario del CLI a la ultima release publicada `applogger-cli-v*`.
+
+```bash
+applogger-cli upgrade
+```
+
+Version especifica:
+
+```bash
+applogger-cli upgrade --version applogger-cli-v0.1.1
+```
+
+Para reinstalar incluso si ya coincide la version actual:
+
+```bash
+applogger-cli upgrade --force
+```
+
+---
 
 ### `applogger-cli version`
 Muestra la versión del CLI.

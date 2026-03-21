@@ -1,6 +1,6 @@
 # AppLogger CLI - Guia Detallada de Configuracion Supabase y Usuario Operativo
 
-Ultima actualizacion: 2026-03-19
+Ultima actualizacion: 2026-03-21
 
 ## Objetivo
 
@@ -87,8 +87,8 @@ Variables de control:
 
 Ruta default del archivo:
 
-- Windows: `%AppData%/applogger/cli.json`
-- Linux/macOS: `$(os.UserConfigDir)/applogger/cli.json`
+- Windows/Linux/macOS: `~/.applogger-cli/cli.json`
+- Fallback legacy compatible: `$(os.UserConfigDir)/applogger/cli.json`
 
 Ejemplo recomendado:
 

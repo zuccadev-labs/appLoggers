@@ -44,13 +44,25 @@ func loadSupabaseConfigFromProjectConfig() (supabaseConfig, error) {
 
 	_, statErr := os.Stat(configPath)
 	if statErr != nil {
-		if os.IsNotExist(statErr) && !explicitConfigPath && explicitProject == "" {
-			return supabaseConfig{}, os.ErrNotExist
+		if os.IsNotExist(statErr) && !explicitConfigPath {
+			if legacyPath := legacyProjectConfigPath(); legacyPath != "" {
+				if _, legacyErr := os.Stat(legacyPath); legacyErr == nil {
+					configPath = legacyPath
+					statErr = nil
+				} else if !os.IsNotExist(legacyErr) {
+					return supabaseConfig{}, fmt.Errorf("failed to stat legacy project config %s: %w", legacyPath, legacyErr)
+				}
+			}
 		}
-		if os.IsNotExist(statErr) {
-			return supabaseConfig{}, fmt.Errorf("project config file not found: %s", configPath)
+		if statErr != nil {
+			if os.IsNotExist(statErr) && !explicitConfigPath && explicitProject == "" {
+				return supabaseConfig{}, os.ErrNotExist
+			}
+			if os.IsNotExist(statErr) {
+				return supabaseConfig{}, fmt.Errorf("project config file not found: %s", configPath)
+			}
+			return supabaseConfig{}, fmt.Errorf("failed to stat project config %s: %w", configPath, statErr)
 		}
-		return supabaseConfig{}, fmt.Errorf("failed to stat project config %s: %w", configPath, statErr)
 	}
 
 	content, err := os.ReadFile(configPath)
@@ -124,11 +136,19 @@ func resolveProjectConfigPath() (string, bool) {
 	if value := strings.TrimSpace(os.Getenv("APPLOGGER_CONFIG")); value != "" {
 		return value, true
 	}
-	baseDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", false
 	}
-	return filepath.Join(baseDir, "applogger", "cli.json"), false
+	return filepath.Join(homeDir, ".applogger-cli", "cli.json"), false
+}
+
+func legacyProjectConfigPath() string {
+	baseDir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(baseDir, "applogger", "cli.json")
 }
 
 func activeProjectName() string {

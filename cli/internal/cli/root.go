@@ -80,6 +80,7 @@ func init() {
 	_ = rootCmd.Flags().MarkHidden("syncbin-metadata")
 
 	rootCmd.AddCommand(newVersionCommand())
+	rootCmd.AddCommand(newUpgradeCommand())
 	rootCmd.AddCommand(newCapabilitiesCommand())
 	rootCmd.AddCommand(newHealthCommand())
 	rootCmd.AddCommand(newAgentCommand())
