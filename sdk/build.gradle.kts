@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = findProperty("GROUP")?.toString() ?: "com.github.zuccadev-labs"
-    version = findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.4"
+    version = findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.5"
 }
 
 detekt {
