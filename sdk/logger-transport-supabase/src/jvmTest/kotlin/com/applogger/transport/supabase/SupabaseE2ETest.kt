@@ -45,7 +45,7 @@ class SupabaseE2ETest {
 
         private val testDeviceInfo = DeviceInfo(
             brand = "E2E-Test", model = "CI-Runner", osVersion = "test",
-            apiLevel = 0, platform = "JVM_TEST", appVersion = "0.1.1-alpha.3",
+            apiLevel = 0, platform = "JVM_TEST", appVersion = "0.1.1-alpha.4",
             appBuild = 1, isLowRamDevice = false, connectionType = "ethernet"
         )
 

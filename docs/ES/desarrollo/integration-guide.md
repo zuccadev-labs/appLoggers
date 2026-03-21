@@ -1,6 +1,6 @@
 # AppLogger — Guía de Integración
 
-**Versión SDK:** 0.1.1-alpha.3  
+**Versión SDK:** 0.1.1-alpha.4  
 **Plataforma:** Android (Mobile + TV) · iOS · JVM  
 **Fecha:** 2026-03-17
 
@@ -78,10 +78,10 @@ En el `build.gradle.kts` del módulo `app`:
 ```kotlin
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.4")
 
     // Módulo de transporte Supabase (opcional — incluido en el core)
-    // implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.3")
+    // implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.4")
 }
 ```
 

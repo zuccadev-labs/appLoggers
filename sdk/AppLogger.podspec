@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'AppLogger'
-  s.version          = '0.1.1-alpha.3'
+  s.version          = '0.1.1-alpha.4'
   s.summary          = 'Kotlin Multiplatform SDK for structured technical telemetry.'
   s.description      = <<-DESC
     AppLogger is a Kotlin Multiplatform SDK that captures structured logs and metrics

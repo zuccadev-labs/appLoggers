@@ -1,5 +1,5 @@
 [versions]
-applogger         = "0.1.1-alpha.3"
+applogger         = "0.1.1-alpha.4"
 kotlin            = "2.1.0"
 agp               = "8.7.3"
 coroutines        = "1.9.0"
