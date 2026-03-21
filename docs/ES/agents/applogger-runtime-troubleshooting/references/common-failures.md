@@ -8,6 +8,7 @@
 6. AppLogger keys missing in `local.properties`.
 7. Wrong SDK imports (`com.applogger.sdk.*` instead of `com.applogger.core.*`).
 8. Misreading Logcat behavior: expecting console output with `isDebugMode=false`.
+9. Passing `throwable` as 3rd positional argument to `warn()` when `anomalyType` is also intended — pass by name: `warn(tag, message, throwable = e, anomalyType = "TYPE")`.
 
 Fix policy for `local.properties`:
 

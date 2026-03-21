@@ -18,6 +18,8 @@ Use this skill when the user needs:
 1. Prioritize business-critical and reliability-critical signals.
 2. Avoid noisy low-value logging.
 3. Keep naming stable and searchable.
+4. All log levels (`debug`, `info`, `warn`, `error`, `critical`) accept an optional `throwable: Throwable?` parameter — recommend it for any error or anomaly event.
+5. For classes that hold an `AppLogger` reference, recommend `Any.logD/I/W/E/C(logger, ...)` from `AppLoggerExtensions` to avoid repeating the tag manually.
 
 ## Workflow
 

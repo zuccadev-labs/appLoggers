@@ -12,7 +12,7 @@
 
 1. Android: `Application.onCreate()` or the main DI/bootstrap layer.
 2. KMP iOS: shared Kotlin bootstrap invoked from app startup code.
-3. Shared business logic: helper wrappers in `commonMain` for repeated usage.
+3. Shared business logic: use `AppLoggerExtensions` (`Any.logD/I/W/E/C`) in `commonMain` for repeated usage — tag is inferred automatically from the class name.
 
 ## First-pass integration policy
 
