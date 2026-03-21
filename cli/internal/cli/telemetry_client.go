@@ -12,25 +12,27 @@ import (
 )
 
 type telemetryQueryRequest struct {
-	Source     string `json:"source" toon:"source"`
-	Aggregate  string `json:"aggregate,omitempty" toon:"aggregate,omitempty"`
-	From       string `json:"from,omitempty" toon:"from,omitempty"`
-	To         string `json:"to,omitempty" toon:"to,omitempty"`
-	Severity   string `json:"severity,omitempty" toon:"severity,omitempty"`
-	SessionID  string `json:"session_id,omitempty" toon:"session_id,omitempty"`
-	Tag        string `json:"tag,omitempty" toon:"tag,omitempty"`
-	Name       string `json:"name,omitempty" toon:"name,omitempty"`
+	Source      string `json:"source" toon:"source"`
+	Aggregate   string `json:"aggregate,omitempty" toon:"aggregate,omitempty"`
+	From        string `json:"from,omitempty" toon:"from,omitempty"`
+	To          string `json:"to,omitempty" toon:"to,omitempty"`
+	Severity    string `json:"severity,omitempty" toon:"severity,omitempty"`
+	SessionID   string `json:"session_id,omitempty" toon:"session_id,omitempty"`
+	Tag         string `json:"tag,omitempty" toon:"tag,omitempty"`
+	Name        string `json:"name,omitempty" toon:"name,omitempty"`
 	AnomalyType string `json:"anomaly_type,omitempty" toon:"anomaly_type,omitempty"`
-	Limit      int    `json:"limit" toon:"limit"`
+	Limit       int    `json:"limit" toon:"limit"`
 }
 
 type telemetryQueryResponse struct {
-	OK      bool                  `json:"ok" toon:"ok"`
-	Source  string                `json:"source" toon:"source"`
-	Count   int                   `json:"count" toon:"count"`
-	Request telemetryQueryRequest `json:"request" toon:"request"`
-	Rows    []map[string]any      `json:"rows" toon:"rows"`
-	Summary *telemetryAggregation `json:"summary,omitempty" toon:"summary,omitempty"`
+	OK           bool                  `json:"ok" toon:"ok"`
+	Project      string                `json:"project,omitempty" toon:"project,omitempty"`
+	ConfigSource string                `json:"config_source,omitempty" toon:"config_source,omitempty"`
+	Source       string                `json:"source" toon:"source"`
+	Count        int                   `json:"count" toon:"count"`
+	Request      telemetryQueryRequest `json:"request" toon:"request"`
+	Rows         []map[string]any      `json:"rows" toon:"rows"`
+	Summary      *telemetryAggregation `json:"summary,omitempty" toon:"summary,omitempty"`
 }
 
 func queryTelemetry(ctx context.Context, cfg supabaseConfig, req telemetryQueryRequest) (telemetryQueryResponse, error) {

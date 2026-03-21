@@ -110,7 +110,13 @@ func newTelemetryCommand() *cobra.Command {
 		if err != nil {
 			return telemetryQueryResponse{}, err
 		}
-		return queryTelemetry(context.Background(), cfg, req)
+			response, err := queryTelemetry(context.Background(), cfg, req)
+			if err != nil {
+				return telemetryQueryResponse{}, err
+			}
+			response.Project = cfg.Project
+			response.ConfigSource = cfg.ConfigSource
+			return response, nil
 	}
 
 	queryCmd := &cobra.Command{

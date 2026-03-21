@@ -14,6 +14,8 @@ var (
 	outputFormat    string
 	verbose         bool
 	syncbinMetadata bool
+	projectName     string
+	configFilePath  string
 )
 
 var rootCmd = &cobra.Command{
@@ -72,6 +74,8 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", "text", "Output format: text|json|agent")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().StringVar(&projectName, "project", "", "Project profile to use from the AppLogger CLI config")
+	rootCmd.PersistentFlags().StringVar(&configFilePath, "config", "", "Path to the AppLogger CLI project config file")
 	rootCmd.Flags().BoolVar(&syncbinMetadata, "syncbin-metadata", false, "Print Syncbin metadata")
 	_ = rootCmd.Flags().MarkHidden("syncbin-metadata")
 

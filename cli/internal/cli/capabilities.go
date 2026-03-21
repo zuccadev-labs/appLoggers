@@ -15,6 +15,7 @@ type capabilityEntry struct {
 type capabilitiesPayload struct {
 	Name         string            `json:"name"`
 	Version      string            `json:"version"`
+	ConfigInputs []string          `json:"config_inputs,omitempty"`
 	OutputModes  []string          `json:"output_modes"`
 	ExitCodes    map[string]int    `json:"exit_codes"`
 	Capabilities []capabilityEntry `json:"capabilities"`
@@ -24,6 +25,7 @@ func buildCapabilitiesPayload() capabilitiesPayload {
 	return capabilitiesPayload{
 		Name:        "applogger-cli",
 		Version:     buildVersion,
+		ConfigInputs: []string{"environment", "project_config", "workspace_autodetect"},
 		OutputModes: []string{"text", "json", "agent"},
 		ExitCodes: map[string]int{
 			"success":     exitCodeSuccess,
@@ -36,7 +38,7 @@ func buildCapabilitiesPayload() capabilitiesPayload {
 			{Name: "capabilities", Description: "Machine-readable CLI capabilities", Stability: "stable"},
 			{Name: "health", Description: "Runtime readiness probe", Stability: "stable"},
 			{Name: "agent schema", Description: "Schema and execution contract for agent clients", Stability: "stable"},
-			{Name: "telemetry query", Description: "Telemetry query endpoint backed by Supabase with optional aggregation", Stability: "preview"},
+			{Name: "telemetry query", Description: "Telemetry query endpoint backed by Supabase with optional aggregation and multi-project resolution", Stability: "preview"},
 			{Name: "telemetry agent-response", Description: "Compact TOON response optimized for agent orchestration", Stability: "preview"},
 		},
 	}

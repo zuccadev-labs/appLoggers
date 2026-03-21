@@ -43,10 +43,12 @@ func newAgentCommand() *cobra.Command {
 			payload := agentSchemaPayload{
 				Name:            "applogger-cli",
 				Version:         buildVersion,
-				Recommendation:  "Agents should prefer --output agent (TOON) and use --output json when strict JSON is required",
+				Recommendation:  "Agents should prefer --output agent (TOON) and use --output json when strict JSON is required; when multiple telemetry apps exist, resolve the active project via --project, APPLOGGER_PROJECT, or workspace autodetection",
 				DefaultOutput:   "text",
 				ContractVersion: "1.0.0",
 				EnvVars: []string{
+					"APPLOGGER_CONFIG",
+					"APPLOGGER_PROJECT",
 					"appLogger_supabaseUrl",
 					"appLogger_supabaseKey",
 					"appLogger_supabaseSchema",
@@ -58,7 +60,7 @@ func newAgentCommand() *cobra.Command {
 					{Command: "--syncbin-metadata", Description: "Metadata discovery endpoint", OutputModes: []string{"text", "json", "agent"}, Stable: true},
 					{Command: "version", Description: "CLI build information", OutputModes: []string{"text", "json", "agent"}, Stable: true},
 					{Command: "capabilities", Description: "Feature discovery endpoint", OutputModes: []string{"text", "json", "agent"}, Stable: true},
-					{Command: "health", Description: "Readiness endpoint", OutputModes: []string{"text", "json", "agent"}, Stable: true},
+					{Command: "health", Description: "Readiness endpoint with resolved project context when available", OutputModes: []string{"text", "json", "agent"}, Stable: true},
 					{Command: "telemetry query", Description: "Telemetry query command backed by Supabase with optional aggregation", OutputModes: []string{"text", "json", "agent"}, Stable: false},
 					{Command: "telemetry agent-response", Description: "Compact TOON envelope dedicated to agent orchestration", OutputModes: []string{"agent"}, Stable: false},
 				},

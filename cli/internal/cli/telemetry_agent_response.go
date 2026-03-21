@@ -3,6 +3,8 @@ package cli
 type telemetryAgentResponse struct {
 	Kind        string                `json:"kind" toon:"kind"`
 	OK          bool                  `json:"ok" toon:"ok"`
+	Project     string                `json:"project,omitempty" toon:"project,omitempty"`
+	ConfigSource string               `json:"config_source,omitempty" toon:"config_source,omitempty"`
 	Source      string                `json:"source" toon:"source"`
 	Count       int                   `json:"count" toon:"count"`
 	Request     telemetryQueryRequest `json:"request" toon:"request"`
@@ -34,6 +36,8 @@ func buildTelemetryAgentResponse(resp telemetryQueryResponse, previewLimit int) 
 	return telemetryAgentResponse{
 		Kind:        "telemetry_agent_response",
 		OK:          resp.OK,
+		Project:     resp.Project,
+		ConfigSource: resp.ConfigSource,
 		Source:      resp.Source,
 		Count:       resp.Count,
 		Request:     resp.Request,
