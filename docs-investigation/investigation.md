@@ -53,7 +53,7 @@ Implementar logging de forma ingenua puede convertir **la solución en el proble
 | Llamar al logger en el hilo principal | ANR (Application Not Responding) |
 | Sin control de volumen en WebSocket/gRPC | 10.000 eventos/minuto → colapso del backend |
 
-### 1.3 Objetivo del Paquete                                                                                                                                                                                                                                                                  
+### 1.3 Objetivo del Paquete
 
 Diseñar `AppLogger` como un paquete Kotlin de código abierto que:
 

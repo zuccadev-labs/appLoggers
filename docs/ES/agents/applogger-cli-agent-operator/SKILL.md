@@ -459,23 +459,23 @@ print(result['kind'])
 
 ```go
 import (
-	"encoding/json"
-	"os/exec"
+ "encoding/json"
+ "os/exec"
 )
 
 // Struct matching telemetry_agent_response
 type AgentResponse struct {
-	Kind   string `json:"kind"`
-	OK     bool   `json:"ok"`
-	Source string `json:"source"`
-	Count  int    `json:"count"`
+ Kind   string `json:"kind"`
+ OK     bool   `json:"ok"`
+ Source string `json:"source"`
+ Count  int    `json:"count"`
 }
 
 // Execute
 cmd := exec.Command("applogger-cli", "telemetry", "agent-response",
-	"--source", "logs",
-	"--aggregate", "severity",
-	"--output", "agent")
+ "--source", "logs",
+ "--aggregate", "severity",
+ "--output", "agent")
 
 output, _ := cmd.Output()
 

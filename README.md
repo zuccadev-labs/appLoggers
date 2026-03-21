@@ -1,5 +1,3 @@
-<!-- markdownlint-disable MD013 MD040 MD051 MD060 MD029 -->
-
 # AppLoggers
 
 Monorepo de telemetría técnica — **SDK** · Frontend · CLI.

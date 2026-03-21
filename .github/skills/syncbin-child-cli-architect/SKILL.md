@@ -228,7 +228,6 @@ Testing: testify (assertions)
 
 **Complete Implementation Template**:
 
-
 **Step 1: Project Setup**
 ```bash
 # Create project structure
@@ -1037,9 +1036,9 @@ START: Implement tests
 │  - Test exit codes
 │
 └─ End-to-end tests
-   - Test full workflows
-   - Test with real dependencies
-   - CI/CD validation
+- Test full workflows
+- Test with real dependencies
+- CI/CD validation
 ```
 
 ### Tree 3: Distribution Strategy

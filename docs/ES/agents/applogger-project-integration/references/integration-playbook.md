@@ -50,21 +50,21 @@ Do not use `com.applogger.sdk.*` imports.
 
 ```kotlin
 val transport = SupabaseTransport(
-	endpoint = BuildConfig.LOGGER_URL,
-	apiKey = BuildConfig.LOGGER_KEY
+ endpoint = BuildConfig.LOGGER_URL,
+ apiKey = BuildConfig.LOGGER_KEY
 )
 
 AppLoggerSDK.initialize(
-	context = this,
-	config = AppLoggerConfig.Builder()
-		.endpoint(BuildConfig.LOGGER_URL)
-		.apiKey(BuildConfig.LOGGER_KEY)
-		.debugMode(BuildConfig.LOGGER_DEBUG)
-		.consoleOutput(BuildConfig.LOGGER_DEBUG)
-		.batchSize(20)
-		.flushIntervalSeconds(30)
-		.build(),
-	transport = transport
+ context = this,
+ config = AppLoggerConfig.Builder()
+  .endpoint(BuildConfig.LOGGER_URL)
+  .apiKey(BuildConfig.LOGGER_KEY)
+  .debugMode(BuildConfig.LOGGER_DEBUG)
+  .consoleOutput(BuildConfig.LOGGER_DEBUG)
+  .batchSize(20)
+  .flushIntervalSeconds(30)
+  .build(),
+ transport = transport
 )
 ```
 
