@@ -114,6 +114,11 @@ tasks.matching { it.name.contains("SourcesJar", ignoreCase = true) }
         dependsOn(generateAppLoggerVersion)
     }
 
+tasks.matching { it.name.contains("dokka", ignoreCase = true) }
+    .configureEach {
+        dependsOn(generateAppLoggerVersion)
+    }
+
 android {
     namespace = "com.applogger.core"
     compileSdk = libs.versions.compileSdk.get().toInt()
