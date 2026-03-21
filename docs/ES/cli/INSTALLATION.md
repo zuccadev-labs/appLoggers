@@ -504,7 +504,7 @@ go build -o applogger-cli ./cmd/applogger-cli
 
 ## Siguiente Paso
 
-Una vez instalado, consulta [../../cli/README.md](../../cli/README.md) para:
+Una vez instalado, consulta [./README.md](./README.md) para:
 - Comandos disponibles
 - Ejemplos de consultas
 - Modo agent para automatización
