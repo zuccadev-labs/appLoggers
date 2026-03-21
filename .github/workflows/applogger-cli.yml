@@ -335,7 +335,7 @@ jobs:
             },
             "bin": "applogger-cli-windows-amd64.exe",
             "checkver": {
-              "github": "devzucca/appLoggers"
+              "github": "zuccadev-labs/appLoggers"
             },
             "autoupdate": {
               "architecture": {

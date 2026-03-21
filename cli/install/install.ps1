@@ -9,7 +9,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$Repo = 'devzucca/appLoggers'
+$Repo = 'zuccadev-labs/appLoggers'
 
 function Write-Log {
     param([string]$Message)

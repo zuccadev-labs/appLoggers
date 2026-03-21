@@ -9,7 +9,7 @@ plugins {
 }
 
 allprojects {
-    group = findProperty("GROUP")?.toString() ?: "com.github.devzucca"
+    group = findProperty("GROUP")?.toString() ?: "com.github.zuccadev-labs"
     version = findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
 }
 
@@ -32,7 +32,7 @@ subprojects {
         if (plugins.hasPlugin("maven-publish")) {
             extensions.configure<PublishingExtension> {
                 publications.withType<MavenPublication> {
-                    groupId = project.findProperty("GROUP")?.toString() ?: "com.github.devzucca"
+                    groupId = project.findProperty("GROUP")?.toString() ?: "com.github.zuccadev-labs"
                     version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
 
                     pom {
@@ -64,7 +64,7 @@ subprojects {
                 repositories {
                     maven {
                         name = "GitHubPackages"
-                        url = uri("https://maven.pkg.github.com/devzucca/appLoggers")
+                        url = uri("https://maven.pkg.github.com/zuccadev-labs/appLoggers")
                         credentials {
                             username = System.getenv("GITHUB_ACTOR") ?: ""
                             password = System.getenv("GITHUB_TOKEN") ?: ""

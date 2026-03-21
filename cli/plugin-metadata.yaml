@@ -3,9 +3,9 @@ version: 0.1.0-alpha.0
 description: AppLoggers telemetry CLI for operational queries, health checks, and AI agent automation
 author: devzucca
 license: MIT
-homepage: https://github.com/devzucca/appLoggers
-repository: https://github.com/devzucca/appLoggers
-documentation: https://github.com/devzucca/appLoggers/tree/main/docs/ES/cli
+homepage: https://github.com/zuccadev-labs/appLoggers
+repository: https://github.com/zuccadev-labs/appLoggers
+documentation: https://github.com/zuccadev-labs/appLoggers/tree/main/docs/ES/cli
 entrypoint: applogger-cli
 
 # Syncbin Universal Contract

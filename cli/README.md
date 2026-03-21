@@ -41,15 +41,15 @@ One-line installers for the latest published CLI release:
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
 # macOS
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ```powershell
 # Windows PowerShell
-irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 ```
 
 Notes:

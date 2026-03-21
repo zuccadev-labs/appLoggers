@@ -80,7 +80,7 @@ applogger-cli --project klinema telemetry query --source logs --severity error -
 
 ```bash
 # Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
 # Verificar
 applogger-cli version --output json
@@ -88,7 +88,7 @@ applogger-cli version --output json
 
 ```powershell
 # Windows PowerShell
-irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 
 # Verificar
 applogger-cli version --output json
@@ -649,5 +649,5 @@ date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ'          # BSD date (macOS)
 ---
 
 **¿Preguntas?**  
-→ [GitHub Issues](https://github.com/devzucca/appLoggers/issues)  
-→ [Discussions](https://github.com/devzucca/appLoggers/discussions)
+→ [GitHub Issues](https://github.com/zuccadev-labs/appLoggers/issues)  
+→ [Discussions](https://github.com/zuccadev-labs/appLoggers/discussions)

@@ -129,7 +129,7 @@ gh auth login
 ## 3. Clonar y Configurar el Repositorio
 
 ```bash
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers
 ```
 
@@ -345,7 +345,7 @@ act push -W .github/workflows/ci.yml --job test
    # → CI remoto: lint → test → security
 
 5. Merge (solo cuando CI está en verde)
-   # Revisar en https://github.com/devzucca/appLoggers/pulls
+   # Revisar en https://github.com/zuccadev-labs/appLoggers/pulls
 ```
 
 ### Diagrama de ramas

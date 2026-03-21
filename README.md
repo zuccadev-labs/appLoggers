@@ -2,8 +2,8 @@
 
 Monorepo de telemetría técnica — **SDK** · Frontend · CLI.
 
-[![CI](https://github.com/devzucca/appLoggers/actions/workflows/ci.yml/badge.svg)](https://github.com/devzucca/appLoggers/actions/workflows/ci.yml)
-[![JitPack](https://jitpack.io/v/devzucca/appLoggers.svg)](https://jitpack.io/#devzucca/appLoggers)
+[![CI](https://github.com/zuccadev-labs/appLoggers/actions/workflows/ci.yml/badge.svg)](https://github.com/zuccadev-labs/appLoggers/actions/workflows/ci.yml)
+[![JitPack](https://jitpack.io/v/zuccadev-labs/appLoggers.svg)](https://jitpack.io/#zuccadev-labs/appLoggers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1+-purple.svg)](https://kotlinlang.org)
 [![API](https://img.shields.io/badge/Android_API-23+-brightgreen.svg)](https://developer.android.com/about/versions/marshmallow)
@@ -103,10 +103,10 @@ Regla de release:
 
 ```bash
 # Linux / macOS (instala la ultima release del CLI)
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 
 # Verificar
 applogger-cli version --output json
@@ -212,7 +212,7 @@ applogger-cli telemetry agent-response \
 ### Paso 1 — Clonar el repositorio
 
 ```bash
-git clone https://github.com/devzucca/appLoggers.git
+git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers
 ```
 
@@ -303,13 +303,13 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.3")
 
     // Transporte Supabase (opcional — si tu backend es Supabase)
-    implementation("com.github.devzucca.appLoggers:logger-transport-supabase:v0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.3")
 
     // Utilidades de testing (solo para tests)
-    testImplementation("com.github.devzucca.appLoggers:logger-test:v0.1.1-alpha.3")
+    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:v0.1.1-alpha.3")
 }
 ```
 
@@ -320,7 +320,7 @@ dependencies {
 dependencyResolutionManagement {
     repositories {
         maven {
-            url = uri("https://maven.pkg.github.com/devzucca/appLoggers")
+            url = uri("https://maven.pkg.github.com/zuccadev-labs/appLoggers")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
@@ -331,8 +331,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.devzucca:logger-core:0.1.1-alpha.3")
-    implementation("com.github.devzucca:logger-transport-supabase:0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs:logger-core:0.1.1-alpha.3")
+    implementation("com.github.zuccadev-labs:logger-transport-supabase:0.1.1-alpha.3")
 }
 ```
 
@@ -557,7 +557,7 @@ JitPack construye automáticamente cuando se crea un tag o cuando alguien solici
 
 ```kotlin
 // Usar en cualquier proyecto
-implementation("com.github.devzucca.appLoggers:logger-core:v0.1.1-alpha.3")
+implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.3")
 ```
 
 ### GitHub Packages (CI/CD)

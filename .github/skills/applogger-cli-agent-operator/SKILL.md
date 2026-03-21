@@ -25,11 +25,11 @@ Use this skill when a Copilot agent or automation needs to interact with AppLogg
 If `applogger-cli` is not yet available, install it using the host-native one-line bootstrap:
 
 1. Linux:
-   - `curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash`
+   - `curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash`
 2. macOS:
-   - `curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash`
+   - `curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash`
 3. Windows PowerShell:
-   - `irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex`
+   - `irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex`
 
 Bootstrap rules:
 

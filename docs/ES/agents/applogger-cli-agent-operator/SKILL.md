@@ -35,15 +35,15 @@ Si `applogger-cli` no existe aun en la maquina del agente, instalar primero:
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
 # macOS (Intel / Apple Silicon)
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ```powershell
 # Windows PowerShell
-irm https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 ```
 
 Despues verificar:
@@ -691,7 +691,7 @@ jobs:
     steps:
       - name: Install CLI
         run: |
-          curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
       - name: Query errors (last 24h)
         env:
@@ -739,7 +739,7 @@ which applogger-cli
 echo $PATH
 
 # Reinstall
-curl -fsSL https://raw.githubusercontent.com/devzucca/appLoggers/main/cli/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ### "backend health check failed"
@@ -811,5 +811,5 @@ A: No. Each `applogger-cli` call hits Supabase. Cache in your agent if needed.
 ---
 
 **Help & Support**  
-→ [GitHub Issues](https://github.com/devzucca/appLoggers/issues)  
-→ [Discussions](https://github.com/devzucca/appLoggers/discussions)
+→ [GitHub Issues](https://github.com/zuccadev-labs/appLoggers/issues)  
+→ [Discussions](https://github.com/zuccadev-labs/appLoggers/discussions)

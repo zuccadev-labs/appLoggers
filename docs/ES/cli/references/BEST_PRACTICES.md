@@ -422,7 +422,7 @@ spec:
 ```dockerfile
 FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache git
-RUN git clone https://github.com/devzucca/appLoggers.git /app
+RUN git clone https://github.com/zuccadev-labs/appLoggers.git /app
 WORKDIR /app/cli
 RUN go build -o /usr/local/bin/applogger-cli ./cmd/applogger-cli
 
@@ -453,7 +453,7 @@ jobs:
     steps:
       - name: Download CLI
         run: |
-          curl -L https://github.com/devzucca/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
+          curl -L https://github.com/zuccadev-labs/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
             -o /tmp/applogger-cli
           chmod +x /tmp/applogger-cli
       
