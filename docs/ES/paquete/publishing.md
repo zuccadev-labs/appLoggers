@@ -1,6 +1,6 @@
 # AppLogger — Guía de Publicación del Paquete
 
-**Versión:** 0.1.1-alpha.4  
+**Versión:** 0.1.1-alpha.5  
 **Fecha:** 2026-03-17  
 **Plataformas objetivo:** JitPack · GitHub Packages · Maven Central
 
@@ -37,7 +37,7 @@ cat gradle/libs.versions.toml
 # gradle.properties
 GROUP=com.github.zuccadev-labs
 POM_ARTIFACT_ID=appLoggers
-VERSION_NAME=0.1.1-alpha.4
+VERSION_NAME=0.1.1-alpha.5
 
 POM_NAME=AppLogger
 POM_DESCRIPTION=Kotlin Multiplatform SDK for structured technical telemetry on Android/TV/iOS/JVM
@@ -194,8 +194,8 @@ JitPack construye el artefacto directamente desde el repositorio de GitHub. No r
 ### 3.1 Crear un release en GitHub
 
 ```bash
-git tag -a v0.1.1-alpha.4 -m "Release 0.1.1-alpha.4"
-git push origin v0.1.1-alpha.4
+git tag -a v0.1.1-alpha.5 -m "Release 0.1.1-alpha.5"
+git push origin v0.1.1-alpha.5
 ```
 
 ### 3.2 Activar la build en JitPack
@@ -296,7 +296,7 @@ repositories {
 
 ```bash
 # Estable
-git tag -a v0.1.1-alpha.4 -m "Current alpha release"
+git tag -a v0.1.1-alpha.5 -m "Current alpha release"
 
 # Alpha (API puede cambiar)
 git tag -a v0.2.0-alpha.1 -m "New transport trait alpha"

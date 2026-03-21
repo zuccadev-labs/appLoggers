@@ -17,13 +17,13 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.4")
+                implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.5")
             }
         }
 
         val iosMain by getting {
             dependencies {
-                implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.4")
+                implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.5")
             }
         }
     }
