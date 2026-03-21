@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = findProperty("GROUP")?.toString() ?: "com.github.zuccadev-labs"
-    version = findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
+    version = findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.4"
 }
 
 detekt {
@@ -33,7 +33,7 @@ subprojects {
             extensions.configure<PublishingExtension> {
                 publications.withType<MavenPublication> {
                     groupId = project.findProperty("GROUP")?.toString() ?: "com.github.zuccadev-labs"
-                    version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
+                    version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.4"
 
                     pom {
                         name.set(project.findProperty("POM_NAME")?.toString() ?: "AppLogger")
