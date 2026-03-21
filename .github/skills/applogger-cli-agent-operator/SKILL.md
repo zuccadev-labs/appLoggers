@@ -63,18 +63,35 @@ Bootstrap rules:
 
 Before `telemetry query`, ensure environment is configured:
 
-1. Required:
+1. Preferred corporate mode (multi-project):
+   - `APPLOGGER_CONFIG` (shared JSON project registry)
+   - `APPLOGGER_PROJECT` (explicit project selection, optional)
+   - `--config` and `--project` flags for deterministic overrides
+2. Legacy required (fallback mode):
    - `appLogger_supabaseUrl`
    - `appLogger_supabaseKey` (service_role key)
-2. Optional:
+3. Optional:
    - `appLogger_supabaseSchema`
    - `appLogger_supabaseLogTable`
    - `appLogger_supabaseMetricTable`
    - `appLogger_supabaseTimeoutSeconds`
-3. If operating with Supabase MCP available, retrieve:
+4. If operating with Supabase MCP available, retrieve:
    - project URL from `mcp_supabase_get_project_url`
-4. Provision `appLogger_supabaseKey` from secure secret storage (service_role).
+5. Provision `appLogger_supabaseKey` from secure secret storage (service_role).
    - Do not use publishable/anon keys for CLI read operations.
+
+Project-resolution precedence for automation:
+
+1. `--project`
+2. `APPLOGGER_PROJECT`
+3. Workspace autodetection via `workspace_roots`
+4. `default_project`
+5. Single configured project
+6. Legacy env fallback (`appLogger_supabase*`, `APPLOGGER_SUPABASE_*`, `SUPABASE_*`)
+
+Auditability rule:
+
+1. Persist `project` and `config_source` from health/telemetry outputs in agent logs.
 
 Telemetry notes:
 
