@@ -1,11 +1,14 @@
 // scripts/publish.gradle.kts
 // Aplicar en cada módulo publicable: apply(from = rootProject.file("scripts/publish.gradle.kts"))
 
+val resolvedGroup = project.findProperty("GROUP")?.toString() ?: "com.github.devzucca"
+val resolvedVersion = project.findProperty("VERSION_NAME")?.toString() ?: "0.0.0-dev"
+
 afterEvaluate {
     publishing {
         publications.withType<MavenPublication> {
-            groupId = project.findProperty("GROUP")?.toString() ?: "com.github.devzucca"
-            version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
+            groupId = project.findProperty("GROUP")?.toString() ?: resolvedGroup
+            version = project.findProperty("VERSION_NAME")?.toString() ?: resolvedVersion
 
             pom {
                 name.set(project.findProperty("POM_NAME")?.toString() ?: "AppLogger")

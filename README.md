@@ -79,6 +79,20 @@ appLoggers/
 - **Offline-first** — buffer FIFO en memoria con reintentos automáticos (backoff exponencial con jitter)
 - **Transporte intercambiable** — backend Supabase incluido; cualquier backend vía `LogTransport` custom
 
+## Versionado Profesional
+
+Single source of truth por superficie:
+
+- SDK: `sdk/gradle.properties` -> `VERSION_NAME`
+    - Se usa para publicar artefactos y para generar `AppLoggerVersion` automaticamente.
+- CLI: `cli/VERSION`
+    - El workflow de CLI lo usa para construir versiones en ramas y valida que el tag release `applogger-cli-v*` coincida con ese valor.
+
+Regla de release:
+
+- SDK release tag: `vX.Y.Z...` (pipeline SDK)
+- CLI release tag: `applogger-cli-vX.Y.Z...` (pipeline CLI)
+
 ---
 
 ## AppLogger CLI (Operaciones)

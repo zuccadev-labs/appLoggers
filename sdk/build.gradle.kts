@@ -8,9 +8,12 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
+val resolvedGroup = findProperty("GROUP")?.toString() ?: "com.github.devzucca"
+val resolvedVersion = findProperty("VERSION_NAME")?.toString() ?: "0.0.0-dev"
+
 allprojects {
-    group = findProperty("GROUP")?.toString() ?: "com.github.devzucca"
-    version = findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
+    group = resolvedGroup
+    version = resolvedVersion
 }
 
 detekt {
@@ -32,8 +35,8 @@ subprojects {
         if (plugins.hasPlugin("maven-publish")) {
             extensions.configure<PublishingExtension> {
                 publications.withType<MavenPublication> {
-                    groupId = project.findProperty("GROUP")?.toString() ?: "com.github.devzucca"
-                    version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.3"
+                    groupId = project.findProperty("GROUP")?.toString() ?: resolvedGroup
+                    version = project.findProperty("VERSION_NAME")?.toString() ?: resolvedVersion
 
                     pom {
                         name.set(project.findProperty("POM_NAME")?.toString() ?: "AppLogger")

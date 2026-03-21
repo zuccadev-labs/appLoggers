@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import java.io.File
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -6,6 +7,34 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.sqldelight)
     `maven-publish`
+}
+
+val sdkVersionName = providers.gradleProperty("VERSION_NAME").orElse("0.0.0-dev")
+val generatedVersionDir = layout.buildDirectory.dir("generated/version/commonMain/kotlin")
+
+val generateAppLoggerVersion by tasks.registering {
+    val outDir = generatedVersionDir.get().asFile
+    outputs.dir(outDir)
+
+    doLast {
+        val pkgDir = File(outDir, "com/applogger/core")
+        pkgDir.mkdirs()
+
+        File(pkgDir, "AppLoggerVersion.kt").writeText(
+            """
+            package com.applogger.core
+
+            /**
+             * Single source of truth for the SDK version.
+             *
+             * Generated from Gradle property `VERSION_NAME`.
+             */
+            object AppLoggerVersion {
+                const val NAME = "${sdkVersionName.get()}"
+            }
+            """.trimIndent()
+        )
+    }
 }
 
 kotlin {
@@ -34,6 +63,8 @@ kotlin {
     jvm()
 
     sourceSets {
+        getByName("commonMain").kotlin.srcDir(generatedVersionDir)
+
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
@@ -72,6 +103,11 @@ kotlin {
         }
     }
 }
+
+tasks.matching { it.name.startsWith("compile") && it.name.contains("Kotlin") }
+    .configureEach {
+        dependsOn(generateAppLoggerVersion)
+    }
 
 android {
     namespace = "com.applogger.core"

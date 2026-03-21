@@ -194,6 +194,7 @@ Syncbin plugin metadata lives in `plugin-metadata.yaml`.
 ## Release Distribution Contract
 
 - Published binaries come from GitHub Releases tagged as `applogger-cli-v*`.
+- Source of truth for CLI base version: `cli/VERSION`.
 - Current release assets:
   - `applogger-cli-linux-amd64`
   - `applogger-cli-linux-arm64`
