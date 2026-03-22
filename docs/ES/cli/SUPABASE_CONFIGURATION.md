@@ -218,10 +218,10 @@ Para `act` en local, definir el mismo par en `.act.secrets`. Si el workflow refe
 Comandos de verificacion minima:
 
 ```bash
-applogger-cli health --output json
-applogger-cli telemetry query --source logs --limit 5 --output json
-applogger-cli telemetry query --source metrics --name response_time_ms --limit 5 --output json
-applogger-cli telemetry agent-response --source logs --aggregate severity --preview-limit 3 --output agent
+apploggers health --output json
+apploggers telemetry query --source logs --limit 5 --output json
+apploggers telemetry query --source metrics --name response_time_ms --limit 5 --output json
+apploggers telemetry agent-response --source logs --aggregate severity --preview-limit 3 --output agent
 ```
 
 Se considera OK cuando:

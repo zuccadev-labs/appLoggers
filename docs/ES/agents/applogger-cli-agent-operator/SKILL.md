@@ -55,7 +55,7 @@ apploggers version --output json
 Reglas:
 
 - Si el instalador cambia `PATH`, abrir una nueva shell o ejecutar por ruta absoluta una vez.
-- Para fijar version: definir `APPLOGGER_CLI_VERSION=apploggers-vX.Y.Z` antes de instalar.
+- Para fijar version: definir `APPLOGGERS_VERSION=apploggers-vX.Y.Z` antes de instalar.
 - En macOS y Linux el instalador exige verificacion SHA-256 y falla si no existe `sha256sum` ni `shasum`.
 
 ### 1. Agent Contract Discovery
@@ -418,8 +418,8 @@ apploggers telemetry agent-response \
 # Standard query
 apploggers telemetry query \
   --source logs \
-  --from 2026-03-19T00:00:00Z \
-  --to 2026-03-19T23:59:59Z \
+  --from 2026-01-01T00:00:00Z \
+  --to 2026-01-01T23:59:59Z \
   --aggregate severity \
   --limit 25 \
   --output json
@@ -794,10 +794,11 @@ A: No. Each `apploggers` call hits Supabase. Cache in your agent if needed.
 
 ## Version Compatibility
 
-| CLI Version | Node Version | Go | Status |
-|---|---|---|---|
-| 0.1.0-alpha.0+ | N/A | 1.24+ | Current |
-| 0.2.0+ (planned) | N/A | 1.26+ | Future |
+| CLI Version | Go | Status |
+|---|---|---|
+| Latest stable | 1.24+ | Current |
+
+Always use the latest stable release. Check [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases) for the current version.
 
 ---
 
