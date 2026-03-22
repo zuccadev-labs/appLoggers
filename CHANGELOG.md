@@ -25,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 ### Changed
 - **CLI version bump**: Updated from v0.1.1 to v0.1.2 across all configuration files.
 - **Plugin metadata version**: Updated `plugin-metadata.yaml` to reflect v0.1.2.
+- **Documentation updates**: Updated CLI README and agent documentation to reflect v0.1.2.
 
 ### Fixed
 - **Config directory initialization**: Resolved issue where `.apploggers` directory was not created automatically, causing config file access failures on fresh installations.
