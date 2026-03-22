@@ -20,7 +20,7 @@ func TestSyncbinMetadataJSON(t *testing.T) {
 		t.Fatalf("metadata command failed: %v, output=%s", err, string(out))
 	}
 	text := string(out)
-	if !strings.Contains(text, "\"name\": \"applogger-cli\"") {
+	if !strings.Contains(text, "\"name\": \"apploggers\"") {
 		t.Fatalf("expected metadata name in output, got: %s", text)
 	}
 }
