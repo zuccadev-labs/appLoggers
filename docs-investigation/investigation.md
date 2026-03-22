@@ -509,9 +509,9 @@ enum class Platform(val isLowResource: Boolean) {
 
 ```properties
 # AppLogger — Configuración local de desarrollo (NO commitear)
-appLogger_url=https://tu-proyecto.supabase.co
-appLogger_anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-appLogger_debug=true
+APPLOGGER_URL=https://tu-proyecto.supabase.co
+APPLOGGER_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+APPLOGGER_DEBUG=true
 appLogger_logToConsole=true
 appLogger_batchSize=20
 appLogger_flushIntervalSeconds=30
@@ -527,9 +527,9 @@ android {
         val props = Properties().also {
             it.load(rootProject.file("local.properties").inputStream())
         }
-        buildConfigField("String",  "LOGGER_URL",   "\"${props["appLogger_url"] ?: ""}\"")
-        buildConfigField("String",  "LOGGER_KEY",   "\"${props["appLogger_anonKey"] ?: ""}\"")
-        buildConfigField("Boolean", "LOGGER_DEBUG", "${props["appLogger_debug"] ?: false}")
+        buildConfigField("String",  "LOGGER_URL",   "\"${props["APPLOGGER_URL"] ?: ""}\"")
+        buildConfigField("String",  "LOGGER_KEY",   "\"${props["APPLOGGER_ANON_KEY"] ?: ""}\"")
+        buildConfigField("Boolean", "LOGGER_DEBUG", "${props["APPLOGGER_DEBUG"] ?: false}")
         buildConfigField("Boolean", "LOG_CONSOLE",  "${props["appLogger_logToConsole"] ?: true}")
         buildConfigField("Int",     "LOGGER_BATCH", "${props["appLogger_batchSize"] ?: 20}")
     }

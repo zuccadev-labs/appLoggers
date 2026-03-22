@@ -9,6 +9,10 @@ import kotlinx.cinterop.usePinned
 import platform.CommonCrypto.CC_SHA256
 import platform.CommonCrypto.CC_SHA256_DIGEST_LENGTH
 
+private const val BYTE_MASK = 0xFF
+private const val HEX_RADIX = 16
+private const val HEX_BYTE_WIDTH = 2
+
 actual fun generateUUID(): String = NSUUID().UUIDString
 
 actual fun currentTimeMillis(): Long =
@@ -32,5 +36,7 @@ actual fun sha256Hex(input: String): String {
         }
     }
 
-    return digest.joinToString(separator = "") { byte -> byte.toInt().and(0xFF).toString(16).padStart(2, '0') }
+    return digest.joinToString(separator = "") { byte ->
+        byte.toInt().and(BYTE_MASK).toString(HEX_RADIX).padStart(HEX_BYTE_WIDTH, '0')
+    }
 }
