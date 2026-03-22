@@ -16,6 +16,9 @@ internal class AppLoggerImpl(
 ) : AppLogger {
 
     @Volatile
+    private var deviceId: String = defaultDeviceId(deviceInfo)
+
+    @Volatile
     private var userId: String? = null
 
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
@@ -61,11 +64,23 @@ internal class AppLoggerImpl(
     override fun flush() = processor.flush()
 
     fun setUserId(id: String) {
-        userId = id
+        val normalized = normalizeAnonymousUserId(id)
+        userId = normalized.ifBlank { null }
     }
 
     fun clearUserId() {
         userId = null
+    }
+
+    fun setDeviceId(id: String) {
+        val normalized = id.trim()
+        if (normalized.isNotEmpty()) {
+            deviceId = normalized
+        }
+    }
+
+    fun clearDeviceId() {
+        deviceId = defaultDeviceId(deviceInfo)
     }
 
     private fun process(
@@ -95,6 +110,7 @@ internal class AppLoggerImpl(
                 message = message.take(10_000),
                 throwableInfo = throwable?.toThrowableInfo(config.maxStackTraceLines),
                 deviceInfo = deviceInfo,
+                deviceId = deviceId,
                 sessionId = sessionManager.sessionId,
                 userId = userId,
                 extra = resolvedExtra

@@ -18,6 +18,11 @@ type telemetryQueryRequest struct {
 	To          string `json:"to,omitempty" toon:"to,omitempty"`
 	Severity    string `json:"severity,omitempty" toon:"severity,omitempty"`
 	SessionID   string `json:"session_id,omitempty" toon:"session_id,omitempty"`
+	DeviceID    string `json:"device_id,omitempty" toon:"device_id,omitempty"`
+	UserID      string `json:"user_id,omitempty" toon:"user_id,omitempty"`
+	Package     string `json:"package,omitempty" toon:"package,omitempty"`
+	ErrorCode   string `json:"error_code,omitempty" toon:"error_code,omitempty"`
+	Contains    string `json:"contains,omitempty" toon:"contains,omitempty"`
 	Tag         string `json:"tag,omitempty" toon:"tag,omitempty"`
 	Name        string `json:"name,omitempty" toon:"name,omitempty"`
 	AnomalyType string `json:"anomaly_type,omitempty" toon:"anomaly_type,omitempty"`
@@ -42,10 +47,10 @@ func queryTelemetry(ctx context.Context, cfg supabaseConfig, req telemetryQueryR
 	}
 
 	table := cfg.LogsTable
-	selectColumns := "id,created_at,level,tag,message,session_id,sdk_version,extra"
+	selectColumns := "id,created_at,level,tag,message,session_id,device_id,user_id,sdk_version,extra"
 	if req.Source == "metrics" {
 		table = cfg.MetricsTable
-		selectColumns = "id,created_at,name,value,unit,session_id,sdk_version"
+		selectColumns = "id,created_at,name,value,unit,session_id,device_id,sdk_version"
 	}
 
 	base.Path = path.Join(base.Path, "rest", "v1", table)
@@ -62,6 +67,21 @@ func queryTelemetry(ctx context.Context, cfg supabaseConfig, req telemetryQueryR
 	}
 	if req.SessionID != "" {
 		query.Set("session_id", "eq."+req.SessionID)
+	}
+	if req.DeviceID != "" {
+		query.Set("device_id", "eq."+req.DeviceID)
+	}
+	if req.UserID != "" && req.Source == "logs" {
+		query.Set("user_id", "eq."+req.UserID)
+	}
+	if req.Package != "" && req.Source == "logs" {
+		query.Set("extra->>package_name", "eq."+req.Package)
+	}
+	if req.ErrorCode != "" && req.Source == "logs" {
+		query.Set("extra->>error_code", "eq."+req.ErrorCode)
+	}
+	if req.Contains != "" && req.Source == "logs" {
+		query.Set("message", "ilike.*"+req.Contains+"*")
 	}
 	if req.Tag != "" && req.Source == "logs" {
 		query.Set("tag", "eq."+req.Tag)

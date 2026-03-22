@@ -15,10 +15,10 @@ sdk.dir=C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
 
 # ── Supabase (backend de logs) ──────────────────────────────────────────────
 # Obtener de: https://supabase.com/dashboard -> Settings -> API
-appLogger_url=https://TU-PROYECTO.supabase.co
-appLogger_anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+APPLOGGER_URL=https://TU-PROYECTO.supabase.co
+APPLOGGER_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # ── Modo Debug ──────────────────────────────────────────────────────────────
 # true  -> logs en Logcat + envio al backend (desarrollo)
 # false -> solo envio al backend, sin output local (produccion)
-appLogger_debug=true
+APPLOGGER_DEBUG=true

@@ -58,6 +58,11 @@ class AppLoggerImplTest {
         )
     }
 
+    private fun isUuid(value: String): Boolean {
+        val uuidPattern = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+        return uuidPattern.matches(value)
+    }
+
     @Test
     fun `debug events are discarded in production mode`() = runBlocking {
         logger = createLogger(buildConfig(debugMode = false))
@@ -194,14 +199,30 @@ class AppLoggerImplTest {
     }
 
     @Test
-    fun `setUserId adds userId to events`() = runBlocking {
+    fun `setUserId sanitizes non UUID values to UUID and adds userId to events`() = runBlocking {
         logger = createLogger(buildConfig(debugMode = false))
         logger.setUserId("user-abc")
         logger.info("TAG", "with user")
         delay(200)
         processor.sendBatch()
 
-        assertEquals("user-abc", fakeTransport.sentEvents[0].userId)
+        val userId = fakeTransport.sentEvents[0].userId
+        assertNotNull(userId)
+        assertTrue(isUuid(userId!!))
+        assertNotEquals("user-abc", userId)
+    }
+
+    @Test
+    fun `setUserId keeps valid UUID unchanged`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        val uuid = "123e4567-e89b-12d3-a456-426614174000"
+
+        logger.setUserId(uuid)
+        logger.info("TAG", "with uuid")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals(uuid, fakeTransport.sentEvents[0].userId)
     }
 
     @Test
@@ -214,6 +235,32 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         assertNull(fakeTransport.sentEvents[0].userId)
+    }
+
+    @Test
+    fun `deviceId is populated by default and can be overridden`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.info("TAG", "default device")
+        delay(200)
+        processor.sendBatch()
+
+        val defaultDeviceId = fakeTransport.sentEvents[0].deviceId
+        assertTrue(defaultDeviceId.isNotBlank())
+        assertTrue(isUuid(defaultDeviceId))
+
+        logger.setDeviceId("custom-device-id")
+        logger.info("TAG", "custom device")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals("custom-device-id", fakeTransport.sentEvents[1].deviceId)
+
+        logger.clearDeviceId()
+        logger.info("TAG", "restored")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals(defaultDeviceId, fakeTransport.sentEvents[2].deviceId)
     }
 
     // ── Throwable propagation on non-critical levels ───────────────────────────

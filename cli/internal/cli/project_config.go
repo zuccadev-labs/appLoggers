@@ -140,7 +140,7 @@ func resolveProjectConfigPath() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return filepath.Join(homeDir, ".applogger-cli", "cli.json"), false
+	return filepath.Join(homeDir, ".apploggers", "cli.json"), false
 }
 
 func legacyProjectConfigPath() string {

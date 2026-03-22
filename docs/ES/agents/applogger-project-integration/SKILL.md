@@ -31,6 +31,9 @@ Do not use this skill when:
 7. Use canonical SDK packages only: `com.applogger.core.*` and `com.applogger.transport.supabase.SupabaseTransport`.
 8. Never generate `com.applogger.sdk.*` imports.
 9. Validate Logcat guidance with the exact condition: `isDebugMode && consoleOutput`.
+10. Never assume `BuildConfig.LOGGER_*` exists; verify symbols first or add mapping explicitly.
+11. Never use Android entrypoint `AppLoggerSDK` in iOS KMP integration code.
+12. For iOS KMP integration, use `AppLoggerIos.shared.initialize(...)` from Kotlin.
 
 ## Workflow
 

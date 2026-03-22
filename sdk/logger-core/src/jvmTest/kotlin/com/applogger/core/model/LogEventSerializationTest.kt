@@ -130,4 +130,16 @@ class LogEventSerializationTest {
         val encoded = json.encodeToString(event)
         assertTrue(encoded.contains("anonymous-user-id"))
     }
+
+    @Test
+    fun `LogEvent with deviceId serializes`() {
+        val event = LogEvent(
+            id = "uuid-device", timestamp = 0L, level = LogLevel.INFO,
+            tag = "T", message = "m", deviceInfo = testDeviceInfo,
+            deviceId = "device-custom-001",
+            sessionId = "s"
+        )
+        val encoded = json.encodeToString(event)
+        assertTrue(encoded.contains("device-custom-001"))
+    }
 }

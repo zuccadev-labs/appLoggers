@@ -1,6 +1,6 @@
 # AppLogger — Guía de Testing
 
-**Versión:** 0.1.1-alpha.5  
+**Versión:** 0.1.1-alpha.6  
 **Fecha:** 2026-03-17  
 **Frameworks:** JUnit 5 · Kotlin Coroutines Test · MockK · Robolectric
 

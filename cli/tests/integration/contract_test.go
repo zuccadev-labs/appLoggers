@@ -322,7 +322,7 @@ func TestTelemetryQueryLogsAnomalyTypeFilterAndExtraJSON(t *testing.T) {
 			http.Error(w, "unexpected anomaly_type filter", http.StatusBadRequest)
 			return
 		}
-		if !strings.Contains(r.URL.RawQuery, "select=id%2Ccreated_at%2Clevel%2Ctag%2Cmessage%2Csession_id%2Csdk_version%2Cextra") {
+		if !strings.Contains(r.URL.RawQuery, "select=id%2Ccreated_at%2Clevel%2Ctag%2Cmessage%2Csession_id%2Cdevice_id%2Cuser_id%2Csdk_version%2Cextra") {
 			http.Error(w, "expected extra in select columns", http.StatusBadRequest)
 			return
 		}
@@ -372,6 +372,150 @@ func TestTelemetryQueryAnomalyTypeInvalidForMetrics(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected usage error for --anomaly-type with metrics source")
+	}
+	if cmd.ProcessState.ExitCode() != 2 {
+		t.Fatalf("expected exit code 2, got %d", cmd.ProcessState.ExitCode())
+	}
+	if !strings.Contains(string(out), "\"error_kind\": \"usage_error\"") {
+		t.Fatalf("expected usage error envelope, output=%s", string(out))
+	}
+}
+
+func TestTelemetryQueryIdentityFiltersJSON(t *testing.T) {
+	binary := buildCLI(t)
+	mockSupabase := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/v1/app_logs" {
+			http.Error(w, "unexpected path", http.StatusNotFound)
+			return
+		}
+		if r.URL.Query().Get("session_id") != "eq.session-mobile-01" {
+			http.Error(w, "unexpected session_id filter", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("device_id") != "eq.device-abc" {
+			http.Error(w, "unexpected device_id filter", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("user_id") != "eq.user-anon-001" {
+			http.Error(w, "unexpected user_id filter", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"id":"1","created_at":"2026-03-01T00:00:00Z","level":"INFO","tag":"player","message":"ok","session_id":"session-mobile-01","device_id":"device-abc","user_id":"user-anon-001"}
+		]`))
+	}))
+	defer mockSupabase.Close()
+
+	cmd := exec.Command(
+		binary,
+		"telemetry",
+		"query",
+		"--source", "logs",
+		"--session-id", "session-mobile-01",
+		"--device-id", "device-abc",
+		"--user-id", "user-anon-001",
+		"--limit", "10",
+		"--output", "json",
+	)
+	cmd.Env = append(cmd.Env,
+		"appLogger_supabaseUrl="+mockSupabase.URL,
+		"appLogger_supabaseKey=test-key",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("telemetry identity filter query failed: %v, output=%s", err, string(out))
+	}
+	text := string(out)
+	if !strings.Contains(text, "\"session_id\": \"session-mobile-01\"") {
+		t.Fatalf("expected session_id echo in request block, output=%s", text)
+	}
+	if !strings.Contains(text, "\"device_id\": \"device-abc\"") {
+		t.Fatalf("expected device_id echo in request block, output=%s", text)
+	}
+	if !strings.Contains(text, "\"user_id\": \"user-anon-001\"") {
+		t.Fatalf("expected user_id echo in request block, output=%s", text)
+	}
+}
+
+func TestTelemetryQueryUserIDInvalidForMetrics(t *testing.T) {
+	binary := buildCLI(t)
+	cmd := exec.Command(binary, "telemetry", "query", "--source", "metrics", "--user-id", "anon-001", "--output", "json")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected usage error for --user-id with metrics source")
+	}
+	if cmd.ProcessState.ExitCode() != 2 {
+		t.Fatalf("expected exit code 2, got %d", cmd.ProcessState.ExitCode())
+	}
+	if !strings.Contains(string(out), "\"error_kind\": \"usage_error\"") {
+		t.Fatalf("expected usage error envelope, output=%s", string(out))
+	}
+}
+
+func TestTelemetryQueryAdvancedLogFiltersJSON(t *testing.T) {
+	binary := buildCLI(t)
+	mockSupabase := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/v1/app_logs" {
+			http.Error(w, "unexpected path", http.StatusNotFound)
+			return
+		}
+		if r.URL.Query().Get("extra->>package_name") != "eq.com.company.billing" {
+			http.Error(w, "unexpected package filter", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("extra->>error_code") != "eq.E-42" {
+			http.Error(w, "unexpected error_code filter", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("message") != "ilike.*timeout*" {
+			http.Error(w, "unexpected contains filter", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"id":"1","created_at":"2026-03-01T00:00:00Z","level":"ERROR","tag":"billing","message":"timeout on payment","extra":{"package_name":"com.company.billing","error_code":"E-42"}}
+		]`))
+	}))
+	defer mockSupabase.Close()
+
+	cmd := exec.Command(
+		binary,
+		"telemetry",
+		"query",
+		"--source", "logs",
+		"--package", "com.company.billing",
+		"--error-code", "E-42",
+		"--contains", "timeout",
+		"--limit", "10",
+		"--output", "json",
+	)
+	cmd.Env = append(cmd.Env,
+		"appLogger_supabaseUrl="+mockSupabase.URL,
+		"appLogger_supabaseKey=test-key",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("telemetry advanced filter query failed: %v, output=%s", err, string(out))
+	}
+	text := string(out)
+	if !strings.Contains(text, "\"package\": \"com.company.billing\"") {
+		t.Fatalf("expected package echo in request block, output=%s", text)
+	}
+	if !strings.Contains(text, "\"error_code\": \"E-42\"") {
+		t.Fatalf("expected error_code echo in request block, output=%s", text)
+	}
+	if !strings.Contains(text, "\"contains\": \"timeout\"") {
+		t.Fatalf("expected contains echo in request block, output=%s", text)
+	}
+}
+
+func TestTelemetryQueryPackageInvalidForMetrics(t *testing.T) {
+	binary := buildCLI(t)
+	cmd := exec.Command(binary, "telemetry", "query", "--source", "metrics", "--package", "pkg.demo", "--output", "json")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected usage error for --package with metrics source")
 	}
 	if cmd.ProcessState.ExitCode() != 2 {
 		t.Fatalf("expected exit code 2, got %d", cmd.ProcessState.ExitCode())

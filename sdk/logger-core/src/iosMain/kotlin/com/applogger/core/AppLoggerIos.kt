@@ -105,4 +105,12 @@ class AppLoggerIos private constructor() : AppLogger {
     fun clearAnonymousUserId() {
         implRef?.clearUserId()
     }
+
+    fun setDeviceId(deviceId: String) {
+        implRef?.setDeviceId(deviceId)
+    }
+
+    fun clearDeviceId() {
+        implRef?.clearDeviceId()
+    }
 }

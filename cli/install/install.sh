@@ -5,6 +5,8 @@ set -euo pipefail
 REPO="zuccadev-labs/appLoggers"
 INSTALL_DIR="${APPLOGGER_CLI_INSTALL_DIR:-}"
 REQUESTED_VERSION="${APPLOGGER_CLI_VERSION:-}"
+CONFIG_DIR="${APPLOGGER_CLI_CONFIG_DIR:-$HOME/.apploggers}"
+CONFIG_FILE_NAME="${APPLOGGER_CLI_CONFIG_FILE:-cli.json}"
 CURL_RETRY_MAX="${APPLOGGER_CLI_CURL_RETRY_MAX:-5}"
 CURL_RETRY_DELAY="${APPLOGGER_CLI_CURL_RETRY_DELAY:-2}"
 CURL_CONNECT_TIMEOUT="${APPLOGGER_CLI_CURL_CONNECT_TIMEOUT:-10}"
@@ -127,7 +129,7 @@ main() {
   need_cmd curl
   need_cmd mktemp
 
-  local os arch version asset_name checksum_name release_base install_dir tmp_dir tmp_asset tmp_checksum final_path
+  local os arch version asset_name checksum_name release_base install_dir config_file tmp_dir tmp_asset tmp_checksum final_path
   os="$(detect_os)"
   arch="$(detect_arch)"
   version="$(resolve_version)"
@@ -135,6 +137,7 @@ main() {
   checksum_name="${asset_name}.sha256"
   release_base="https://github.com/${REPO}/releases/download/${version}"
   install_dir="$(resolve_install_dir)"
+  config_file="${CONFIG_DIR}/${CONFIG_FILE_NAME}"
 
   tmp_dir="$(mktemp -d)"
   trap 'rm -rf "$tmp_dir"' EXIT
@@ -143,6 +146,11 @@ main() {
   final_path="${install_dir}/applogger-cli"
 
   mkdir -p "$install_dir"
+  mkdir -p "$CONFIG_DIR"
+  if [ ! -f "$config_file" ]; then
+    printf '{\n  "default_project": "",\n  "projects": []\n}\n' > "$config_file"
+    log "created config template at ${config_file}"
+  fi
 
   log "installing ${asset_name} from ${version}"
   download_file "${release_base}/${asset_name}" "$tmp_asset"

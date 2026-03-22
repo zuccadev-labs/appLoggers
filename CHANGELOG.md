@@ -8,34 +8,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ## [Unreleased]
 
-### Added
-- **CLI project profiles**: `APPLOGGER_CONFIG` and `--config` now support a shared JSON config file for multiple telemetry apps/projects.
-- **Project selection controls**: `APPLOGGER_PROJECT` and `--project` allow explicit project selection when multiple Supabase backends exist.
-- **Workspace autodetection**: the CLI can resolve the active telemetry project from the current working directory when `workspace_roots` are configured.
-- **Machine-readable project context**: `health` and telemetry JSON/agent responses now include the resolved `project` and `config_source` when available.
-- **Corporate-ready distribution pipeline**: CLI release workflow now contains conditional publication jobs for Homebrew, Scoop, and Winget repositories.
-
-### Changed
-- **CLI CI gate hardening**: multi-OS CLI tests now fail the pipeline on every protected runner instead of tolerating macOS or Windows failures.
-- **Release metadata embedding**: CLI binaries now embed version, commit, and build date from valid linker targets and are verified in a governance gate before release.
-- **Security scanner reproducibility**: `gosec` is installed from a pinned immutable release instead of a mutable branch reference.
-- **Supabase error guidance**: CLI configuration errors now mention `APPLOGGER_SUPABASE_URL` and `APPLOGGER_SUPABASE_KEY` aliases explicitly.
-- **Repository markdown governance**: markdown quality is now enforced repository-wide through a centralized `.markdownlint.jsonc` policy aligned with the real documentation style.
-
-### Security
-- Release governance now blocks `main` and tag deliveries when embedded CLI build metadata remains at `dev`, `none`, or `unknown`.
-- Package-manager publication remains gated behind explicit repository variables and secrets, reducing accidental distribution drift.
-- CLI installers now enforce checksum verification as a hard requirement (no silent fallback when hash tooling is missing).
-
-### Fixed
-- Installer network hardening: Linux/macOS and Windows installers now apply retry and timeout policies for release and checksum downloads.
-- Installer version input hardening: explicit version pin is now validated to `applogger-cli-v*` format before download.
-
 ### Planned
 - `logger-transport-firebase` module — transport to Firebase Realtime Database
 - Support for `logger-transport-grpc` — direct delivery via gRPC to a custom server
 - Wear OS support in `PlatformDetector`
 - Web dashboard for real-time log visualization
+
+---
+
+## [0.1.1-alpha.6] — 2026-03-22
+
+### Added
+- **SDK identity contract extension**: logs and metrics now include `device_id` separately from optional anonymous `user_id`.
+- **Anonymous ID normalization**: non-UUID anonymous IDs are normalized to deterministic UUID-compatible values in the SDK.
+- **CLI segmentation filters**: telemetry query now supports `--device-id`, `--user-id`, `--package`, `--error-code`, and `--contains`.
+- **Cross-platform user config bootstrap**: installers now create a standard user config directory (`~/.apploggers`) and initialize `cli.json` when missing.
+
+### Changed
+- **Default CLI project config path**: switched from `~/.applogger-cli/cli.json` to `~/.apploggers/cli.json` with legacy fallback support preserved.
+- **MCP/agent guidance**: agent schema recommendations now explicitly require deterministic discovery flow (`capabilities -> agent schema -> health`) before telemetry queries.
+- **Telemetry docs and skills alignment**: SDK/CLI docs now reflect flexible identity fields and advanced filtering for operational triage and user segmentation.
+- **AppLogger local config naming**: references were normalized to uppercase keys (`APPLOGGER_URL`, `APPLOGGER_ANON_KEY`, `APPLOGGER_DEBUG`) across templates/docs/skills.
+
+### Fixed
+- **CLI contract coverage**: integration tests now validate identity filters and advanced log filters (`package`, `error_code`, `contains`) including source guardrails.
+
+### Security
+- **Installer baseline hardening preserved**: checksum verification remains mandatory while introducing config bootstrap behavior.
+
 
 ---
 
