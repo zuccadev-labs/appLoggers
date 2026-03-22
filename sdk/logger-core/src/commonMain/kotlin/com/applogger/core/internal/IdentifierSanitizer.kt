@@ -69,14 +69,14 @@ private fun hashHexToUuidV5(hashHex: String): String {
     }
 
     return buildString(UUID_STRING_LENGTH) {
-        append(base, SEGMENT_ONE_START, SEGMENT_ONE_LENGTH)
+        appendRange(base, SEGMENT_ONE_START, SEGMENT_ONE_START + SEGMENT_ONE_LENGTH)
         append('-')
-        append(base, SEGMENT_TWO_START, SEGMENT_TWO_LENGTH)
+        appendRange(base, SEGMENT_TWO_START, SEGMENT_TWO_START + SEGMENT_TWO_LENGTH)
         append('-')
-        append(base, SEGMENT_THREE_START, SEGMENT_THREE_LENGTH)
+        appendRange(base, SEGMENT_THREE_START, SEGMENT_THREE_START + SEGMENT_THREE_LENGTH)
         append('-')
-        append(base, SEGMENT_FOUR_START, SEGMENT_FOUR_LENGTH)
+        appendRange(base, SEGMENT_FOUR_START, SEGMENT_FOUR_START + SEGMENT_FOUR_LENGTH)
         append('-')
-        append(base, SEGMENT_FIVE_START, SEGMENT_FIVE_LENGTH)
+        appendRange(base, SEGMENT_FIVE_START, SEGMENT_FIVE_START + SEGMENT_FIVE_LENGTH)
     }
 }

@@ -31,8 +31,11 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Run All Tests
-        run: ./gradlew check
+      - name: Run Detekt
+        run: ./gradlew detekt
+
+      - name: Run Unit Tests
+        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :sample:testDebugUnitTest
 
       - name: Upload Test Reports
         if: always()
@@ -43,6 +46,56 @@ jobs:
             sdk/**/build/reports/tests/
             sdk/**/build/test-results/
           retention-days: 30
+
+      - name: Build
+        run: ./gradlew assemble
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Download CLI dependencies
+        working-directory: cli
+        run: go mod download
+
+      - name: Run CLI tests
+        working-directory: cli
+        env:
+          appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL }}
+          appLogger_supabaseKey: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
+          APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL }}
+          APPLOGGER_SUPABASE_KEY: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
+        run: go test -v -race "-coverprofile=coverage.out" "-covermode=atomic" ./...
+
+      - name: Wait for CI workflow
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const workflow = 'ci.yml'
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const sha = process.env.GITHUB_SHA
+            let attempts = 0
+            while (attempts < 30) {
+              const res = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflow, per_page: 5, head_sha: sha })
+              if (res.data.total_count > 0) {
+                const run = res.data.workflow_runs[0]
+                core.info(`Found CI run: status=${run.status} conclusion=${run.conclusion}`)
+                if (run.status === 'completed') {
+                  if (run.conclusion === 'success') { core.info('CI workflow passed'); return }
+                  else { core.setFailed(`Required workflow CI concluded with ${run.conclusion}`); return }
+                }
+              } else {
+                core.info('No CI workflow found yet for this SHA')
+              }
+              await new Promise(r => setTimeout(r, 10000))
+              attempts++
+            }
+            core.setFailed('Timeout waiting for CI workflow to finish')
 
   publish:
     name: Publish & Release
