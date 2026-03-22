@@ -33,6 +33,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [0.1.1-alpha.7] — 2026-03-22
+
+### Changed
+- **SDK version bump**: Updated from v0.1.1-alpha.6 to v0.1.1-alpha.7.
+- **CI/CD workflows**: Fixed deprecated action versions (checkout@v4, setup-java@v4, setup-gradle@v4, upload-artifact@v4, codeql@v3).
+- **Release workflow**: Added tag validation against gradle.properties, prerelease flag, and body_path for SDK releases.
+
+---
+
 ## [0.1.1-alpha.6] — 2026-03-22
 
 ### Added

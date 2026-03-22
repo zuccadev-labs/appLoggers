@@ -91,7 +91,7 @@ Usa este skill para validar si la integracion ya esta lista, por ejemplo:
 
 ## Alcance
 
-Los ejemplos y flujos estan alineados con AppLogger SDK `v0.1.1-alpha.6` y CLI `v0.1.2`, con la politica actual de iOS KMP-only.
+Los ejemplos y flujos estan alineados con AppLogger SDK `v0.1.1-alpha.7` y CLI `v0.1.2`, con la politica actual de iOS KMP-only.
 
 ## Regla clave de configuracion
 
