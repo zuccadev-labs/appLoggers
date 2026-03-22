@@ -3,22 +3,22 @@
 set -euo pipefail
 
 REPO="zuccadev-labs/appLoggers"
-INSTALL_DIR="${APPLOGGER_CLI_INSTALL_DIR:-}"
-REQUESTED_VERSION="${APPLOGGER_CLI_VERSION:-}"
-CONFIG_DIR="${APPLOGGER_CLI_CONFIG_DIR:-$HOME/.apploggers}"
-CONFIG_FILE_NAME="${APPLOGGER_CLI_CONFIG_FILE:-cli.json}"
-CURL_RETRY_MAX="${APPLOGGER_CLI_CURL_RETRY_MAX:-5}"
-CURL_RETRY_DELAY="${APPLOGGER_CLI_CURL_RETRY_DELAY:-2}"
-CURL_CONNECT_TIMEOUT="${APPLOGGER_CLI_CURL_CONNECT_TIMEOUT:-10}"
-CURL_MAX_TIME="${APPLOGGER_CLI_CURL_MAX_TIME:-120}"
-CURL_RETRY_MAX_TIME="${APPLOGGER_CLI_CURL_RETRY_MAX_TIME:-300}"
+INSTALL_DIR="${APPLOGGERS_INSTALL_DIR:-}"
+REQUESTED_VERSION="${APPLOGGERS_VERSION:-}"
+CONFIG_DIR="${APPLOGGERS_CONFIG_DIR:-$HOME/.apploggers}"
+CONFIG_FILE_NAME="${APPLOGGERS_CONFIG_FILE:-cli.json}"
+CURL_RETRY_MAX="${APPLOGGERS_CURL_RETRY_MAX:-5}"
+CURL_RETRY_DELAY="${APPLOGGERS_CURL_RETRY_DELAY:-2}"
+CURL_CONNECT_TIMEOUT="${APPLOGGERS_CURL_CONNECT_TIMEOUT:-10}"
+CURL_MAX_TIME="${APPLOGGERS_CURL_MAX_TIME:-120}"
+CURL_RETRY_MAX_TIME="${APPLOGGERS_CURL_RETRY_MAX_TIME:-300}"
 
 log() {
-  printf '[applogger-cli] %s\n' "$*"
+  printf '[apploggers] %s\n' "$*"
 }
 
 fail() {
-  printf '[applogger-cli] ERROR: %s\n' "$*" >&2
+  printf '[apploggers] ERROR: %s\n' "$*" >&2
   exit 1
 }
 
@@ -45,8 +45,8 @@ detect_arch() {
 resolve_version() {
   if [ -n "$REQUESTED_VERSION" ]; then
     case "$REQUESTED_VERSION" in
-      applogger-cli-v*) ;;
-      *) fail "APPLOGGER_CLI_VERSION must match applogger-cli-v*" ;;
+      apploggers-v*) ;;
+      *) fail "APPLOGGERS_VERSION must match apploggers-v*" ;;
     esac
     printf '%s' "$REQUESTED_VERSION"
     return
@@ -56,8 +56,8 @@ resolve_version() {
   local releases
   releases="$(download_text "$api_url")"
   local tag
-  tag="$(printf '%s' "$releases" | grep -o '"tag_name": *"applogger-cli-v[^"]*"' | head -n 1 | sed 's/.*"\(applogger-cli-v[^"]*\)"/\1/')"
-  [ -n "$tag" ] || fail "unable to resolve latest applogger-cli release tag"
+  tag="$(printf '%s' "$releases" | grep -o '"tag_name": *"apploggers-v[^"]*"' | head -n 1 | sed 's/.*"\(apploggers-v[^"]*\)"/\1/')"
+  [ -n "$tag" ] || fail "unable to resolve latest apploggers release tag"
   printf '%s' "$tag"
 }
 
@@ -125,6 +125,32 @@ verify_checksum() {
   fail "sha256 verifier not available (requires sha256sum or shasum)"
 }
 
+write_example_config() {
+  local config_file="$1"
+  cat > "$config_file" <<'EOF'
+{
+  "_comment": "AppLoggers CLI configuration file. Edit this file to configure your projects.",
+  "_docs": "https://github.com/zuccadev-labs/appLoggers/tree/main/docs/ES/cli",
+  "default_project": "my-app",
+  "projects": [
+    {
+      "name": "my-app",
+      "display_name": "My Application",
+      "workspace_roots": [],
+      "supabase": {
+        "url": "https://your-project.supabase.co",
+        "api_key_env": "APPLOGGER_SUPABASE_KEY",
+        "schema": "public",
+        "logs_table": "app_logs",
+        "metrics_table": "app_metrics",
+        "timeout_seconds": 15
+      }
+    }
+  ]
+}
+EOF
+}
+
 main() {
   need_cmd curl
   need_cmd mktemp
@@ -133,7 +159,7 @@ main() {
   os="$(detect_os)"
   arch="$(detect_arch)"
   version="$(resolve_version)"
-  asset_name="applogger-cli-${os}-${arch}"
+  asset_name="apploggers-${os}-${arch}"
   checksum_name="${asset_name}.sha256"
   release_base="https://github.com/${REPO}/releases/download/${version}"
   install_dir="$(resolve_install_dir)"
@@ -143,12 +169,12 @@ main() {
   trap 'rm -rf "$tmp_dir"' EXIT
   tmp_asset="${tmp_dir}/${asset_name}"
   tmp_checksum="${tmp_dir}/${checksum_name}"
-  final_path="${install_dir}/applogger-cli"
+  final_path="${install_dir}/apploggers"
 
   mkdir -p "$install_dir"
   mkdir -p "$CONFIG_DIR"
   if [ ! -f "$config_file" ]; then
-    printf '{\n  "default_project": "",\n  "projects": []\n}\n' > "$config_file"
+    write_example_config "$config_file"
     log "created config template at ${config_file}"
   fi
 

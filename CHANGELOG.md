@@ -16,6 +16,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [CLI 0.1.3] — 2026-03-22
+
+### Added
+- **Binary renamed to `apploggers`**: CLI binary, install scripts, and all references updated from `applogger-cli` to `apploggers`.
+- **Bootstrap `~/.apploggers/cli.json`**: On first run the CLI now creates `~/.apploggers/` and writes a fully-commented example `cli.json` template (cross-platform: Windows, Linux, macOS).
+- **Config auto-read**: CLI reads `~/.apploggers/cli.json` automatically; no `--config` flag required for the default path.
+- **Updated install scripts**: `install.sh` and `install.ps1` both create the config dir, write the example config, and install the binary as `apploggers` / `apploggers.exe`.
+- **Updated upgrade command**: `apploggers upgrade` now resolves tags with prefix `apploggers-v*`.
+- **Updated package manager manifests**: Homebrew formula `Apploggers`, Scoop `apploggers.json`, Winget `DevZucca.AppLoggers`.
+
+### Changed
+- **CLI version bump**: Updated from v0.1.2 to v0.1.3.
+- **Env vars for installer**: Renamed `APPLOGGER_CLI_*` → `APPLOGGERS_*` in both install scripts.
+- **Documentation**: Updated `docs/ES/cli/README.md`, `docs/ES/cli/INSTALLATION.md`, and `docs/ES/agents/applogger-cli-agent-operator/SKILL.md` to reflect new binary name and version.
+
+---
+
 ## [0.1.2] — 2026-03-22
 
 ### Added

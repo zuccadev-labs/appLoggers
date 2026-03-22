@@ -1,7 +1,7 @@
 param(
-    [string]$Version = $env:APPLOGGER_CLI_VERSION,
-    [string]$InstallDir = $env:APPLOGGER_CLI_INSTALL_DIR,
-    [string]$ConfigDir = $env:APPLOGGER_CLI_CONFIG_DIR,
+    [string]$Version = $env:APPLOGGERS_VERSION,
+    [string]$InstallDir = $env:APPLOGGERS_INSTALL_DIR,
+    [string]$ConfigDir = $env:APPLOGGERS_CONFIG_DIR,
     [int]$DownloadRetries = 5,
     [int]$RetryDelaySeconds = 2,
     [int]$DownloadTimeoutSeconds = 120
@@ -14,15 +14,15 @@ $Repo = 'zuccadev-labs/appLoggers'
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[applogger-cli] $Message"
+    Write-Host "[apploggers] $Message"
 }
 
 function Resolve-Version {
     param([string]$RequestedVersion)
 
     if ($RequestedVersion) {
-        if ($RequestedVersion -notlike 'applogger-cli-v*') {
-            throw 'APPLOGGER_CLI_VERSION must match applogger-cli-v*.'
+        if ($RequestedVersion -notlike 'apploggers-v*') {
+            throw 'APPLOGGERS_VERSION must match apploggers-v*.'
         }
         return $RequestedVersion
     }
@@ -30,9 +30,9 @@ function Resolve-Version {
     $releases = Invoke-WithRetry -Action {
         Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=100" -TimeoutSec $DownloadTimeoutSeconds
     }
-    $release = $releases | Where-Object { $_.tag_name -like 'applogger-cli-v*' } | Select-Object -First 1
+    $release = $releases | Where-Object { $_.tag_name -like 'apploggers-v*' } | Select-Object -First 1
     if (-not $release) {
-        throw 'Unable to resolve latest applogger-cli release tag.'
+        throw 'Unable to resolve latest apploggers release tag.'
     }
     return $release.tag_name
 }
@@ -85,8 +85,36 @@ function Ensure-PathContains {
     }
 }
 
+function Write-ExampleConfig {
+    param([string]$ConfigFile)
+
+    @'
+{
+  "_comment": "AppLoggers CLI configuration file. Edit this file to configure your projects.",
+  "_docs": "https://github.com/zuccadev-labs/appLoggers/tree/main/docs/ES/cli",
+  "default_project": "my-app",
+  "projects": [
+    {
+      "name": "my-app",
+      "display_name": "My Application",
+      "workspace_roots": [],
+      "supabase": {
+        "url": "https://your-project.supabase.co",
+        "api_key_env": "APPLOGGER_SUPABASE_KEY",
+        "schema": "public",
+        "logs_table": "app_logs",
+        "metrics_table": "app_metrics",
+        "timeout_seconds": 15
+      }
+    }
+  ]
+}
+'@ | Set-Content -Path $ConfigFile -Encoding UTF8
+    Write-Log "Created config template at $ConfigFile"
+}
+
 if (-not $InstallDir) {
-    $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\AppLoggerCLI'
+    $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\AppLoggers'
 }
 
 if (-not $ConfigDir) {
@@ -98,29 +126,23 @@ if (-not $ConfigDir) {
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $tag = Resolve-Version -RequestedVersion $Version
-$assetName = 'applogger-cli-windows-amd64.exe'
+$assetName = 'apploggers-windows-amd64.exe'
 $checksumName = "$assetName.sha256"
 $releaseBase = "https://github.com/$Repo/releases/download/$tag"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
 if (-not (Test-Path -LiteralPath $ConfigFile)) {
-        @'
-{
-    "default_project": "",
-    "projects": []
-}
-'@ | Set-Content -Path $ConfigFile -Encoding UTF8
-        Write-Log "Created config template at $ConfigFile"
+    Write-ExampleConfig -ConfigFile $ConfigFile
 }
 
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("applogger-cli-" + [System.Guid]::NewGuid().ToString('N'))
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("apploggers-" + [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
 try {
     $downloadPath = Join-Path $tempDir $assetName
     $checksumPath = Join-Path $tempDir $checksumName
-    $finalPath = Join-Path $InstallDir 'applogger-cli.exe'
+    $finalPath = Join-Path $InstallDir 'apploggers.exe'
 
     Write-Log "Installing $assetName from $tag"
     Download-File -Uri "$releaseBase/$assetName" -OutFile $downloadPath
@@ -129,7 +151,7 @@ try {
     $expectedHash = (Get-Content -Path $checksumPath -Raw).Split([char[]]@(' ', "`t", "`r", "`n"), [System.StringSplitOptions]::RemoveEmptyEntries)[0].ToLowerInvariant()
     $actualHash = (Get-FileHash -Path $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($expectedHash -ne $actualHash) {
-        throw 'Checksum mismatch for downloaded applogger-cli binary.'
+        throw 'Checksum mismatch for downloaded apploggers binary.'
     }
 
     Move-Item -Force $downloadPath $finalPath

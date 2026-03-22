@@ -1,4 +1,4 @@
-name: AppLogger CLI - Build & Test
+name: AppLoggers CLI - Build & Test
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
       - dev
     tags:
-      - 'applogger-cli-v*'
+      - 'apploggers-v*'
     paths:
       - 'cli/**'
       - '.github/workflows/applogger-cli.yml'
@@ -92,30 +92,25 @@ jobs:
     name: Build ${{ matrix.os }}-${{ matrix.arch }}
     runs-on: ${{ matrix.runners }}
     needs: [test, lint]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/applogger-cli-v'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/apploggers-v'))
     strategy:
       matrix:
         include:
           - os: linux
             arch: amd64
             runners: ubuntu-latest
-            ldflags: "-s -w"
           - os: linux
             arch: arm64
             runners: ubuntu-latest
-            ldflags: "-s -w"
           - os: darwin
             arch: amd64
             runners: macos-latest
-            ldflags: "-s -w"
           - os: darwin
             arch: arm64
             runners: macos-latest
-            ldflags: "-s -w"
           - os: windows
             arch: amd64
             runners: windows-latest
-            ldflags: "-s -w"
 
     steps:
       - name: Checkout code
@@ -130,6 +125,7 @@ jobs:
 
       - name: Set version info
         working-directory: cli
+        shell: bash
         run: |
           BASE_VERSION=$(tr -d ' \t\r\n' < VERSION)
           if [[ -z "$BASE_VERSION" ]]; then
@@ -137,17 +133,16 @@ jobs:
             exit 1
           fi
 
-          if [[ "${GITHUB_REF:-}" == refs/tags/applogger-cli-v* ]]; then
+          if [[ "${GITHUB_REF:-}" == refs/tags/apploggers-v* ]]; then
             VERSION="${GITHUB_REF_NAME}"
           else
             SHORT_SHA=$(git rev-parse --short HEAD)
-            VERSION="applogger-cli-v${BASE_VERSION}-dev.${SHORT_SHA}"
+            VERSION="apploggers-v${BASE_VERSION}-dev.${SHORT_SHA}"
           fi
 
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
-        shell: bash
 
       - name: Build
         working-directory: cli
@@ -159,34 +154,34 @@ jobs:
         run: |
           go build \
             -ldflags="-s -w -X main.version=${{ env.VERSION }} -X main.commit=${{ env.COMMIT }} -X main.date=${{ env.BUILD_TIME }}" \
-            -o applogger-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }} \
+            -o apploggers-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }} \
             ./cmd/applogger-cli
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: applogger-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: cli/applogger-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}
+          name: apploggers-${{ matrix.os }}-${{ matrix.arch }}
+          path: cli/apploggers-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}
           retention-days: 5
 
   smoke-linux-artifact:
     name: Smoke Test (Linux artifact)
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/applogger-cli-v'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/apploggers-v'))
     steps:
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: applogger-cli-linux-amd64
+          name: apploggers-linux-amd64
           path: ./smoke
 
       - name: Execute smoke checks
         run: |
-          chmod +x ./smoke/applogger-cli-linux-amd64
-          ./smoke/applogger-cli-linux-amd64 version --output json
-          ./smoke/applogger-cli-linux-amd64 --syncbin-metadata --output json
-          ./smoke/applogger-cli-linux-amd64 capabilities --output json
+          chmod +x ./smoke/apploggers-linux-amd64
+          ./smoke/apploggers-linux-amd64 version --output json
+          ./smoke/apploggers-linux-amd64 --syncbin-metadata --output json
+          ./smoke/apploggers-linux-amd64 capabilities --output json
 
   security:
     name: Security Scan
@@ -213,18 +208,18 @@ jobs:
     name: Governance Gate (main/tag)
     runs-on: ubuntu-latest
     needs: [build, security]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/applogger-cli-v'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/apploggers-v'))
     steps:
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: applogger-cli-linux-amd64
+          name: apploggers-linux-amd64
           path: ./governance
 
       - name: Validate embedded build metadata
         run: |
-          chmod +x ./governance/applogger-cli-linux-amd64
-          ./governance/applogger-cli-linux-amd64 version --output json > version.json
+          chmod +x ./governance/apploggers-linux-amd64
+          ./governance/apploggers-linux-amd64 version --output json > version.json
           VERSION_VALUE="$(jq -r '.version' version.json)"
           COMMIT_VALUE="$(jq -r '.commit' version.json)"
           DATE_VALUE="$(jq -r '.date' version.json)"
@@ -246,7 +241,7 @@ jobs:
     name: Create Release (on tag)
     runs-on: ubuntu-latest
     needs: [test, lint, build, security, smoke-linux-artifact, governance-main]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v')
+    if: startsWith(github.ref, 'refs/tags/apploggers-v')
     permissions:
       contents: write
       packages: write
@@ -258,7 +253,7 @@ jobs:
       - name: Validate tag against cli/VERSION
         run: |
           BASE_VERSION=$(tr -d ' \t\r\n' < cli/VERSION)
-          EXPECTED_TAG="applogger-cli-v${BASE_VERSION}"
+          EXPECTED_TAG="apploggers-v${BASE_VERSION}"
           if [[ "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]]; then
             echo "Tag/version mismatch: got ${GITHUB_REF_NAME}, expected ${EXPECTED_TAG} from cli/VERSION"
             exit 1
@@ -278,119 +273,107 @@ jobs:
 
       - name: Generate package manager manifests
         run: |
-          VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
+          VERSION="${GITHUB_REF_NAME#apploggers-v}"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
           DOWNLOAD_BASE="${REPO_URL}/releases/download/${GITHUB_REF_NAME}"
 
-          DARWIN_AMD64_SHA="$(cut -d' ' -f1 artifacts/applogger-cli-darwin-amd64/applogger-cli-darwin-amd64.sha256)"
-          DARWIN_ARM64_SHA="$(cut -d' ' -f1 artifacts/applogger-cli-darwin-arm64/applogger-cli-darwin-arm64.sha256)"
-          WINDOWS_AMD64_SHA="$(cut -d' ' -f1 artifacts/applogger-cli-windows-amd64/applogger-cli-windows-amd64.exe.sha256)"
+          DARWIN_AMD64_SHA="$(cut -d' ' -f1 artifacts/apploggers-darwin-amd64/apploggers-darwin-amd64.sha256)"
+          DARWIN_ARM64_SHA="$(cut -d' ' -f1 artifacts/apploggers-darwin-arm64/apploggers-darwin-arm64.sha256)"
+          WINDOWS_AMD64_SHA="$(cut -d' ' -f1 artifacts/apploggers-windows-amd64/apploggers-windows-amd64.exe.sha256)"
 
           mkdir -p artifacts/manifests/homebrew
           mkdir -p artifacts/manifests/scoop
           mkdir -p artifacts/manifests/winget
 
-          cat > artifacts/manifests/homebrew/applogger-cli.rb <<EOF
-          class ApploggerCli < Formula
-            desc "AppLogger telemetry CLI"
+          cat > artifacts/manifests/homebrew/apploggers.rb <<EOF
+          class Apploggers < Formula
+            desc "AppLoggers telemetry CLI"
             homepage "${REPO_URL}"
             version "${VERSION}"
-            license "Apache-2.0"
+            license "MIT"
 
             on_macos do
               if Hardware::CPU.arm?
-                url "${DOWNLOAD_BASE}/applogger-cli-darwin-arm64"
+                url "${DOWNLOAD_BASE}/apploggers-darwin-arm64"
                 sha256 "${DARWIN_ARM64_SHA}"
               else
-                url "${DOWNLOAD_BASE}/applogger-cli-darwin-amd64"
+                url "${DOWNLOAD_BASE}/apploggers-darwin-amd64"
                 sha256 "${DARWIN_AMD64_SHA}"
               end
             end
 
             def install
               if Hardware::CPU.arm?
-                bin.install "applogger-cli-darwin-arm64" => "applogger-cli"
+                bin.install "apploggers-darwin-arm64" => "apploggers"
               else
-                bin.install "applogger-cli-darwin-amd64" => "applogger-cli"
+                bin.install "apploggers-darwin-amd64" => "apploggers"
               end
             end
 
             test do
-              assert_match "applogger-cli", shell_output("#{bin}/applogger-cli version --output text")
+              assert_match "apploggers", shell_output("#{bin}/apploggers version --output text")
             end
           end
           EOF
 
-          cat > artifacts/manifests/scoop/applogger-cli.json <<EOF
+          cat > artifacts/manifests/scoop/apploggers.json <<EOF
           {
             "version": "${VERSION}",
-            "description": "AppLogger telemetry CLI",
+            "description": "AppLoggers telemetry CLI",
             "homepage": "${REPO_URL}",
-            "license": "Apache-2.0",
+            "license": "MIT",
             "architecture": {
               "64bit": {
-                "url": "${DOWNLOAD_BASE}/applogger-cli-windows-amd64.exe",
+                "url": "${DOWNLOAD_BASE}/apploggers-windows-amd64.exe",
                 "hash": "${WINDOWS_AMD64_SHA}"
               }
             },
-            "bin": "applogger-cli-windows-amd64.exe",
+            "bin": "apploggers-windows-amd64.exe",
             "checkver": {
               "github": "zuccadev-labs/appLoggers"
             },
             "autoupdate": {
               "architecture": {
                 "64bit": {
-                  "url": "${DOWNLOAD_BASE}/applogger-cli-windows-amd64.exe"
+                  "url": "${DOWNLOAD_BASE}/apploggers-windows-amd64.exe"
                 }
               }
             }
           }
           EOF
 
-          cat > artifacts/manifests/winget/DevZucca.AppLoggerCLI.yaml <<EOF
-          PackageIdentifier: DevZucca.AppLoggerCLI
+          cat > artifacts/manifests/winget/DevZucca.AppLoggers.yaml <<EOF
+          PackageIdentifier: DevZucca.AppLoggers
           PackageVersion: ${VERSION}
           DefaultLocale: en-US
           ManifestType: version
           ManifestVersion: 1.6.0
           EOF
 
-          cat > artifacts/manifests/winget/DevZucca.AppLoggerCLI.locale.en-US.yaml <<EOF
-          PackageIdentifier: DevZucca.AppLoggerCLI
+          cat > artifacts/manifests/winget/DevZucca.AppLoggers.locale.en-US.yaml <<EOF
+          PackageIdentifier: DevZucca.AppLoggers
           PackageVersion: ${VERSION}
           PackageLocale: en-US
           Publisher: DevZucca
-          PackageName: AppLogger CLI
-          License: Apache-2.0
-          ShortDescription: AppLogger telemetry CLI
+          PackageName: AppLoggers CLI
+          License: MIT
+          ShortDescription: AppLoggers telemetry CLI
           ManifestType: defaultLocale
           ManifestVersion: 1.6.0
           EOF
 
-          cat > artifacts/manifests/winget/DevZucca.AppLoggerCLI.installer.yaml <<EOF
-          PackageIdentifier: DevZucca.AppLoggerCLI
+          cat > artifacts/manifests/winget/DevZucca.AppLoggers.installer.yaml <<EOF
+          PackageIdentifier: DevZucca.AppLoggers
           PackageVersion: ${VERSION}
           Installers:
             - Architecture: x64
               InstallerType: portable
-              InstallerUrl: ${DOWNLOAD_BASE}/applogger-cli-windows-amd64.exe
+              InstallerUrl: ${DOWNLOAD_BASE}/apploggers-windows-amd64.exe
               InstallerSha256: ${WINDOWS_AMD64_SHA}
               Commands:
-                - applogger-cli
+                - apploggers
           ManifestType: installer
           ManifestVersion: 1.6.0
-          EOF
-
-          cat > artifacts/manifests/README.md <<EOF
-          # Package Manager Manifests
-
-          Generated from release tag: ${GITHUB_REF_NAME}
-
-          - Homebrew formula: manifests/homebrew/applogger-cli.rb
-          - Scoop manifest: manifests/scoop/applogger-cli.json
-          - Winget manifests: manifests/winget/*.yaml
-
-          These files are release artifacts ready to publish in taps/buckets/community repos.
           EOF
 
       - name: Create Release
@@ -407,7 +390,7 @@ jobs:
     name: Publish Homebrew Tap
     runs-on: ubuntu-latest
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.HOMEBREW_TAP_REPO != ''
+    if: startsWith(github.ref, 'refs/tags/apploggers-v') && vars.HOMEBREW_TAP_REPO != ''
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
@@ -420,34 +403,34 @@ jobs:
       - name: Build Homebrew formula
         if: env.TAP_TOKEN != ''
         run: |
-          VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
+          VERSION="${GITHUB_REF_NAME#apploggers-v}"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
           DOWNLOAD_BASE="${REPO_URL}/releases/download/${GITHUB_REF_NAME}"
-          DARWIN_AMD64_SHA="$(sha256sum artifacts/applogger-cli-darwin-amd64/applogger-cli-darwin-amd64 | cut -d' ' -f1)"
-          DARWIN_ARM64_SHA="$(sha256sum artifacts/applogger-cli-darwin-arm64/applogger-cli-darwin-arm64 | cut -d' ' -f1)"
+          DARWIN_AMD64_SHA="$(sha256sum artifacts/apploggers-darwin-amd64/apploggers-darwin-amd64 | cut -d' ' -f1)"
+          DARWIN_ARM64_SHA="$(sha256sum artifacts/apploggers-darwin-arm64/apploggers-darwin-arm64 | cut -d' ' -f1)"
 
-          cat > applogger-cli.rb <<EOF
-          class ApploggerCli < Formula
-            desc "AppLogger telemetry CLI"
+          cat > apploggers.rb <<EOF
+          class Apploggers < Formula
+            desc "AppLoggers telemetry CLI"
             homepage "${REPO_URL}"
             version "${VERSION}"
-            license "Apache-2.0"
+            license "MIT"
 
             on_macos do
               if Hardware::CPU.arm?
-                url "${DOWNLOAD_BASE}/applogger-cli-darwin-arm64"
+                url "${DOWNLOAD_BASE}/apploggers-darwin-arm64"
                 sha256 "${DARWIN_ARM64_SHA}"
               else
-                url "${DOWNLOAD_BASE}/applogger-cli-darwin-amd64"
+                url "${DOWNLOAD_BASE}/apploggers-darwin-amd64"
                 sha256 "${DARWIN_AMD64_SHA}"
               end
             end
 
             def install
               if Hardware::CPU.arm?
-                bin.install "applogger-cli-darwin-arm64" => "applogger-cli"
+                bin.install "apploggers-darwin-arm64" => "apploggers"
               else
-                bin.install "applogger-cli-darwin-amd64" => "applogger-cli"
+                bin.install "apploggers-darwin-amd64" => "apploggers"
               end
             end
           end
@@ -460,19 +443,19 @@ jobs:
         run: |
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" tap
           mkdir -p tap/Formula
-          cp applogger-cli.rb tap/Formula/applogger-cli.rb
+          cp apploggers.rb tap/Formula/apploggers.rb
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/applogger-cli.rb
-          git commit -m "chore: publish applogger-cli ${GITHUB_REF_NAME}" || echo "No formula changes"
+          git add Formula/apploggers.rb
+          git commit -m "chore: publish apploggers ${GITHUB_REF_NAME}" || echo "No formula changes"
           git push origin HEAD:main
 
   publish-scoop:
     name: Publish Scoop Bucket
     runs-on: ubuntu-latest
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.SCOOP_BUCKET_REPO != ''
+    if: startsWith(github.ref, 'refs/tags/apploggers-v') && vars.SCOOP_BUCKET_REPO != ''
     env:
       SCOOP_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
     steps:
@@ -485,24 +468,24 @@ jobs:
       - name: Build Scoop manifest
         if: env.SCOOP_TOKEN != ''
         run: |
-          VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
+          VERSION="${GITHUB_REF_NAME#apploggers-v}"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
           DOWNLOAD_BASE="${REPO_URL}/releases/download/${GITHUB_REF_NAME}"
-          WINDOWS_AMD64_SHA="$(sha256sum artifacts/applogger-cli-windows-amd64/applogger-cli-windows-amd64.exe | cut -d' ' -f1)"
+          WINDOWS_AMD64_SHA="$(sha256sum artifacts/apploggers-windows-amd64/apploggers-windows-amd64.exe | cut -d' ' -f1)"
 
-          cat > applogger-cli.json <<EOF
+          cat > apploggers.json <<EOF
           {
             "version": "${VERSION}",
-            "description": "AppLogger telemetry CLI",
+            "description": "AppLoggers telemetry CLI",
             "homepage": "${REPO_URL}",
-            "license": "Apache-2.0",
+            "license": "MIT",
             "architecture": {
               "64bit": {
-                "url": "${DOWNLOAD_BASE}/applogger-cli-windows-amd64.exe",
+                "url": "${DOWNLOAD_BASE}/apploggers-windows-amd64.exe",
                 "hash": "${WINDOWS_AMD64_SHA}"
               }
             },
-            "bin": "applogger-cli-windows-amd64.exe"
+            "bin": "apploggers-windows-amd64.exe"
           }
           EOF
 
@@ -512,19 +495,19 @@ jobs:
           SCOOP_REPO: ${{ vars.SCOOP_BUCKET_REPO }}
         run: |
           git clone "https://x-access-token:${SCOOP_TOKEN}@github.com/${SCOOP_REPO}.git" scoop
-          cp applogger-cli.json scoop/applogger-cli.json
+          cp apploggers.json scoop/apploggers.json
           cd scoop
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add applogger-cli.json
-          git commit -m "chore: publish applogger-cli ${GITHUB_REF_NAME}" || echo "No scoop changes"
+          git add apploggers.json
+          git commit -m "chore: publish apploggers ${GITHUB_REF_NAME}" || echo "No scoop changes"
           git push origin HEAD:main
 
   publish-winget:
     name: Publish Winget Manifests
     runs-on: ubuntu-latest
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/applogger-cli-v') && vars.WINGET_REPO != ''
+    if: startsWith(github.ref, 'refs/tags/apploggers-v') && vars.WINGET_REPO != ''
     env:
       WINGET_TOKEN: ${{ secrets.WINGET_REPO_TOKEN }}
     steps:
@@ -537,42 +520,42 @@ jobs:
       - name: Build Winget manifests
         if: env.WINGET_TOKEN != ''
         run: |
-          VERSION="${GITHUB_REF_NAME#applogger-cli-v}"
+          VERSION="${GITHUB_REF_NAME#apploggers-v}"
           DOWNLOAD_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
-          WINDOWS_AMD64_SHA="$(sha256sum artifacts/applogger-cli-windows-amd64/applogger-cli-windows-amd64.exe | cut -d' ' -f1)"
+          WINDOWS_AMD64_SHA="$(sha256sum artifacts/apploggers-windows-amd64/apploggers-windows-amd64.exe | cut -d' ' -f1)"
 
-          mkdir -p winget/DevZucca/AppLoggerCLI/${VERSION}
+          mkdir -p winget/DevZucca/AppLoggers/${VERSION}
 
-          cat > winget/DevZucca/AppLoggerCLI/${VERSION}/DevZucca.AppLoggerCLI.yaml <<EOF
-          PackageIdentifier: DevZucca.AppLoggerCLI
+          cat > winget/DevZucca/AppLoggers/${VERSION}/DevZucca.AppLoggers.yaml <<EOF
+          PackageIdentifier: DevZucca.AppLoggers
           PackageVersion: ${VERSION}
           DefaultLocale: en-US
           ManifestType: version
           ManifestVersion: 1.6.0
           EOF
 
-          cat > winget/DevZucca/AppLoggerCLI/${VERSION}/DevZucca.AppLoggerCLI.locale.en-US.yaml <<EOF
-          PackageIdentifier: DevZucca.AppLoggerCLI
+          cat > winget/DevZucca/AppLoggers/${VERSION}/DevZucca.AppLoggers.locale.en-US.yaml <<EOF
+          PackageIdentifier: DevZucca.AppLoggers
           PackageVersion: ${VERSION}
           PackageLocale: en-US
           Publisher: DevZucca
-          PackageName: AppLogger CLI
-          License: Apache-2.0
-          ShortDescription: AppLogger telemetry CLI
+          PackageName: AppLoggers CLI
+          License: MIT
+          ShortDescription: AppLoggers telemetry CLI
           ManifestType: defaultLocale
           ManifestVersion: 1.6.0
           EOF
 
-          cat > winget/DevZucca/AppLoggerCLI/${VERSION}/DevZucca.AppLoggerCLI.installer.yaml <<EOF
-          PackageIdentifier: DevZucca.AppLoggerCLI
+          cat > winget/DevZucca/AppLoggers/${VERSION}/DevZucca.AppLoggers.installer.yaml <<EOF
+          PackageIdentifier: DevZucca.AppLoggers
           PackageVersion: ${VERSION}
           Installers:
             - Architecture: x64
               InstallerType: portable
-              InstallerUrl: ${DOWNLOAD_BASE}/applogger-cli-windows-amd64.exe
+              InstallerUrl: ${DOWNLOAD_BASE}/apploggers-windows-amd64.exe
               InstallerSha256: ${WINDOWS_AMD64_SHA}
               Commands:
-                - applogger-cli
+                - apploggers
           ManifestType: installer
           ManifestVersion: 1.6.0
           EOF
@@ -583,11 +566,11 @@ jobs:
           WINGET_REPO: ${{ vars.WINGET_REPO }}
         run: |
           git clone "https://x-access-token:${WINGET_TOKEN}@github.com/${WINGET_REPO}.git" winget-repo
-          mkdir -p "winget-repo/manifests/d/DevZucca/AppLoggerCLI"
-          cp -R winget/DevZucca/AppLoggerCLI/* "winget-repo/manifests/d/DevZucca/AppLoggerCLI/"
+          mkdir -p "winget-repo/manifests/d/DevZucca/AppLoggers"
+          cp -R winget/DevZucca/AppLoggers/* "winget-repo/manifests/d/DevZucca/AppLoggers/"
           cd winget-repo
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manifests/d/DevZucca/AppLoggerCLI
-          git commit -m "chore: publish applogger-cli ${GITHUB_REF_NAME}" || echo "No winget changes"
+          git add manifests/d/DevZucca/AppLoggers
+          git commit -m "chore: publish apploggers ${GITHUB_REF_NAME}" || echo "No winget changes"
           git push origin HEAD:main

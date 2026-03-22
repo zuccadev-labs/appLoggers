@@ -19,7 +19,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:           "applogger-cli",
+	Use:           "apploggers",
 	Short:         "AppLoggers telemetry CLI",
 	SilenceUsage:  true,
 	SilenceErrors: true,

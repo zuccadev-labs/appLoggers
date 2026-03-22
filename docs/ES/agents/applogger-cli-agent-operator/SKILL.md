@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Skill ID**: `applogger-cli-agent-operator`
+- **Skill ID**: `apploggers-agent-operator`
 - **Version**: `1.0.0`
 - **Category**: Production Operations, Telemetry Discovery, DevOps Automation
 - **Complexity**: Advanced
@@ -31,7 +31,7 @@ This skill enables AI agents and automation systems to **safely, predictably, an
 
 ### 0. Instalacion bootstrap del CLI
 
-Si `applogger-cli` no existe aun en la maquina del agente, instalar primero:
+Si `apploggers` no existe aun en la maquina del agente, instalar primero:
 
 ```bash
 # Linux
@@ -49,13 +49,13 @@ irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/
 Despues verificar:
 
 ```bash
-applogger-cli version --output json
+apploggers version --output json
 ```
 
 Reglas:
 
 - Si el instalador cambia `PATH`, abrir una nueva shell o ejecutar por ruta absoluta una vez.
-- Para fijar version: definir `APPLOGGER_CLI_VERSION=applogger-cli-vX.Y.Z` antes de instalar.
+- Para fijar version: definir `APPLOGGER_CLI_VERSION=apploggers-vX.Y.Z` antes de instalar.
 - En macOS y Linux el instalador exige verificacion SHA-256 y falla si no existe `sha256sum` ni `shasum`.
 
 ### 1. Agent Contract Discovery
@@ -64,13 +64,13 @@ Before executing any command, **always** discover capabilities and schema:
 
 ```bash
 # What can this CLI do?
-applogger-cli capabilities --output json
+apploggers capabilities --output json
 
 # What fields exist in telemetry?
-applogger-cli agent schema --output json
+apploggers agent schema --output json
 
 # Is the backend available?
-applogger-cli health --output json
+apploggers health --output json
 ```
 
 **Why?** The CLI may have new commands, output format changes, or schema updates between versions. Discovery ensures forward compatibility.
@@ -117,7 +117,7 @@ When a command fails, **always check stderr** for error envelope:
 
 ```bash
 # Example failure
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --aggregate INVALID_MODE \
   --output json \
@@ -151,8 +151,8 @@ echo $?  # outputs: 2
 #!/bin/bash
 
 # 1. Verify CLI is installed
-if ! command -v applogger-cli &> /dev/null; then
-  echo "FATAL: applogger-cli not found in PATH"
+if ! command -v apploggers &> /dev/null; then
+  echo "FATAL: apploggers not found in PATH"
   exit 127
 fi
 
@@ -163,14 +163,14 @@ if [ -z "$APPLOGGER_CONFIG" ] && { [ -z "$appLogger_supabaseUrl" ] || [ -z "$app
 fi
 
 # 3. Verify CLI version compatibility
-VERSION=$(applogger-cli version --output json | jq -r '.version // empty')
+VERSION=$(apploggers version --output json | jq -r '.version // empty')
 if [ -z "$VERSION" ]; then
   echo "FATAL: Cannot determine CLI version"
   exit 1
 fi
 
 # 4. Verify backend is healthy (optionally pin project)
-HEALTH=$(applogger-cli ${APPLOGGER_PROJECT:+--project "$APPLOGGER_PROJECT"} health --output json)
+HEALTH=$(apploggers ${APPLOGGER_PROJECT:+--project "$APPLOGGER_PROJECT"} health --output json)
 if ! jq -e '.ok' <<< "$HEALTH" > /dev/null 2>&1; then
   echo "FATAL: Backend health check failed"
   echo "$HEALTH" | jq .
@@ -207,7 +207,7 @@ FROM=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
        date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
 
 # Execute query
-QUERY=$(applogger-cli telemetry query \
+QUERY=$(apploggers telemetry query \
   --source "$SOURCE" \
   --from "$FROM" \
   --severity "$SEVERITY" \
@@ -247,7 +247,7 @@ detect_incident() {
   local from=$(date -u -d "-${hours_back} hours" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
                date -u -v-${hours_back}H '+%Y-%m-%dT%H:%M:%SZ')
   
-  local resp=$(applogger-cli telemetry query \
+  local resp=$(apploggers telemetry query \
     --source logs \
     --severity error \
     --aggregate hour \
@@ -302,7 +302,7 @@ fi
 echo "Reconstructing session: $SESSION_ID"
 
 # Get all logs for session ordered by time
-LOGS=$(applogger-cli telemetry query \
+LOGS=$(apploggers telemetry query \
   --source logs \
   --session-id "$SESSION_ID" \
   --limit 1000 \
@@ -315,7 +315,7 @@ if ! jq -e '.ok' <<< "$LOGS" > /dev/null; then
 fi
 
 # Get all metrics for session
-METRICS=$(applogger-cli telemetry query \
+METRICS=$(apploggers telemetry query \
   --source metrics \
   --session-id "$SESSION_ID" \
   --limit 1000 \
@@ -341,13 +341,13 @@ echo "✓ Audit trail saved to: session-${SESSION_ID}-${TIMESTAMP}.json"
 
 ## Command Reference
 
-### `applogger-cli capabilities`
+### `apploggers capabilities`
 
 **When to use**: At startup and periodically (hourly cache) to verify CLI features.
 
 ```bash
 # Discover output modes
-capabilities=$(applogger-cli capabilities --output json)
+capabilities=$(apploggers capabilities --output json)
 
 # Check if agent mode is supported
 if jq -e '.output_modes[] | select(. == "agent")' <<< "$capabilities" > /dev/null; then
@@ -360,32 +360,32 @@ if jq -e '.capabilities[] | select(. == "telemetry-agent-response")' <<< "$capab
 fi
 ```
 
-### `applogger-cli health`
+### `apploggers health`
 
 **When to use**: Every query (cached for 30 seconds) to detect transient failures.
 
 ```bash
 # Full check
-applogger-cli health --output json
+apploggers health --output json
 
 # Example output:
 # { "ok": true, "services": { "supabase": "available", "database": "online" } }
 
 # Minimal check (just success/fail)
-if applogger-cli health --output json | jq -e '.ok' > /dev/null; then
+if apploggers health --output json | jq -e '.ok' > /dev/null; then
   echo "Backend healthy"
 else
   echo "Backend degraded or unavailable"
 fi
 ```
 
-### `applogger-cli telemetry agent-response`
+### `apploggers telemetry agent-response`
 
 **Recommended for agents** — Compact TOON output for machine parsing.
 
 ```bash
 # Preferred: Compact agent response with summary
-applogger-cli telemetry agent-response \
+apploggers telemetry agent-response \
   --source logs \
   --aggregate severity \
   --preview-limit 3 \
@@ -410,13 +410,13 @@ applogger-cli telemetry agent-response \
 #   - prefer_session_id_for_isolation
 ```
 
-### `applogger-cli telemetry query`
+### `apploggers telemetry query`
 
 **When to use**: Full results needed, strict JSON required, analytics pipeline.
 
 ```bash
 # Standard query
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --from 2026-03-19T00:00:00Z \
   --to 2026-03-19T23:59:59Z \
@@ -425,7 +425,7 @@ applogger-cli telemetry query \
   --output json
 
 # Filter warning anomalies stored in extra.anomaly_type
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --severity warn \
   --anomaly-type slow_response \
@@ -433,7 +433,7 @@ applogger-cli telemetry query \
   --output json
 
 # Piping for further processing
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source metrics \
   --name response_time_ms \
   --aggregate name \
@@ -465,7 +465,7 @@ import json
 
 # Execute query
 output = subprocess.check_output([
-    'applogger-cli', 'telemetry', 'agent-response',
+    'apploggers', 'telemetry', 'agent-response',
     '--source', 'logs',
     '--aggregate', 'severity',
     '--output', 'agent'
@@ -500,7 +500,7 @@ type AgentResponse struct {
 }
 
 // Execute
-cmd := exec.Command("applogger-cli", "telemetry", "agent-response",
+cmd := exec.Command("apploggers", "telemetry", "agent-response",
  "--source", "logs",
  "--aggregate", "severity",
  "--output", "agent")
@@ -560,7 +560,7 @@ retry_query() {
   done
 }
 
-retry_query applogger-cli telemetry query --source logs --limit 10 --output json
+retry_query apploggers telemetry query --source logs --limit 10 --output json
 ```
 
 ---
@@ -571,7 +571,7 @@ retry_query applogger-cli telemetry query --source logs --limit 10 --output json
 
 ```bash
 # ❌ Don't do this
-applogger-cli telemetry query --source "$source_from_user" --limit "$limit_from_user"
+apploggers telemetry query --source "$source_from_user" --limit "$limit_from_user"
 
 # ✅ Do this
 case "$source_from_user" in
@@ -585,7 +585,7 @@ case "$limit_from_user" in
   *) echo "ERROR: Invalid limit"; exit 2 ;;
 esac
 
-applogger-cli telemetry query --source "$source" --limit $limit
+apploggers telemetry query --source "$source" --limit $limit
 ```
 
 ### 2. **Cache Discovery Results (CloudFlare Workers Pattern)**
@@ -607,7 +607,7 @@ if [ -f "$DISCOVERY_CACHE" ]; then
 fi
 
 # Refresh
-applogger-cli capabilities --output json > "$DISCOVERY_CACHE"
+apploggers capabilities --output json > "$DISCOVERY_CACHE"
 cat "$DISCOVERY_CACHE"
 ```
 
@@ -619,7 +619,7 @@ log_file="/var/log/applogger-agent.log"
 
 {
   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Query: $@"
-  applogger-cli "$@" 2>&1
+  apploggers "$@" 2>&1
   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Exit: $?"
 } >> "$log_file"
 ```
@@ -628,10 +628,10 @@ log_file="/var/log/applogger-agent.log"
 
 ```bash
 # ❌ Risky: Query all logs
-applogger-cli telemetry query --source logs --limit 5000
+apploggers telemetry query --source logs --limit 5000
 
 # ✅ Safe: Isolate by session
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --session-id "$user_session_id" \
   --limit 1000
@@ -641,10 +641,10 @@ applogger-cli telemetry query \
 
 ```bash
 # ❌ Verbose: Full query response
-applogger-cli telemetry query --source logs --aggregate severity --output json
+apploggers telemetry query --source logs --aggregate severity --output json
 
 # ✅ Compact: Agent-optimized
-applogger-cli telemetry agent-response \
+apploggers telemetry agent-response \
   --source logs \
   --aggregate severity \
   --preview-limit 2 \
@@ -671,7 +671,7 @@ spec:
         command:
         - sh
         - -c
-        - applogger-cli health --output json | jq -e '.ok'
+        - apploggers health --output json | jq -e '.ok'
       initialDelaySeconds: 30
       periodSeconds: 10
 ```
@@ -698,7 +698,7 @@ jobs:
           appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL }}
           appLogger_supabaseKey: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
         run: |
-          /tmp/applogger-cli telemetry query \
+          /tmp/apploggers telemetry query \
             --source logs \
             --severity error \
             --output json \
@@ -716,7 +716,7 @@ jobs:
 ```hcl
 resource "null_resource" "applogger_health_check" {
   provisioners "local-exec" {
-    command = "applogger-cli health --output json | jq '.ok'"
+    command = "apploggers health --output json | jq '.ok'"
   }
   
   triggers = {
@@ -729,11 +729,11 @@ resource "null_resource" "applogger_health_check" {
 
 ## Troubleshooting
 
-### "applogger-cli: command not found"
+### "apploggers: command not found"
 
 ```bash
 # Check installation
-which applogger-cli
+which apploggers
 
 # Check PATH
 echo $PATH
@@ -769,7 +769,7 @@ count: 1247
 If your parser shows errors, verify:
 1. Output is actually TOON (not JSON with `--output json`)
 2. Lines aren't wrapped/truncated
-3. Use `applogger-cli telemetry agent-response --output agent 2>&1 | od -c` to debug bytes
+3. Use `apploggers telemetry agent-response --output agent 2>&1 | od -c` to debug bytes
 
 ---
 
@@ -788,7 +788,7 @@ A: Queries have `--limit` (default 25, max 1000). Use `--from` and `--to` to nar
 A: Yes, but be responsible. The CLI has no filtering. Ensure your agent doesn't log sensitive data. Use RLS policies in Supabase.
 
 **Q: Does the CLI cache results?**  
-A: No. Each `applogger-cli` call hits Supabase. Cache in your agent if needed.
+A: No. Each `apploggers` call hits Supabase. Cache in your agent if needed.
 
 ---
 

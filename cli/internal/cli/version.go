@@ -19,7 +19,7 @@ func newVersionCommand() *cobra.Command {
 			}
 
 			payload := map[string]string{
-				"name":    "applogger-cli",
+				"name":    "apploggers",
 				"version": buildVersion,
 				"commit":  buildCommit,
 				"date":    buildDate,
@@ -34,7 +34,7 @@ func newVersionCommand() *cobra.Command {
 
 			_, err := fmt.Fprintf(
 				cmd.OutOrStdout(),
-				"applogger-cli version %s\ncommit: %s\nbuilt: %s\n",
+				"apploggers version %s\ncommit: %s\nbuilt: %s\n",
 				buildVersion,
 				buildCommit,
 				buildDate,
