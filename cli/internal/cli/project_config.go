@@ -140,7 +140,28 @@ func resolveProjectConfigPath() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return filepath.Join(homeDir, ".applogger-cli", "cli.json"), false
+	configDir := filepath.Join(homeDir, ".apploggers")
+	if err := ensureConfigDir(configDir); err != nil {
+		return "", false
+	}
+	return filepath.Join(configDir, "cli.json"), false
+}
+
+func ensureConfigDir(path string) error {
+	info, err := os.Stat(path)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("config path %s exists but is not a directory", path)
+		}
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory %s: %w", path, err)
+	}
+	return nil
 }
 
 func legacyProjectConfigPath() string {

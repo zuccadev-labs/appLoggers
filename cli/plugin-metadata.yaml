@@ -1,5 +1,5 @@
 name: applogger-cli
-version: 0.1.0-alpha.0
+version: 0.1.2
 description: AppLoggers telemetry CLI for operational queries, health checks, and AI agent automation
 author: devzucca
 license: MIT
