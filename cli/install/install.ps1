@@ -1,6 +1,7 @@
 param(
     [string]$Version = $env:APPLOGGER_CLI_VERSION,
     [string]$InstallDir = $env:APPLOGGER_CLI_INSTALL_DIR,
+    [string]$ConfigDir = $env:APPLOGGER_CLI_CONFIG_DIR,
     [int]$DownloadRetries = 5,
     [int]$RetryDelaySeconds = 2,
     [int]$DownloadTimeoutSeconds = 120
@@ -88,6 +89,12 @@ if (-not $InstallDir) {
     $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\AppLoggerCLI'
 }
 
+if (-not $ConfigDir) {
+    $ConfigDir = Join-Path $env:USERPROFILE '.apploggers'
+}
+
+[string]$ConfigFile = Join-Path $ConfigDir 'cli.json'
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $tag = Resolve-Version -RequestedVersion $Version
@@ -96,6 +103,17 @@ $checksumName = "$assetName.sha256"
 $releaseBase = "https://github.com/$Repo/releases/download/$tag"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
+if (-not (Test-Path -LiteralPath $ConfigFile)) {
+        @'
+{
+    "default_project": "",
+    "projects": []
+}
+'@ | Set-Content -Path $ConfigFile -Encoding UTF8
+        Write-Log "Created config template at $ConfigFile"
+}
+
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("applogger-cli-" + [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 

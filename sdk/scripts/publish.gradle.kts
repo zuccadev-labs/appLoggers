@@ -5,7 +5,7 @@ afterEvaluate {
     publishing {
         publications.withType<MavenPublication> {
             groupId = project.findProperty("GROUP")?.toString() ?: "com.github.zuccadev-labs"
-            version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.5"
+            version = project.findProperty("VERSION_NAME")?.toString() ?: "0.1.1-alpha.6"
 
             pom {
                 name.set(project.findProperty("POM_NAME")?.toString() ?: "AppLogger")

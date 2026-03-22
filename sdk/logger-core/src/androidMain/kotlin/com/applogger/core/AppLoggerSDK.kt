@@ -141,6 +141,14 @@ object AppLoggerSDK : AppLogger {
         implRef?.clearUserId()
     }
 
+    fun setDeviceId(deviceId: String) {
+        implRef?.setDeviceId(deviceId)
+    }
+
+    fun clearDeviceId() {
+        implRef?.clearDeviceId()
+    }
+
     private fun computeBufferCapacity(
         appContext: Context,
         platform: Platform,

@@ -31,9 +31,9 @@
 
 Required keys:
 
-1. `appLogger_url`
-2. `appLogger_anonKey`
-3. `appLogger_debug`
+1. `APPLOGGER_URL`
+2. `APPLOGGER_ANON_KEY`
+3. `APPLOGGER_DEBUG`
 
 ## Canonical imports and packages
 
@@ -45,6 +45,14 @@ Use only these package roots in Android integration code:
 4. `com.applogger.transport.supabase.SupabaseTransport`
 
 Do not use `com.applogger.sdk.*` imports.
+
+Platform API mapping (must match SDK source):
+
+1. Android entry point: `com.applogger.core.AppLoggerSDK`
+2. iOS KMP entry point: `com.applogger.core.AppLoggerIos.shared`
+3. Shared health snapshot: `com.applogger.core.AppLoggerHealth.snapshot()`
+
+Do not cross these entry points between platforms.
 
 ## Canonical initialization snippet (Android)
 
@@ -66,6 +74,25 @@ AppLoggerSDK.initialize(
   .build(),
  transport = transport
 )
+```
+
+Before applying this snippet, verify that `BuildConfig.LOGGER_URL`, `BuildConfig.LOGGER_KEY`, and `BuildConfig.LOGGER_DEBUG` exist. If they do not exist, map values from your current config source first.
+
+## Canonical initialization snippet (iOS KMP)
+
+```kotlin
+val config = AppLoggerConfig.Builder()
+ .endpoint(url)
+ .apiKey(anonKey)
+ .debugMode(debugMode)
+ .consoleOutput(debugMode)
+ .batchSize(20)
+ .flushIntervalSeconds(30)
+ .build()
+
+val transport = SupabaseTransport(endpoint = url, apiKey = anonKey)
+
+AppLoggerIos.shared.initialize(config = config, transport = transport)
 ```
 
 Logcat visibility rule: output is shown only when `isDebugMode=true` and `consoleOutput=true`.

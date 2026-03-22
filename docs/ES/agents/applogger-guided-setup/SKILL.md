@@ -29,11 +29,14 @@ Do not use this skill when:
 5. When handling configuration, verify `local.properties` keys first.
 6. If AppLogger keys are missing, add only missing keys directly.
 7. Never modify, rename, or delete unrelated existing variables in `local.properties`.
-8. When `appLogger_debug=true`, AppLogger outputs automatically to Logcat — do not instruct the user to add any additional Logcat or logging configuration.
-9. Never set `appLogger_debug=true` in production builds.
+8. When `APPLOGGER_DEBUG=true`, AppLogger outputs automatically to Logcat — do not instruct the user to add any additional Logcat or logging configuration.
+9. Never set `APPLOGGER_DEBUG=true` in production builds.
 10. Use canonical imports from this SDK only: `com.applogger.core.*` and `com.applogger.transport.supabase.SupabaseTransport`.
 11. Never suggest `com.applogger.sdk.*` imports; that package is not valid for this SDK version.
 12. State Logcat behavior precisely: output is visible only when `isDebugMode=true` and `consoleOutput=true`.
+13. Treat `BuildConfig.LOGGER_URL`, `BuildConfig.LOGGER_KEY`, and `BuildConfig.LOGGER_DEBUG` as placeholders unless the target app already defines them.
+14. If Android snippets use `BuildConfig.*` and fields are missing, provide the Gradle mapping step before initialization code.
+15. Never use `AppLoggerSDK` in iOS/KMP setup code; use `AppLoggerIos.shared` for iOS KMP initialization.
 
 ## Workflow
 

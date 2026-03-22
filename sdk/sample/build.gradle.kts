@@ -10,15 +10,13 @@ android {
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()
 
-        val loggerUrl = project.findProperty("appLogger_url")
-            ?: project.findProperty("appLogger.url")
-            ?: ""
-        val loggerKey = project.findProperty("appLogger_anonKey")
-            ?: project.findProperty("appLogger.anonKey")
-            ?: ""
+        val loggerUrl = project.findProperty("APPLOGGER_URL") ?: ""
+        val loggerKey = project.findProperty("APPLOGGER_ANON_KEY") ?: ""
+        val loggerDebug = project.findProperty("APPLOGGER_DEBUG") ?: "false"
 
         buildConfigField("String", "LOGGER_URL", "\"${loggerUrl}\"")
         buildConfigField("String", "LOGGER_KEY", "\"${loggerKey}\"")
+        buildConfigField("boolean", "LOGGER_DEBUG", loggerDebug.toString())
     }
 
     buildFeatures { buildConfig = true }
@@ -39,8 +37,8 @@ dependencies {
     implementation(project(":logger-transport-supabase"))
 
     // En una app real que consume el SDK publicado:
-    // implementation("com.github.zuccadev-labs.appLoggers:logger-core:0.1.1-alpha.5")
-    // implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:0.1.1-alpha.5")
+    // implementation("com.github.zuccadev-labs.appLoggers:logger-core:0.1.1-alpha.6")
+    // implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:0.1.1-alpha.6")
 
     // Test utilities
     testImplementation(project(":logger-test"))

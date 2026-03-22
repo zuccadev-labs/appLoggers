@@ -17,13 +17,13 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.5")
+                implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.6")
             }
         }
 
         val iosMain by getting {
             dependencies {
-                implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.5")
+                implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.6")
             }
         }
     }
@@ -35,24 +35,38 @@ kotlin {
 Preferred initialization point: Kotlin code in `iosMain`.
 
 ```kotlin
-val config = AppLoggerConfig.Builder()
-    .endpoint(url)
-    .apiKey(anonKey)
-    .debugMode(debugMode)
-    .batchSize(20)
-    .flushIntervalSeconds(30)
-    .build()
+import com.applogger.core.AppLoggerConfig
+import com.applogger.core.AppLoggerIos
+import com.applogger.transport.supabase.SupabaseTransport
 
-val transport = SupabaseTransport(
-    endpoint = url,
-    apiKey = anonKey
-)
+object IosLoggerBootstrap {
+    fun initialize(url: String, anonKey: String, debugMode: Boolean) {
+        val config = AppLoggerConfig.Builder()
+            .endpoint(url)
+            .apiKey(anonKey)
+            .debugMode(debugMode)
+            .consoleOutput(debugMode)
+            .batchSize(20)
+            .flushIntervalSeconds(30)
+            .build()
 
-AppLoggerIos.shared.initialize(
-    config = config,
-    transport = transport
-)
+        val transport = SupabaseTransport(
+            endpoint = url,
+            apiKey = anonKey
+        )
+
+        AppLoggerIos.shared.initialize(
+            config = config,
+            transport = transport
+        )
+    }
+}
 ```
+
+Compile guard:
+
+1. Do not use `AppLoggerSDK` in iOS KMP modules.
+2. Keep initialization in Kotlin (`iosMain` or shared Kotlin bootstrap), not in ad-hoc Swift host wrappers.
 
 ## local.properties policy
 
@@ -65,9 +79,9 @@ If `local.properties` is present:
 Suggested keys:
 
 ```properties
-appLogger_url=https://YOUR-PROJECT.supabase.co
-appLogger_anonKey=YOUR_ANON_KEY
-appLogger_debug=false
+APPLOGGER_URL=https://YOUR-PROJECT.supabase.co
+APPLOGGER_ANON_KEY=YOUR_ANON_KEY
+APPLOGGER_DEBUG=false
 ```
 
 ## Minimal verification

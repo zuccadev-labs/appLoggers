@@ -43,7 +43,7 @@ func newAgentCommand() *cobra.Command {
 			payload := agentSchemaPayload{
 				Name:            "applogger-cli",
 				Version:         buildVersion,
-				Recommendation:  "Agents should prefer --output agent (TOON) and use --output json when strict JSON is required; when multiple telemetry apps exist, resolve the active project via --project, APPLOGGER_PROJECT, or workspace autodetection",
+				Recommendation:  "MCP-compatible agents should run capabilities -> agent schema -> health before telemetry query, prefer --output agent (TOON), and use --output json when strict JSON is required; when multiple telemetry apps exist, resolve the active project via --project, APPLOGGER_PROJECT, or workspace autodetection",
 				DefaultOutput:   "text",
 				ContractVersion: "1.0.0",
 				EnvVars: []string{

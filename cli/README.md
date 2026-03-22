@@ -96,7 +96,7 @@ Config file resolution:
 
 - `--config <path>`
 - `APPLOGGER_CONFIG`
-- Default path: `$HOME/.applogger-cli/cli.json`
+- Default path: `$HOME/.apploggers/cli.json`
 - Legacy fallback path: `os.UserConfigDir()/applogger/cli.json`
 
 Recommended JSON structure:
@@ -202,7 +202,7 @@ applogger-cli health --output json
 applogger-cli --project klinema telemetry query --source logs --severity error --output json
 
 # Workspace-based autodetection via APPLOGGER_CONFIG
-APPLOGGER_CONFIG="$HOME/.applogger-cli/cli.json" applogger-cli telemetry query --source logs --limit 25 --output json
+APPLOGGER_CONFIG="$HOME/.apploggers/cli.json" applogger-cli telemetry query --source logs --limit 25 --output json
 
 # Upgrade CLI to latest published release
 applogger-cli upgrade
@@ -234,7 +234,26 @@ applogger-cli telemetry query \
 applogger-cli telemetry query \
   --source metrics \
   --aggregate name \
-  --session-id 00000000-0000-0000-0000-000000000000 \
+  --session-id session-mobile-01 \
+  --limit 50 \
+  --output json
+
+# Query logs with identity filters (session/device/user)
+applogger-cli telemetry query \
+  --source logs \
+  --session-id session-mobile-01 \
+  --device-id a13b8f3b-61f8-5a11-8a9d-6fdf3f5d1f2d \
+  --user-id 6b5b0f7b-3fd5-5c2f-8f67-45d1a6f8f2dd \
+  --limit 25 \
+  --output json
+
+# Query logs with package/error/message segmentation filters
+applogger-cli telemetry query \
+  --source logs \
+  --package com.company.billing \
+  --error-code E-42 \
+  --contains timeout \
+  --severity error \
   --limit 50 \
   --output json
 ```
@@ -253,6 +272,12 @@ applogger-cli telemetry query \
 - Log queries include the `extra` object when present.
 - `warn(..., anomalyType = "...")` is exposed through `extra.anomaly_type`.
 - Use `--anomaly-type` to filter warning anomalies on the server side.
+- `--session-id` now accepts any identifier string supported by your table schema.
+- `--device-id` works for both `logs` and `metrics` sources.
+- `--user-id` is available for `logs` source and maps to anonymized user identifiers.
+- `--package` maps to `extra.package_name` for module/package-level segmentation in logs.
+- `--error-code` maps to `extra.error_code` for operational error grouping.
+- `--contains` applies `ilike` filtering over `message` for fast development triage.
 - Project-based responses include `project` and `config_source` when the CLI resolved a project profile.
 
 ## Development

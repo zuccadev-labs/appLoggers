@@ -138,6 +138,7 @@ internal data class SupabaseLogEntry(
     @SerialName("api_level") val apiLevel: Int,
     @SerialName("sdk_version") val sdkVersion: String,
     @SerialName("session_id") val sessionId: String,
+    @SerialName("device_id") val deviceId: String,
     @SerialName("user_id") val userId: String? = null,
     val extra: Map<String, String>? = null
 )
@@ -148,6 +149,7 @@ internal data class SupabaseMetricEntry(
     val value: Double,
     val unit: String,
     val tags: Map<String, String>,
+    @SerialName("device_id") val deviceId: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("sdk_version") val sdkVersion: String
 )
@@ -174,6 +176,7 @@ private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
     apiLevel = deviceInfo.apiLevel,
     sdkVersion = sdkVersion,
     sessionId = sessionId,
+    deviceId = deviceId,
     userId = userId,
     extra = extra
 )
@@ -190,6 +193,7 @@ private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
         value = metricValue,
         unit = metricUnit,
         tags = metricTags + mapOf("platform" to deviceInfo.platform),
+        deviceId = deviceId,
         sessionId = sessionId,
         sdkVersion = sdkVersion
     )

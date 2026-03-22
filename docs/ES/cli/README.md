@@ -196,7 +196,9 @@ $ applogger-cli agent schema --output json
       "created_at": "timestamp",
       "level": "enum(debug|info|warn|error)",
       "message": "text",
-      "session_id": "uuid",
+      "session_id": "text",
+      "device_id": "text",
+      "user_id": "text",
       "tag": "text",
       "extra": "json"
     }
@@ -207,7 +209,8 @@ $ applogger-cli agent schema --output json
       "created_at": "timestamp",
       "name": "text",
       "value": "float64",
-      "session_id": "uuid",
+      "session_id": "text",
+      "device_id": "text",
       "unit": "text"
     }
   }
@@ -233,7 +236,12 @@ applogger-cli telemetry query \
   [--severity LEVEL] \          # logs only
   [--tag NAME] \                # logs only
   [--anomaly-type TYPE] \       # logs only (extra.anomaly_type)
-  [--session-id UUID] \
+  [--session-id SESSION_ID] \
+  [--device-id DEVICE_ID] \
+  [--user-id USER_ID] \         # logs only
+  [--package PACKAGE_NAME] \    # logs only (extra.package_name)
+  [--error-code CODE] \         # logs only (extra.error_code)
+  [--contains TEXT] \           # logs only (message ilike)
   [--name METRIC_NAME] \        # metrics only
   [--limit N] \
   [--output FORMAT]
@@ -250,7 +258,12 @@ applogger-cli telemetry query \
 | `--severity` | ❌ (logs) | `debug`, `info`, `warn`, `error`, `critical`, `metric` | `--severity error` |
 | `--tag` | ❌ (logs) | texto libre | `--tag PAYMENT` |
 | `--anomaly-type` | ❌ (logs) | texto libre | `--anomaly-type slow_response` |
-| `--session-id` | ❌ | UUID | `--session-id 550e8400-e29b-41d4-a716-446655440000` |
+| `--session-id` | ❌ | texto libre | `--session-id session-mobile-01` |
+| `--device-id` | ❌ | texto libre | `--device-id device-abc` |
+| `--user-id` | ❌ (logs) | texto libre | `--user-id user-anon-001` |
+| `--package` | ❌ (logs) | texto libre | `--package com.company.billing` |
+| `--error-code` | ❌ (logs) | texto libre | `--error-code E-42` |
+| `--contains` | ❌ (logs) | texto libre | `--contains timeout` |
 | `--name` | ❌ (metrics) | texto libre | `--name response_time_ms` |
 | `--limit` | ❌ | 1-1000 (default: 100) | `--limit 50` |
 | `--output` | ❌ | `text`, `json`, `agent` | `--output json` |
@@ -279,7 +292,7 @@ applogger-cli telemetry query \
 ```bash
 applogger-cli telemetry query \
   --source metrics \
-  --session-id 550e8400-e29b-41d4-a716-446655440000 \
+  --session-id session-mobile-01 \
   --aggregate name \
   --limit 100 \
   --output json
@@ -305,6 +318,18 @@ applogger-cli telemetry query \
   --output json
 ```
 
+**F. Segmentacion por paquete y error operativo**
+```bash
+applogger-cli telemetry query \
+  --source logs \
+  --package com.company.billing \
+  --error-code E-42 \
+  --contains timeout \
+  --severity error \
+  --limit 50 \
+  --output json
+```
+
 Notas operativas:
 
 - Las consultas de `logs` devuelven el campo `extra` cuando existe.
@@ -327,7 +352,9 @@ applogger-cli telemetry agent-response \
   [--severity LEVEL] \
   [--tag NAME] \
   [--anomaly-type TYPE] \
-  [--session-id UUID] \
+  [--session-id SESSION_ID] \
+  [--device-id DEVICE_ID] \
+  [--user-id USER_ID] \
   [--name METRIC_NAME] \
   [--limit N] \
   [--preview-limit 0-50]
@@ -486,7 +513,7 @@ jq '.rows | length' /tmp/daily-errors.json
 **Escenario**: Un usuario reporta problema. Revisar toda su sesión.
 
 ```bash
-SESSION_ID="550e8400-e29b-41d4-a716-446655440000"
+SESSION_ID="session-mobile-01"
 
 applogger-cli telemetry query \
   --source logs \

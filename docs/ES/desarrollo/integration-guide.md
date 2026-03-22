@@ -106,9 +106,9 @@ Todas las variables se colocan en `local.properties` (no commiteable) y se mapea
 
 | Variable | Tipo | Valor por defecto | Descripción |
 |---|---|---|---|
-| `appLogger_url` | String | `""` | Endpoint del backend (Supabase URL o URL propia) |
-| `appLogger_anonKey` | String | `""` | API key de autenticación (anon key de Supabase) |
-| `appLogger_debug` | Boolean | `false` | Modo debug: logs van a Logcat en vez de backend |
+| `APPLOGGER_URL` | String | `""` | Endpoint del backend (Supabase URL o URL propia) |
+| `APPLOGGER_ANON_KEY` | String | `""` | API key de autenticación (anon key de Supabase) |
+| `APPLOGGER_DEBUG` | Boolean | `false` | Modo debug: logs van a Logcat en vez de backend |
 | `appLogger_logToConsole` | Boolean | `true` | Mostrar logs en Logcat (solo en debug) |
 | `appLogger_batchSize` | Int | `20` | Número de eventos por batch antes de enviar (1-100) |
 | `appLogger_flushIntervalSeconds` | Int | `30` | Intervalo máximo en segundos antes de flush automático (5-300) |
@@ -124,9 +124,9 @@ Todas las variables se colocan en `local.properties` (no commiteable) y se mapea
 
 ```properties
 # AppLogger — NUNCA commitear este archivo
-appLogger_url=https://tu-proyecto.supabase.co
-appLogger_anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.tu_anon_key_aqui
-appLogger_debug=true
+APPLOGGER_URL=https://tu-proyecto.supabase.co
+APPLOGGER_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.tu_anon_key_aqui
+APPLOGGER_DEBUG=true
 appLogger_logToConsole=true
 appLogger_batchSize=20
 appLogger_flushIntervalSeconds=30
@@ -155,9 +155,9 @@ android {
             if (file.exists()) load(file.inputStream())
         }
 
-        buildConfigField("String",  "LOGGER_URL",            "\"${props["appLogger_url"] ?: ""}\"")
-        buildConfigField("String",  "LOGGER_KEY",            "\"${props["appLogger_anonKey"] ?: ""}\"")
-        buildConfigField("Boolean", "LOGGER_DEBUG_MODE",     "${props["appLogger_debug"] ?: false}")
+        buildConfigField("String",  "LOGGER_URL",            "\"${props["APPLOGGER_URL"] ?: ""}\"")
+        buildConfigField("String",  "LOGGER_KEY",            "\"${props["APPLOGGER_ANON_KEY"] ?: ""}\"")
+        buildConfigField("Boolean", "LOGGER_DEBUG_MODE",     "${props["APPLOGGER_DEBUG"] ?: false}")
         buildConfigField("Boolean", "LOGGER_CONSOLE_OUTPUT", "${props["appLogger_logToConsole"] ?: true}")
         buildConfigField("Int",     "LOGGER_BATCH_SIZE",     "${props["appLogger_batchSize"] ?: 20}")
         buildConfigField("Int",     "LOGGER_FLUSH_INTERVAL", "${props["appLogger_flushIntervalSeconds"] ?: 30}")
@@ -182,23 +182,23 @@ Para el pipeline de producción, las credenciales se inyectan como secrets:
     LOGGER_URL: ${{ secrets.LOGGER_URL }}
     LOGGER_KEY: ${{ secrets.LOGGER_ANON_KEY }}
   run: |
-    echo "appLogger_url=$LOGGER_URL" >> local.properties
-    echo "appLogger_anonKey=$LOGGER_KEY" >> local.properties
-    echo "appLogger_debug=false" >> local.properties
+    echo "APPLOGGER_URL=$LOGGER_URL" >> local.properties
+    echo "APPLOGGER_ANON_KEY=$LOGGER_KEY" >> local.properties
+    echo "APPLOGGER_DEBUG=false" >> local.properties
     echo "appLogger_logToConsole=false" >> local.properties
     ./gradlew assembleRelease
 ```
 
 ### 3.5 Comportamiento según configuración
 
-| `appLogger_debug` | `appLogger_logToConsole` | Resultado |
+| `APPLOGGER_DEBUG` | `appLogger_logToConsole` | Resultado |
 |---|---|---|
 | `true` | `true` | Logs a Logcat + backend (doble envío) |
 | `true` | `false` | Solo a Logcat (desarrollo sin red) |
 | `false` | `true` | Solo a backend (producción con verbose) |
 | `false` | `false` | Solo a backend (producción normal) |
 
-Para desactivar completamente el envío de datos (modo offline-only), no configurar `appLogger_url` o dejarlo vacío. El SDK operará solo con SQLite local.
+Para desactivar completamente el envío de datos (modo offline-only), no configurar `APPLOGGER_URL` o dejarlo vacío. El SDK operará solo con SQLite local.
 
 ---
 
@@ -638,7 +638,7 @@ Para requisitos más estrictos (ej. banca), se recomienda:
 
 ```kotlin
 // El valor de LOGGER_DEBUG_MODE viene de local.properties → build.gradle
-// En desarrollo: appLogger_debug=true → consola
+// En desarrollo: APPLOGGER_DEBUG=true → consola
 // En release: la variable no existe o es false → remoto
 
 AppLoggerConfig.Builder()
@@ -652,6 +652,11 @@ AppLoggerConfig.Builder()
 
 Por defecto, el `user_id` en todos los logs es `null`. Solo tiene sentido activarlo cuando el usuario ha dado consentimiento explícito para que sus logs sean correlacionables.
 
+Desde esta version, AppLogger separa identidad de dispositivo e identidad de usuario:
+
+- `device_id`: se calcula automaticamente desde huellas tecnicas del dispositivo y puede sobreescribirse.
+- `user_id`: es opcional y anonimo; cuando llamas `setAnonymousUserId(...)`, el SDK normaliza internamente el valor a un formato UUID-compatible deterministico si no recibe ya un UUID canonico.
+
 ```kotlin
 // Paso 1: El usuario acepta la política de privacidad
 fun onPrivacyPolicyAccepted() {
@@ -659,7 +664,8 @@ fun onPrivacyPolicyAccepted() {
     AppLoggerSDK.setAnonymousUserId(anonymousId)
 }
 
-// Paso 2: Generar/recuperar UUID anónimo (NO usar el ID real del usuario)
+// Paso 2: Generar/recuperar ID anónimo (NO usar el ID real del usuario)
+// El SDK acepta UUID o texto libre y lo normaliza a UUID-compatible.
 private fun getOrCreateAnonymousId(): String {
     val prefs = getSharedPreferences("app_logger_prefs", Context.MODE_PRIVATE)
     return prefs.getString("anon_user_id", null)
@@ -668,10 +674,20 @@ private fun getOrCreateAnonymousId(): String {
         }
 }
 
+// Paso 3 (opcional): fijar un device_id estable propio
+fun onDeviceIdAvailable(deviceFingerprint: String) {
+    AppLoggerSDK.setDeviceId(deviceFingerprint)
+}
+
 // Para revocar el consentimiento (derecho al olvido):
 fun onPrivacyPolicyRevoked() {
     AppLoggerSDK.clearAnonymousUserId()
     // Opcionalmente: borrar datos del servidor
+}
+
+// Para restaurar el device_id calculado automaticamente por el SDK:
+fun onResetDeviceIdentity() {
+    AppLoggerSDK.clearDeviceId()
 }
 ```
 

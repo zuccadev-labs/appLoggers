@@ -87,7 +87,7 @@ Variables de control:
 
 Ruta default del archivo:
 
-- Windows/Linux/macOS: `~/.applogger-cli/cli.json`
+- Windows/Linux/macOS: `~/.apploggers/cli.json`
 - Fallback legacy compatible: `$(os.UserConfigDir)/applogger/cli.json`
 
 Ejemplo recomendado:

@@ -235,21 +235,21 @@ sdk.dir=C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
 
 # ── Supabase (backend de logs) ──────────────────────────────────────────
 # Obtener de: https://supabase.com/dashboard → Settings → API
-appLogger_url=https://TU-PROYECTO.supabase.co
-appLogger_anonKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+APPLOGGER_URL=https://TU-PROYECTO.supabase.co
+APPLOGGER_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # ── Modo Debug ──────────────────────────────────────────────────────────
 # true  → logs en Logcat + envío al backend (desarrollo)
 # false → solo envío al backend, sin output local (producción)
-appLogger_debug=true
+APPLOGGER_DEBUG=true
 ```
 
 | Variable | Obligatoria | Dónde obtenerla |
 |---|:---:|---|
 | `sdk.dir` | ✅ | Android Studio lo autocompleta, o ver `ANDROID_HOME` |
-| `appLogger_url` | ✅ | [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API → Project URL |
-| `appLogger_anonKey` | ✅ | Supabase Dashboard → Settings → API → `anon` `public` key |
-| `appLogger_debug` | ❌ | `true` para desarrollo, `false` para producción (default: `false`) |
+| `APPLOGGER_URL` | ✅ | [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API → Project URL |
+| `APPLOGGER_ANON_KEY` | ✅ | Supabase Dashboard → Settings → API → `anon` `public` key |
+| `APPLOGGER_DEBUG` | ❌ | `true` para desarrollo, `false` para producción (default: `false`) |
 
 > ⚠️ **`local.properties` está en `.gitignore`** — nunca se sube al repositorio.  
 > Si clonás el repo y no existe, copiá desde `local.properties.example`.
@@ -277,9 +277,9 @@ android {
             val file = rootProject.file("local.properties")
             if (file.exists()) load(file.inputStream())
         }
-        buildConfigField("String",  "LOGGER_URL",  "\"${props["appLogger_url"] ?: ""}\"")
-        buildConfigField("String",  "LOGGER_KEY",  "\"${props["appLogger_anonKey"] ?: ""}\"")
-        buildConfigField("Boolean", "LOGGER_DEBUG", "${props["appLogger_debug"] ?: false}")
+        buildConfigField("String",  "LOGGER_URL",  "\"${props["APPLOGGER_URL"] ?: ""}\"")
+        buildConfigField("String",  "LOGGER_KEY",  "\"${props["APPLOGGER_ANON_KEY"] ?: ""}\"")
+        buildConfigField("Boolean", "LOGGER_DEBUG", "${props["APPLOGGER_DEBUG"] ?: false}")
     }
 }
 ```
@@ -303,13 +303,13 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.5")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.6")
 
     // Transporte Supabase (opcional — si tu backend es Supabase)
-    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.5")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.6")
 
     // Utilidades de testing (solo para tests)
-    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:v0.1.1-alpha.5")
+    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:v0.1.1-alpha.6")
 }
 ```
 
@@ -331,8 +331,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.zuccadev-labs:logger-core:0.1.1-alpha.5")
-    implementation("com.github.zuccadev-labs:logger-transport-supabase:0.1.1-alpha.5")
+    implementation("com.github.zuccadev-labs:logger-core:0.1.1-alpha.6")
+    implementation("com.github.zuccadev-labs:logger-transport-supabase:0.1.1-alpha.6")
 }
 ```
 
@@ -557,7 +557,7 @@ JitPack construye automáticamente cuando se crea un tag o cuando alguien solici
 
 ```kotlin
 // Usar en cualquier proyecto
-implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.5")
+implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.6")
 ```
 
 ### GitHub Packages (CI/CD)
@@ -565,8 +565,8 @@ implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.5")
 El workflow `release.yml` publica automáticamente al crear un tag `v*`:
 
 ```bash
-git tag -a v0.1.1-alpha.5 -m "Release 0.1.1-alpha.5"
-git push origin v0.1.1-alpha.5
+git tag -a v0.1.1-alpha.6 -m "Release 0.1.1-alpha.6"
+git push origin v0.1.1-alpha.6
 # → GitHub Actions: tests + publish + GitHub Release
 ```
 

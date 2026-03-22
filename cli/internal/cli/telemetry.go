@@ -22,6 +22,11 @@ func newTelemetryCommand() *cobra.Command {
 		toFlag          string
 		severityFlag    string
 		sessionFlag     string
+		deviceIDFlag    string
+		userIDFlag      string
+		packageFlag     string
+		errorCodeFlag   string
+		containsFlag    string
 		tagFlag         string
 		nameFlag        string
 		anomalyTypeFlag string
@@ -90,6 +95,18 @@ func newTelemetryCommand() *cobra.Command {
 		if strings.TrimSpace(anomalyTypeFlag) != "" && source != "logs" {
 			return telemetryQueryRequest{}, newUsageError("--anomaly-type is only valid when --source=logs")
 		}
+		if strings.TrimSpace(userIDFlag) != "" && source != "logs" {
+			return telemetryQueryRequest{}, newUsageError("--user-id is only valid when --source=logs")
+		}
+		if strings.TrimSpace(packageFlag) != "" && source != "logs" {
+			return telemetryQueryRequest{}, newUsageError("--package is only valid when --source=logs")
+		}
+		if strings.TrimSpace(errorCodeFlag) != "" && source != "logs" {
+			return telemetryQueryRequest{}, newUsageError("--error-code is only valid when --source=logs")
+		}
+		if strings.TrimSpace(containsFlag) != "" && source != "logs" {
+			return telemetryQueryRequest{}, newUsageError("--contains is only valid when --source=logs")
+		}
 
 		return telemetryQueryRequest{
 			Source:      source,
@@ -98,6 +115,11 @@ func newTelemetryCommand() *cobra.Command {
 			To:          toFlag,
 			Severity:    severity,
 			SessionID:   strings.TrimSpace(sessionFlag),
+			DeviceID:    strings.TrimSpace(deviceIDFlag),
+			UserID:      strings.TrimSpace(userIDFlag),
+			Package:     strings.TrimSpace(packageFlag),
+			ErrorCode:   strings.TrimSpace(errorCodeFlag),
+			Contains:    strings.TrimSpace(containsFlag),
 			Tag:         strings.TrimSpace(tagFlag),
 			Name:        strings.TrimSpace(nameFlag),
 			AnomalyType: strings.TrimSpace(anomalyTypeFlag),
@@ -147,7 +169,7 @@ func newTelemetryCommand() *cobra.Command {
 			}
 			_, err = fmt.Fprintf(
 				cmd.OutOrStdout(),
-				"source=%s\ncount=%d\naggregate=%s\nfrom=%s\nto=%s\nseverity=%s\nsession_id=%s\ntag=%s\nname=%s\nlimit=%d\n",
+				"source=%s\ncount=%d\naggregate=%s\nfrom=%s\nto=%s\nseverity=%s\nsession_id=%s\ndevice_id=%s\nuser_id=%s\npackage=%s\nerror_code=%s\ncontains=%s\ntag=%s\nname=%s\nlimit=%d\n",
 				response.Source,
 				response.Count,
 				response.Request.Aggregate,
@@ -155,6 +177,11 @@ func newTelemetryCommand() *cobra.Command {
 				response.Request.To,
 				response.Request.Severity,
 				response.Request.SessionID,
+				response.Request.DeviceID,
+				response.Request.UserID,
+				response.Request.Package,
+				response.Request.ErrorCode,
+				response.Request.Contains,
 				response.Request.Tag,
 				response.Request.Name,
 				response.Request.Limit,
@@ -192,7 +219,12 @@ func newTelemetryCommand() *cobra.Command {
 	queryCmd.Flags().StringVar(&fromFlag, "from", "", "Start timestamp (RFC3339)")
 	queryCmd.Flags().StringVar(&toFlag, "to", "", "End timestamp (RFC3339)")
 	queryCmd.Flags().StringVar(&severityFlag, "severity", "", "Severity filter for logs: debug|info|warn|error|critical|metric")
-	queryCmd.Flags().StringVar(&sessionFlag, "session-id", "", "Session UUID filter")
+	queryCmd.Flags().StringVar(&sessionFlag, "session-id", "", "Session identifier filter")
+	queryCmd.Flags().StringVar(&deviceIDFlag, "device-id", "", "Device identifier filter")
+	queryCmd.Flags().StringVar(&userIDFlag, "user-id", "", "Anonymous user identifier filter (logs source only)")
+	queryCmd.Flags().StringVar(&packageFlag, "package", "", "Package/module filter from extra.package_name (logs source only)")
+	queryCmd.Flags().StringVar(&errorCodeFlag, "error-code", "", "Error code filter from extra.error_code (logs source only)")
+	queryCmd.Flags().StringVar(&containsFlag, "contains", "", "Message substring filter (logs source only)")
 	queryCmd.Flags().StringVar(&tagFlag, "tag", "", "Tag filter (logs source only)")
 	queryCmd.Flags().StringVar(&nameFlag, "name", "", "Metric name filter (metrics source only)")
 	queryCmd.Flags().StringVar(&anomalyTypeFlag, "anomaly-type", "", "Anomaly type filter (logs source only, e.g. slow_response)")
@@ -203,7 +235,12 @@ func newTelemetryCommand() *cobra.Command {
 	agentResponseCmd.Flags().StringVar(&fromFlag, "from", "", "Start timestamp (RFC3339)")
 	agentResponseCmd.Flags().StringVar(&toFlag, "to", "", "End timestamp (RFC3339)")
 	agentResponseCmd.Flags().StringVar(&severityFlag, "severity", "", "Severity filter for logs: debug|info|warn|error|critical|metric")
-	agentResponseCmd.Flags().StringVar(&sessionFlag, "session-id", "", "Session UUID filter")
+	agentResponseCmd.Flags().StringVar(&sessionFlag, "session-id", "", "Session identifier filter")
+	agentResponseCmd.Flags().StringVar(&deviceIDFlag, "device-id", "", "Device identifier filter")
+	agentResponseCmd.Flags().StringVar(&userIDFlag, "user-id", "", "Anonymous user identifier filter (logs source only)")
+	agentResponseCmd.Flags().StringVar(&packageFlag, "package", "", "Package/module filter from extra.package_name (logs source only)")
+	agentResponseCmd.Flags().StringVar(&errorCodeFlag, "error-code", "", "Error code filter from extra.error_code (logs source only)")
+	agentResponseCmd.Flags().StringVar(&containsFlag, "contains", "", "Message substring filter (logs source only)")
 	agentResponseCmd.Flags().StringVar(&tagFlag, "tag", "", "Tag filter (logs source only)")
 	agentResponseCmd.Flags().StringVar(&nameFlag, "name", "", "Metric name filter (metrics source only)")
 	agentResponseCmd.Flags().StringVar(&anomalyTypeFlag, "anomaly-type", "", "Anomaly type filter (logs source only, e.g. slow_response)")

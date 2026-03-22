@@ -8,3 +8,6 @@ expect fun currentTimeMillis(): Long
 
 /** Imprime un mensaje en la consola nativa de la plataforma. */
 expect fun platformLog(tag: String, message: String)
+
+/** Returns SHA-256 hash encoded as lowercase hex. */
+expect fun sha256Hex(input: String): String
