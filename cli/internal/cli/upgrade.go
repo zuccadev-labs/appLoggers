@@ -18,7 +18,7 @@ import (
 
 const (
 	cliReleaseRepo   = "zuccadev-labs/appLoggers"
-	cliReleasePrefix = "applogger-cli-v"
+	cliReleasePrefix = "apploggers-v"
 )
 
 type githubRelease struct {
@@ -40,7 +40,7 @@ func newUpgradeCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "upgrade",
-		Short: "Upgrade applogger-cli to the latest published release",
+		Short: "Upgrade apploggers to the latest published release",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return newUsageError("upgrade does not accept positional arguments")
@@ -71,7 +71,7 @@ func newUpgradeCommand() *cobra.Command {
 					CurrentVersion: currentVersion,
 					TargetVersion:  targetVersion,
 					Asset:          assetName,
-					Message:        "applogger-cli is already up to date",
+					Message:        "apploggers is already up to date",
 				}
 				return writeUpgradeOutput(cmd, payload)
 			}
@@ -111,13 +111,13 @@ func newUpgradeCommand() *cobra.Command {
 				CurrentVersion: currentVersion,
 				TargetVersion:  targetVersion,
 				Asset:          assetName,
-				Message:        "upgrade applied successfully; run 'applogger-cli version' to verify current binary",
+				Message:        "upgrade applied successfully; run 'apploggers version' to verify current binary",
 			}
 			return writeUpgradeOutput(cmd, payload)
 		},
 	}
 
-	cmd.Flags().StringVar(&requestedVersion, "version", "", "Specific release tag to install (e.g. applogger-cli-v0.1.1)")
+	cmd.Flags().StringVar(&requestedVersion, "version", "", "Specific release tag to install (e.g. apploggers-v0.1.3)")
 	cmd.Flags().BoolVar(&force, "force", false, "Force upgrade even if current version matches")
 	return cmd
 }
@@ -205,7 +205,7 @@ func resolveUpgradeAssetName() (string, error) {
 		return "", fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
 	}
 
-	asset := fmt.Sprintf("applogger-cli-%s-%s", osPart, archPart)
+	asset := fmt.Sprintf("apploggers-%s-%s", osPart, archPart)
 	if runtime.GOOS == "windows" {
 		asset += ".exe"
 	}

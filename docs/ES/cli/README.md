@@ -1,7 +1,7 @@
 # AppLogger CLI — Guía de Uso y Referencia
 
 **Última actualización**: 2026-03-22  
-**Versión**: v0.1.2  
+**Versión**: v0.1.3  
 **Status**: Production-ready (beta)
 
 ---
@@ -75,7 +75,7 @@ Variables nuevas:
 Ejemplo rápido:
 
 ```bash
-applogger-cli --project klinema telemetry query --source logs --severity error --output json
+apploggers --project klinema telemetry query --source logs --severity error --output json
 ```
 
 ```bash
@@ -83,7 +83,7 @@ applogger-cli --project klinema telemetry query --source logs --severity error -
 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
 # Verificar
-applogger-cli version --output json
+apploggers version --output json
 ```
 
 ```powershell
@@ -91,7 +91,7 @@ applogger-cli version --output json
 irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 
 # Verificar
-applogger-cli version --output json
+apploggers version --output json
 ```
 
 Notas:
@@ -104,49 +104,49 @@ Notas:
 
 ## Comandos Principales
 
-### `applogger-cli upgrade`
-Actualiza el binario del CLI a la ultima release publicada `applogger-cli-v*`.
+### `apploggers upgrade`
+Actualiza el binario del CLI a la ultima release publicada `apploggers-v*`.
 
 ```bash
-applogger-cli upgrade
+apploggers upgrade
 ```
 
 Version especifica:
 
 ```bash
-applogger-cli upgrade --version applogger-cli-v0.1.1
+apploggers upgrade --version apploggers-v0.1.1
 ```
 
 Para reinstalar incluso si ya coincide la version actual:
 
 ```bash
-applogger-cli upgrade --force
+apploggers upgrade --force
 ```
 
 ---
 
-### `applogger-cli version`
+### `apploggers version`
 Muestra la versión del CLI.
 
 ```bash
-$ applogger-cli version
-applogger-cli v0.1.0-alpha.0 (commit: abc1234, built: 2026-03-19T10:30:00Z)
+$ apploggers version
+apploggers v0.1.0-alpha.0 (commit: abc1234, built: 2026-03-19T10:30:00Z)
 
 # JSON
-$ applogger-cli version --output json
+$ apploggers version --output json
 {"ok": true, "version": "v0.1.0-alpha.0", "commit": "abc1234", "build_time": "2026-03-19T10:30:00Z"}
 ```
 
 ---
 
-### `applogger-cli capabilities`
+### `apploggers capabilities`
 Muestra capacidades disponibles del CLI y modo agent soportado.
 
 ```bash
-$ applogger-cli capabilities --output json
+$ apploggers capabilities --output json
 {
   "ok": true,
-  "cli_name": "applogger-cli",
+  "cli_name": "apploggers",
   "version": "v0.1.0-alpha.0",
   "output_modes": ["text", "json", "agent"],
   "capabilities": [
@@ -166,11 +166,11 @@ $ applogger-cli capabilities --output json
 
 ---
 
-### `applogger-cli health`
+### `apploggers health`
 Verifica la salud del CLI y servicios backend.
 
 ```bash
-$ applogger-cli health --output json
+$ apploggers health --output json
 {
   "ok": true,
   "services": {
@@ -184,11 +184,11 @@ $ applogger-cli health --output json
 
 ---
 
-### `applogger-cli agent schema`
+### `apploggers agent schema`
 Muestra el esquema de datos para consumo de agentes.
 
 ```bash
-$ applogger-cli agent schema --output json
+$ apploggers agent schema --output json
 {
   "telemetry_log": {
     "fields": {
@@ -221,14 +221,14 @@ $ applogger-cli agent schema --output json
 
 ## Consultas de Telemetría
 
-### `applogger-cli telemetry query`
+### `apploggers telemetry query`
 
 Consulta logs o métricas con filtrado y agregación opcionales.
 
 #### Sintaxis
 
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source <logs|metrics> \
   [--from TIMESTAMP] \
   [--to TIMESTAMP] \
@@ -272,7 +272,7 @@ applogger-cli telemetry query \
 
 **A. Consultar todos los logs de error (última semana)**
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --severity error \
   --limit 50
@@ -280,7 +280,7 @@ applogger-cli telemetry query \
 
 **B. Logs agregados por severidad (últimas 24 horas)**
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --aggregate severity \
   --from 2026-03-18T00:00:00Z \
@@ -290,7 +290,7 @@ applogger-cli telemetry query \
 
 **C. Métricas de sesión específica**
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source metrics \
   --session-id session-mobile-01 \
   --aggregate name \
@@ -300,7 +300,7 @@ applogger-cli telemetry query \
 
 **D. Logs con tag PAYMENT (agregados por hora)**
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --tag PAYMENT \
   --aggregate hour \
@@ -310,7 +310,7 @@ applogger-cli telemetry query \
 
 **E. Warnings por tipo de anomalia**
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --severity warn \
   --anomaly-type slow_response \
@@ -320,7 +320,7 @@ applogger-cli telemetry query \
 
 **F. Segmentacion por paquete y error operativo**
 ```bash
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --package com.company.billing \
   --error-code E-42 \
@@ -337,14 +337,14 @@ Notas operativas:
 
 ---
 
-### `applogger-cli telemetry agent-response`
+### `apploggers telemetry agent-response`
 
 Salida **compacta optimizada para agentes IA y automatización**. (Version TOON)
 
 #### Sintaxis
 
 ```bash
-applogger-cli telemetry agent-response \
+apploggers telemetry agent-response \
   --source <logs|metrics> \
   [--aggregate MODE] \
   [--from TIMESTAMP] \
@@ -389,7 +389,7 @@ hint:
 #### Ejemplo
 
 ```bash
-$ applogger-cli telemetry agent-response \
+$ apploggers telemetry agent-response \
   --source logs \
   --aggregate severity \
   --preview-limit 2
@@ -415,7 +415,7 @@ El CLI soporta tres modos de salida:
 Por defecto, amigable para lectura.
 
 ```bash
-$ applogger-cli telemetry query --source logs --severity error --limit 2
+$ apploggers telemetry query --source logs --severity error --limit 2
 
 source=logs
 count=2
@@ -496,7 +496,7 @@ hints: [use_from_to_for_date_range, check_severity_enum]
 YESTERDAY=$(date -u -d '-1 day' '+%Y-%m-%dT00:00:00Z')
 TODAY=$(date -u '+%Y-%m-%dT00:00:00Z')
 
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --severity error \
   --from "$YESTERDAY" \
@@ -515,7 +515,7 @@ jq '.rows | length' /tmp/daily-errors.json
 ```bash
 SESSION_ID="session-mobile-01"
 
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --session-id "$SESSION_ID" \
   --aggregate tag \
@@ -532,7 +532,7 @@ applogger-cli telemetry query \
 LAST_WEEK_FROM=$(date -u -d '-14 days' '+%Y-%m-%dT00:00:00Z')
 LAST_WEEK_TO=$(date -u -d '-7 days' '+%Y-%m-%dT00:00:00Z')
 
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source metrics \
   --name response_time_ms \
   --from "$LAST_WEEK_FROM" \
@@ -544,7 +544,7 @@ applogger-cli telemetry query \
 THIS_WEEK_FROM=$(date -u -d '-7 days' '+%Y-%m-%dT00:00:00Z')
 THIS_WEEK_TO=$(date -u '+%Y-%m-%dT00:00:00Z')
 
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source metrics \
   --name response_time_ms \
   --from "$THIS_WEEK_FROM" \
@@ -567,13 +567,13 @@ diff <(jq '.summary' /tmp/last-week.json) <(jq '.summary' /tmp/this-week.json)
 set -e
 
 # Health check
-if ! applogger-cli health --output json | jq -e '.ok' > /dev/null; then
+if ! apploggers health --output json | jq -e '.ok' > /dev/null; then
   echo "ERROR: AppLogger health check failed" | mail -s "AppLogger Down" ops@company.com
   exit 1
 fi
 
 # Count errors in last 24h
-ERROR_COUNT=$(applogger-cli telemetry query \
+ERROR_COUNT=$(apploggers telemetry query \
   --source logs \
   --severity error \
   --from "$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ')" \
@@ -595,7 +595,7 @@ echo "✓ AppLogger operates normally ($ERROR_COUNT errors/24h)"
 
 ## Integración con Agentes
 
-Ver [AGENT_OPERATOR_SKILL.md](../agents/applogger-cli-agent-operator/SKILL.md) para operación de agentes IA.
+Ver [AGENT_OPERATOR_SKILL.md](../agents/apploggers-agent-operator/SKILL.md) para operación de agentes IA.
 
 ---
 
@@ -635,14 +635,14 @@ Fallback aliases para compatibilidad:
 
 | Código | Significado | Ejemplo |
 |---|---|---|
-| **0** | Éxito | `applogger-cli version` |
+| **0** | Éxito | `apploggers version` |
 | **1** | Error en runtime | Red caída, Supabase no disponible |
 | **2** | Error en uso/sintaxis | Flag inválido, valor fuera de rango |
 
 ### Ejemplo
 
 ```bash
-$ applogger-cli telemetry query --aggregate INVALID_MODE
+$ apploggers telemetry query --aggregate INVALID_MODE
 Error: invalid --aggregate value "INVALID_MODE" (expected: none, hour, severity, tag, session, name)
 $ echo $?
 2
@@ -691,7 +691,7 @@ date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ'          # BSD date (macOS)
 
 - **Instalación problemas**: Ver [INSTALLATION.md](./INSTALLATION.md)
 - **Supabase + usuario CLI (detallado)**: Ver [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md)
-- **Agentes IA**: Ver [../agents/applogger-cli-agent-operator/SKILL.md](../agents/applogger-cli-agent-operator/SKILL.md)
+- **Agentes IA**: Ver [../agents/apploggers-agent-operator/SKILL.md](../agents/apploggers-agent-operator/SKILL.md)
 - **Desarrollo**: Ver [../../cli/README.md](../../cli/README.md)
 
 ---

@@ -14,7 +14,7 @@ type metadataPayload struct {
 
 func writeMetadata(cmd *cobra.Command) error {
 	payload := metadataPayload{
-		Name:        "applogger-cli",
+		Name:        "apploggers",
 		Version:     buildVersion,
 		Description: "CLI for querying and analyzing AppLoggers telemetry",
 	}

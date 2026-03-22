@@ -144,7 +144,9 @@ func resolveProjectConfigPath() (string, bool) {
 	if err := ensureConfigDir(configDir); err != nil {
 		return "", false
 	}
-	return filepath.Join(configDir, "cli.json"), false
+	configPath := filepath.Join(configDir, "cli.json")
+	writeExampleConfigIfAbsent(configPath)
+	return configPath, false
 }
 
 func ensureConfigDir(path string) error {
@@ -162,6 +164,35 @@ func ensureConfigDir(path string) error {
 		return fmt.Errorf("failed to create config directory %s: %w", path, err)
 	}
 	return nil
+}
+
+const exampleConfigJSON = `{
+  "_comment": "AppLoggers CLI configuration file. Edit this file to configure your projects.",
+  "_docs": "https://github.com/zuccadev-labs/appLoggers/tree/main/docs/ES/cli",
+  "default_project": "my-app",
+  "projects": [
+    {
+      "name": "my-app",
+      "display_name": "My Application",
+      "workspace_roots": [],
+      "supabase": {
+        "url": "https://your-project.supabase.co",
+        "api_key_env": "APPLOGGER_SUPABASE_KEY",
+        "schema": "public",
+        "logs_table": "app_logs",
+        "metrics_table": "app_metrics",
+        "timeout_seconds": 15
+      }
+    }
+  ]
+}
+`
+
+func writeExampleConfigIfAbsent(configPath string) {
+	if _, err := os.Stat(configPath); err == nil {
+		return
+	}
+	_ = os.WriteFile(configPath, []byte(exampleConfigJSON), 0644)
 }
 
 func legacyProjectConfigPath() string {

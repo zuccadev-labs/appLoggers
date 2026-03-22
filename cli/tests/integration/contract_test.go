@@ -49,7 +49,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if err := json.Unmarshal(out, &payload); err != nil {
 		t.Fatalf("invalid json output: %v, output=%s", err, string(out))
 	}
-	if payload["name"] != "applogger-cli" {
+	if payload["name"] != "apploggers" {
 		t.Fatalf("unexpected name: %#v", payload["name"])
 	}
 }
@@ -104,7 +104,7 @@ func TestVersionAgentOutput(t *testing.T) {
 		t.Fatalf("version agent output failed: %v, output=%s", err, string(out))
 	}
 	text := string(out)
-	if !strings.Contains(text, "name: applogger-cli") {
+	if !strings.Contains(text, "name: apploggers") {
 		t.Fatalf("expected toon field name, output=%s", text)
 	}
 	if !strings.Contains(text, "version:") {

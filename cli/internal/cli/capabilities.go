@@ -23,7 +23,7 @@ type capabilitiesPayload struct {
 
 func buildCapabilitiesPayload() capabilitiesPayload {
 	return capabilitiesPayload{
-		Name:         "applogger-cli",
+		Name:         "apploggers",
 		Version:      buildVersion,
 		ConfigInputs: []string{"environment", "project_config", "workspace_autodetect"},
 		OutputModes:  []string{"text", "json", "agent"},
