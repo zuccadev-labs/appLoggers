@@ -16,6 +16,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [0.1.2] — 2026-03-22
+
+### Added
+- **Automatic `.apploggers` directory creation**: CLI now automatically creates the user config directory (`~/.apploggers`) on all platforms (Windows, Linux, macOS) during first run.
+- **Enhanced directory creation logic**: Added `ensureConfigDir()` function with proper error handling and permissions (0755) for cross-platform compatibility.
+
+### Changed
+- **CLI version bump**: Updated from v0.1.1 to v0.1.2 across all configuration files.
+- **Plugin metadata version**: Updated `plugin-metadata.yaml` to reflect v0.1.2.
+- **Documentation updates**: Updated CLI README and agent documentation to reflect v0.1.2.
+
+### Fixed
+- **Config directory initialization**: Resolved issue where `.apploggers` directory was not created automatically, causing config file access failures on fresh installations.
+- **Cross-platform compatibility**: Ensured directory creation works correctly on Windows (PowerShell/CMD), Linux (bash), and macOS (bash/zsh).
+
+---
+
 ## [0.1.1-alpha.6] — 2026-03-22
 
 ### Added

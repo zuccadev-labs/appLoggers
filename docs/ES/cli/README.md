@@ -1,7 +1,7 @@
 # AppLogger CLI — Guía de Uso y Referencia
 
-**Última actualización**: 2026-03-21  
-**Versión**: v0.1.1  
+**Última actualización**: 2026-03-22  
+**Versión**: v0.1.2  
 **Status**: Production-ready (beta)
 
 ---
