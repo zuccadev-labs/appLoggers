@@ -18,6 +18,10 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
+private const val HTTP_TOO_MANY_REQUESTS = 429
+private const val HTTP_SERVICE_UNAVAILABLE = 503
+private const val DEFAULT_RETRY_AFTER_SECONDS = 60L
+
 /**
  * [LogTransport] implementation that delivers events to Supabase (PostgreSQL)
  * via the PostgREST API.
@@ -27,6 +31,18 @@ import kotlinx.serialization.json.buildJsonObject
  * - [com.applogger.core.model.LogLevel.METRIC] events → `app_metrics` table.
  *
  * Uses a Ktor [HttpClient] for multiplatform HTTP.
+ *
+ * ## Network availability
+ * By default, [isAvailable] only checks that endpoint and apiKey are non-blank.
+ * On Android, pass a [networkAvailabilityProvider] backed by `ConnectivityManager`
+ * to avoid retry loops when the device is offline:
+ * ```kotlin
+ * val transport = SupabaseTransport(
+ *     endpoint = url,
+ *     apiKey = key,
+ *     networkAvailabilityProvider = { connectivityManager.activeNetwork != null }
+ * )
+ * ```
  *
  * ## Certificate pinning
  * Pass a pre-configured [HttpClient] with engine-level TLS pinning:
@@ -43,17 +59,21 @@ import kotlinx.serialization.json.buildJsonObject
  * SupabaseTransport(url, key, httpClient = pinned)
  * ```
  *
- * @param endpoint          Supabase project URL (e.g. `https://xyz.supabase.co`).
- * @param apiKey            Supabase anon key.
- * @param tableName         Target table for log events (default: `"app_logs"`).
- * @param metricsTableName  Target table for metric events (default: `"app_metrics"`).
- * @param httpClient        Optional pre-configured [HttpClient] (e.g. with cert pinning).
+ * @param endpoint                    Supabase project URL (e.g. `https://xyz.supabase.co`).
+ * @param apiKey                      Supabase anon key.
+ * @param tableName                   Target table for log events (default: `"app_logs"`).
+ * @param metricsTableName            Target table for metric events (default: `"app_metrics"`).
+ * @param networkAvailabilityProvider Optional lambda returning `true` when network is reachable.
+ *                                    Defaults to checking endpoint/apiKey are non-blank.
+ *                                    Should use cached state — no I/O.
+ * @param httpClient                  Optional pre-configured [HttpClient] (e.g. with cert pinning).
  */
 class SupabaseTransport(
     private val endpoint: String,
     private val apiKey: String,
     private val tableName: String = "app_logs",
     private val metricsTableName: String = "app_metrics",
+    private val networkAvailabilityProvider: (() -> Boolean)? = null,
     httpClient: HttpClient? = null
 ) : LogTransport {
 
@@ -76,10 +96,12 @@ class SupabaseTransport(
             val (metrics, logs) = events.partition { it.level == LogLevel.METRIC }
 
             if (logs.isNotEmpty()) {
-                sendLogs(logs)
+                val result = sendLogs(logs)
+                if (result is TransportResult.Failure) return result
             }
             if (metrics.isNotEmpty()) {
-                sendMetrics(metrics)
+                val result = sendMetrics(metrics)
+                if (result is TransportResult.Failure) return result
             }
 
             TransportResult.Success
@@ -92,7 +114,7 @@ class SupabaseTransport(
         }
     }
 
-    private suspend fun sendLogs(events: List<LogEvent>) {
+    private suspend fun sendLogs(events: List<LogEvent>): TransportResult {
         val payload = events.map { it.toSupabaseLog() }
         val response = client.post("$restUrl/$tableName") {
             header("apikey", apiKey)
@@ -102,12 +124,10 @@ class SupabaseTransport(
             val body = json.encodeToString(ListSerializer(SupabaseLogEntry.serializer()), payload)
             setBody(body)
         }
-        if (response.status.value !in 200..299) {
-            error("Supabase insert failed: ${response.status} - ${response.bodyAsText()}")
-        }
+        return response.toTransportResult("app_logs")
     }
 
-    private suspend fun sendMetrics(events: List<LogEvent>) {
+    private suspend fun sendMetrics(events: List<LogEvent>): TransportResult {
         val payload = events.map { it.toSupabaseMetric() }
         val response = client.post("$restUrl/$metricsTableName") {
             header("apikey", apiKey)
@@ -117,12 +137,53 @@ class SupabaseTransport(
             val body = json.encodeToString(ListSerializer(SupabaseMetricEntry.serializer()), payload)
             setBody(body)
         }
-        if (response.status.value !in 200..299) {
-            error("Supabase metrics insert failed: ${response.status} - ${response.bodyAsText()}")
+        return response.toTransportResult("app_metrics")
+    }
+
+    /**
+     * Maps an HTTP response to [TransportResult].
+     *
+     * - 2xx → Success
+     * - 429 Too Many Requests → Failure(retryable=true, retryAfterMs from Retry-After header)
+     * - 503 Service Unavailable → Failure(retryable=true)
+     * - 4xx (other) → Failure(retryable=false) — bad request, retrying won't help
+     * - 5xx (other) → Failure(retryable=true)
+     */
+    private suspend fun HttpResponse.toTransportResult(table: String): TransportResult {
+        val code = status.value
+        if (code in 200..299) return TransportResult.Success
+
+        val body = bodyAsText()
+        return when (code) {
+            HTTP_TOO_MANY_REQUESTS -> {
+                // Parse Retry-After header (seconds or HTTP-date — we only handle seconds)
+                val retryAfterSeconds = headers["Retry-After"]?.toLongOrNull()
+                    ?: DEFAULT_RETRY_AFTER_SECONDS
+                TransportResult.Failure(
+                    reason = "Rate limited by Supabase ($table): retry after ${retryAfterSeconds}s",
+                    retryable = true,
+                    retryAfterMs = retryAfterSeconds * 1_000L
+                )
+            }
+            HTTP_SERVICE_UNAVAILABLE -> TransportResult.Failure(
+                reason = "Supabase unavailable ($table): $body",
+                retryable = true
+            )
+            in 400..499 -> TransportResult.Failure(
+                reason = "Supabase client error $code ($table): $body",
+                retryable = false  // Bad request — retrying won't help
+            )
+            else -> TransportResult.Failure(
+                reason = "Supabase server error $code ($table): $body",
+                retryable = true
+            )
         }
     }
 
-    override fun isAvailable(): Boolean = endpoint.isNotBlank() && apiKey.isNotBlank()
+    override fun isAvailable(): Boolean {
+        if (endpoint.isBlank() || apiKey.isBlank()) return false
+        return networkAvailabilityProvider?.invoke() ?: true
+    }
 
     fun close() {
         client.close()
@@ -134,6 +195,7 @@ internal data class SupabaseLogEntry(
     val level: String,
     val tag: String,
     val message: String,
+    val environment: String,
     @SerialName("throwable_type") val throwableType: String? = null,
     @SerialName("throwable_msg") val throwableMsg: String? = null,
     @SerialName("stack_trace") val stackTrace: List<String>? = null,
@@ -152,6 +214,7 @@ internal data class SupabaseMetricEntry(
     val value: Double,
     val unit: String,
     val tags: Map<String, String>,
+    val environment: String,
     @SerialName("device_id") val deviceId: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("sdk_version") val sdkVersion: String
@@ -161,6 +224,7 @@ private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
     level = level.name,
     tag = tag,
     message = message,
+    environment = environment,
     throwableType = throwableInfo?.type,
     throwableMsg = throwableInfo?.message,
     stackTrace = throwableInfo?.stackTrace,
@@ -190,6 +254,7 @@ private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
         value = metricValue ?: 0.0,
         unit = metricUnit ?: "count",
         tags = metricTags ?: emptyMap(),
+        environment = environment,
         deviceId = deviceId,
         sessionId = sessionId,
         sdkVersion = sdkVersion

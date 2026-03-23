@@ -114,6 +114,7 @@ internal class AppLoggerImpl(
                 deviceId = deviceId,
                 sessionId = sessionManager.sessionId,
                 userId = userId,
+                environment = config.environment,
                 sdkVersion = AppLoggerVersion.NAME,
                 metricName = name,
                 metricValue = value,
@@ -225,6 +226,7 @@ internal class AppLoggerImpl(
                 deviceId = deviceId,
                 sessionId = sessionManager.sessionId,
                 userId = userId,
+                environment = config.environment,
                 extra = resolvedExtra
             )
 

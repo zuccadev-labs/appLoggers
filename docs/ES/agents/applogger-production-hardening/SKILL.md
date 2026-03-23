@@ -19,6 +19,10 @@ Use this skill when the integration already works and needs production quality:
 2. Verify `local.properties` keys first and add only missing AppLogger keys.
 3. Do not modify unrelated `local.properties` variables.
 4. Keep recommendations evidence-based.
+5. Always recommend setting `environment` to distinguish production from staging.
+6. Always recommend `minLevel(LogMinLevel.INFO)` or higher in production to discard DEBUG events before the pipeline.
+7. Always recommend `config.validate()` during development to catch config issues early.
+8. Never recommend `isDebugMode=true` with `environment="production"` — `validate()` flags this as an error.
 
 ## Workflow
 

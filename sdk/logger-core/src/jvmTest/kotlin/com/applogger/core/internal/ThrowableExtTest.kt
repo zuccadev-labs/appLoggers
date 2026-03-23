@@ -9,7 +9,24 @@ class ThrowableExtTest {
     fun `toThrowableInfo extracts type correctly`() {
         val exception = NullPointerException("oops")
         val info = exception.toThrowableInfo(maxLines = 10)
-        assertEquals("NullPointerException", info.type)
+        // Fully-qualified name — distinguishes same simpleName in different packages
+        assertEquals("java.lang.NullPointerException", info.type)
+    }
+
+    @Test
+    fun `toThrowableInfo uses fully qualified name for java io exceptions`() {
+        val exception = java.io.IOException("network error")
+        val info = exception.toThrowableInfo(maxLines = 10)
+        assertEquals("java.io.IOException", info.type)
+    }
+
+    @Test
+    fun `toThrowableInfo uses fully qualified name for custom exceptions`() {
+        class CustomDomainException(msg: String) : Exception(msg)
+        val exception = CustomDomainException("domain error")
+        val info = exception.toThrowableInfo(maxLines = 10)
+        // qualifiedName includes enclosing class for local classes
+        assertTrue(info.type.contains("CustomDomainException"), "type was: ${info.type}")
     }
 
     @Test

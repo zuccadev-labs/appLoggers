@@ -41,11 +41,19 @@ func newAgentCommand() *cobra.Command {
 			}
 
 			payload := agentSchemaPayload{
-				Name:            "apploggers",
-				Version:         buildVersion,
-				Recommendation:  "Configure projects in ~/.apploggers/cli.json (created on first run). Use api_key for direct key storage or api_key_env for env-var indirection — if api_key_env is set but the variable is empty, the CLI falls back to api_key. Select the active project via --project flag, APPLOGGER_PROJECT env var, or workspace_roots autodetection. For MCP/SSE/agent use, prefer cli.json with api_key so no shell env export is required. Use --output agent (TOON) for agent orchestration, --output json for strict JSON consumers.",
+				Name:    "apploggers",
+				Version: buildVersion,
+				Recommendation: "Configure projects in ~/.apploggers/cli.json (created on first run). " +
+					"Use api_key for direct key storage or api_key_env for env-var indirection. " +
+					"Select the active project via --project flag, APPLOGGER_PROJECT env var, or workspace_roots autodetection. " +
+					"For MCP/SSE/agent use, prefer cli.json with api_key so no shell env export is required. " +
+					"Use --output agent (TOON) for agent orchestration, --output json for strict JSON consumers. " +
+					"Use --environment to isolate production/staging/development data. " +
+					"Use --min-severity error to capture error+critical in one filter. " +
+					"Use telemetry stream for SSE output to frontend EventSource clients. " +
+					"Use telemetry stats for quick error-rate and top-tag summaries.",
 				DefaultOutput:   "text",
-				ContractVersion: "1.0.0",
+				ContractVersion: "2.0.0",
 				EnvVars: []string{
 					"APPLOGGER_CONFIG (path to cli.json override)",
 					"APPLOGGER_PROJECT (active project name)",
@@ -59,10 +67,15 @@ func newAgentCommand() *cobra.Command {
 				Commands: []commandContract{
 					{Command: "--syncbin-metadata", Description: "Metadata discovery endpoint", OutputModes: []string{"text", "json", "agent"}, Stable: true},
 					{Command: "version", Description: "CLI build information", OutputModes: []string{"text", "json", "agent"}, Stable: true},
+					{Command: "upgrade", Description: "Self-update to latest published release with SHA-256 checksum verification", OutputModes: []string{"text", "json", "agent"}, Stable: true},
 					{Command: "capabilities", Description: "Feature discovery endpoint", OutputModes: []string{"text", "json", "agent"}, Stable: true},
-					{Command: "health", Description: "Readiness endpoint with resolved project context when available", OutputModes: []string{"text", "json", "agent"}, Stable: true},
-					{Command: "telemetry query", Description: "Telemetry query command backed by Supabase with optional aggregation", OutputModes: []string{"text", "json", "agent"}, Stable: false},
-					{Command: "telemetry agent-response", Description: "Compact TOON envelope dedicated to agent orchestration", OutputModes: []string{"agent"}, Stable: false},
+					{Command: "health", Description: "Readiness endpoint with resolved project context", OutputModes: []string{"text", "json", "agent"}, Stable: true},
+					{Command: "health --deep", Description: "Deep connectivity probe against Supabase with latency measurement", OutputModes: []string{"text", "json", "agent"}, Stable: true},
+					{Command: "telemetry query", Description: "Telemetry query with full filter set: environment, min-severity, extra-key/value, offset, order, throwable, sdk-version", OutputModes: []string{"text", "json", "agent"}, Stable: false},
+					{Command: "telemetry agent-response", Description: "Compact TOON envelope dedicated to agent orchestration with rows_preview", OutputModes: []string{"agent"}, Stable: false},
+					{Command: "telemetry stream", Description: "SSE stream (text/event-stream) for frontend EventSource consumers — polls Supabase at configurable interval", OutputModes: []string{"text"}, Stable: false},
+					{Command: "telemetry tail", Description: "Human-friendly follow mode — prints new events as they arrive (tail -f equivalent)", OutputModes: []string{"text", "json"}, Stable: false},
+					{Command: "telemetry stats", Description: "Quick statistical summary: error rate, top tags, events per hour, by environment — supports all standard filters", OutputModes: []string{"text", "json", "agent"}, Stable: false},
 				},
 			}
 			if outputFormat == "json" {

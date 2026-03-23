@@ -5,6 +5,8 @@ import com.applogger.core.model.LogEvent
 import com.applogger.core.model.LogLevel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -33,11 +35,17 @@ internal class BatchProcessor(
     )
 
     private val eventChannel = Channel<LogEvent>(capacity = Channel.BUFFERED)
+    /** Prevents concurrent batch sends from overlapping (B4). */
+    private val sendMutex = Mutex()
     private var consecutiveFailures = 0
+    @Volatile private var lastSuccessfulFlushTimestamp: Long = 0L
     internal val deadLetterQueue = DeadLetterQueue()
 
     /** Exposes current consecutive failure count for health monitoring. */
     internal fun getConsecutiveFailures(): Int = consecutiveFailures
+
+    /** Exposes timestamp of last successful transport flush for health monitoring. */
+    internal fun getLastSuccessfulFlushTimestamp(): Long = lastSuccessfulFlushTimestamp
 
     init {
         scope.launch { drainOfflineStorage() }
@@ -84,7 +92,7 @@ internal class BatchProcessor(
         }
     }
 
-    internal suspend fun sendBatch() {
+    internal suspend fun sendBatch() = sendMutex.withLock {
         val batch = buffer.drain()
         if (batch.isEmpty()) return
 
@@ -98,7 +106,10 @@ internal class BatchProcessor(
             .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
 
         when (result) {
-            is TransportResult.Success -> consecutiveFailures = 0
+            is TransportResult.Success -> {
+                consecutiveFailures = 0
+                lastSuccessfulFlushTimestamp = currentTimeMillis()
+            }
             is TransportResult.Failure -> handleFailure(batch, result)
         }
     }
@@ -128,13 +139,16 @@ internal class BatchProcessor(
         consecutiveFailures++
         if (consecutiveFailures <= maxRetries) {
             batch.forEach { buffer.push(it) }
-            val delayMs = backoffWithJitter(consecutiveFailures)
+            // Respect Retry-After from server (e.g. HTTP 429) over our own backoff
+            val delayMs = result.retryAfterMs ?: backoffWithJitter(consecutiveFailures)
             if (config.verboseTransportLogging) {
                 platformLog("AppLogger", "Retry #$consecutiveFailures in ${delayMs}ms")
             }
             delay(delayMs)
         } else {
-            // Reintentos agotados: persiste offline si está configurado, sino DLQ en memoria
+            // Reintentos agotados: persiste offline si está configurado, sino DLQ en memoria.
+            // NO reseteamos consecutiveFailures aquí — el transporte sigue caído.
+            // Se resetea solo cuando un send() tiene éxito.
             if (config.offlinePersistenceMode != OfflinePersistenceMode.NONE) {
                 persistOrRequeue(batch)
             } else {
@@ -143,7 +157,9 @@ internal class BatchProcessor(
             if (config.verboseTransportLogging) {
                 platformLog("AppLogger", "Max retries exhausted, ${batch.size} events persisted/DLQ")
             }
-            consecutiveFailures = 0
+            // Reset solo el contador de intentos del batch actual, no el estado global de fallos.
+            // Esto permite que el próximo batch empiece con backoff máximo, no desde cero.
+            consecutiveFailures = maxRetries
         }
     }
 

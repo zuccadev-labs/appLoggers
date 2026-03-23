@@ -87,12 +87,14 @@ $env:APPLOGGER_SUPABASE_KEY = "eyJhbGci..."
 
 ```bash
 apploggers capabilities --output json
-apploggers health --output json
+apploggers health --deep --output json
 apploggers telemetry query --source logs --limit 5 --output json
 apploggers telemetry query --source metrics --limit 5 --output json
 ```
 
-Se considera listo cuando `health` retorna `ok: true` y las queries no retornan 403.
+`health --deep` verifica conectividad real a Supabase: latencia, existencia de tablas `app_logs` y `app_metrics`, y que las migraciones 007/008/009 estén aplicadas (columnas `environment`, `anomaly_type` e índices adicionales).
+
+Se considera listo cuando `health --deep` retorna `ok: true` y las queries no retornan 403.
 
 ---
 

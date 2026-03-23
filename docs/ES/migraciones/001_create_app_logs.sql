@@ -35,4 +35,4 @@ COMMENT ON COLUMN app_logs.api_level    IS 'Nivel API normalizado. Android usa B
 COMMENT ON COLUMN app_logs.device_id    IS 'Identificador del dispositivo. String opaco generado por el SDK (no necesariamente UUID)';
 COMMENT ON COLUMN app_logs.user_id      IS 'UUID anónimo. NULL por defecto. Solo se popula con consentimiento explícito del usuario final';
 COMMENT ON COLUMN app_logs.stack_trace  IS 'Array de líneas del stack trace. TV: máx 5 líneas. Mobile: máx 50 líneas';
-COMMENT ON COLUMN app_logs.extra        IS 'Metadatos adicionales en JSONB. Campos conocidos: package_name, error_code, anomaly_type';
+COMMENT ON COLUMN app_logs.extra        IS 'Metadatos adicionales en JSONB. Campos conocidos: package_name, error_code. NOTA: anomaly_type fue promovido a columna top-level en migración 007 — ya no vive en extra.';

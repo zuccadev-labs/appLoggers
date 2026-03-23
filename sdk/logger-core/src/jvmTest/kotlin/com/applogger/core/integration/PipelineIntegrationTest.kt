@@ -83,7 +83,7 @@ class PipelineIntegrationTest {
         assertEquals(1, transport.sentEvents.size)
         val event = transport.sentEvents[0]
         assertNotNull(event.throwableInfo)
-        assertEquals("IOException", event.throwableInfo?.type)
+        assertEquals("java.io.IOException", event.throwableInfo?.type)
     }
 
     @Test

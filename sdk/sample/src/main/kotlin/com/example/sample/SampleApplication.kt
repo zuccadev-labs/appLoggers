@@ -24,12 +24,19 @@ object SampleApplication {
      *
      * IMPORTANTE: En producción, usa BuildConfig para las credenciales.
      * Nunca hardcodees URLs ni API keys.
+     *
+     * En tu build.gradle.kts:
+     * ```kotlin
+     * buildConfigField("String", "LOGGER_URL", "\"${localProperties["APPLOGGER_URL"]}\"")
+     * buildConfigField("String", "LOGGER_KEY", "\"${localProperties["APPLOGGER_ANON_KEY"]}\"")
+     * ```
      */
     fun buildConfig(): AppLoggerConfig {
         return AppLoggerConfig.Builder()
-            .endpoint("https://tu-proyecto.supabase.co")  // Usar BuildConfig.LOGGER_URL
-            .apiKey("tu_anon_key_aqui")                    // Usar BuildConfig.LOGGER_KEY
-            .debugMode(true)                               // Usar BuildConfig.DEBUG
+            .endpoint(BuildConfig.LOGGER_URL)
+            .apiKey(BuildConfig.LOGGER_KEY)
+            .debugMode(BuildConfig.DEBUG)
+            .environment(if (BuildConfig.DEBUG) "development" else "production")
             .batchSize(20)
             .flushIntervalSeconds(30)
             .build()
@@ -37,8 +44,8 @@ object SampleApplication {
 
     fun buildTransport(): SupabaseTransport {
         return SupabaseTransport(
-            endpoint = "https://tu-proyecto.supabase.co",  // Usar BuildConfig.LOGGER_URL
-            apiKey = "tu_anon_key_aqui"                    // Usar BuildConfig.LOGGER_KEY
+            endpoint = BuildConfig.LOGGER_URL,
+            apiKey = BuildConfig.LOGGER_KEY
         )
     }
 
@@ -46,9 +53,10 @@ object SampleApplication {
     // Si quieres forzar configuración de bajo recurso:
     fun buildTVConfig(): AppLoggerConfig {
         return AppLoggerConfig.Builder()
-            .endpoint("https://tu-proyecto.supabase.co")
-            .apiKey("tu_anon_key_aqui")
+            .endpoint(BuildConfig.LOGGER_URL)
+            .apiKey(BuildConfig.LOGGER_KEY)
             .debugMode(false)
+            .environment("production")
             .batchSize(5)
             .flushIntervalSeconds(60)
             .maxStackTraceLines(5)

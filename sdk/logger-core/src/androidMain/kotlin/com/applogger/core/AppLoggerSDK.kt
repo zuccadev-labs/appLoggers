@@ -89,7 +89,7 @@ object AppLoggerSDK : AppLogger {
         val processor = BatchProcessor(
             buffer = buffer,
             transport = transport ?: NoOpTransport(),
-            formatter = JsonLogFormatter(),
+            formatter = JsonLogFormatter(prettyPrint = resolvedConfig.isDebugMode),
             config = resolvedConfig,
             offlineStorage = buildOfflineStorage(appContext, resolvedConfig)
         )
@@ -303,4 +303,41 @@ internal class NoOpTransport : LogTransport {
     override suspend fun send(events: List<com.applogger.core.model.LogEvent>): TransportResult =
         TransportResult.Success
     override fun isAvailable(): Boolean = false
+}
+
+/**
+ * Returns a network availability provider backed by Android's [ConnectivityManager].
+ *
+ * Pass this to [com.applogger.transport.supabase.SupabaseTransport] to avoid
+ * retry loops when the device is offline:
+ *
+ * ```kotlin
+ * val transport = SupabaseTransport(
+ *     endpoint = url,
+ *     apiKey = key,
+ *     networkAvailabilityProvider = androidNetworkAvailabilityProvider(context)
+ * )
+ * AppLoggerSDK.initialize(context, config, transport)
+ * ```
+ *
+ * The returned lambda uses cached network state — no I/O on the calling thread.
+ */
+fun androidNetworkAvailabilityProvider(context: Context): () -> Boolean {
+    val appContext = context.applicationContext
+    return {
+        try {
+            val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+                as? android.net.ConnectivityManager
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val network = cm?.activeNetwork
+                val caps = cm?.getNetworkCapabilities(network)
+                caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            } else {
+                @Suppress("DEPRECATION")
+                cm?.activeNetworkInfo?.isConnected == true
+            }
+        } catch (_: Exception) {
+            true // Fail open — let the transport attempt and handle the error
+        }
+    }
 }

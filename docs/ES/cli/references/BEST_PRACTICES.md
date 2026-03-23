@@ -32,6 +32,8 @@ La configuración del CLI vive en `~/.apploggers/cli.json`. Este archivo es la f
 chmod 600 ~/.apploggers/cli.json
 ```
 
+> El CLI crea `cli.json` con permisos `0600` automáticamente en la primera ejecución. En Linux/macOS puedes verificarlo con `ls -la ~/.apploggers/cli.json`.
+
 ```bash
 # Si se prefiere no almacenar el key en el archivo, usar api_key_env
 # con el nombre de la variable UPPERCASE — el CLI la resuelve en runtime
@@ -207,17 +209,20 @@ LOG_FILE="/var/log/applogger-monitor.log"
 {
   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running operational health check"
 
-  if ! apploggers health --output json | jq -e '.ok' > /dev/null; then
-    echo "ALERT: Backend unavailable"
+  # --deep verifica conectividad real a Supabase (latencia + tablas)
+  if ! apploggers health --deep --output json | jq -e '.ok' > /dev/null; then
+    echo "ALERT: Backend unavailable or degraded"
     echo "ALERT: Backend unavailable" | mail -s "AppLogger Down" "$ALERT_EMAIL"
     exit 1
   fi
 
   from=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
          date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
+
+  # Filtrar solo producción con severidad mínima ERROR
   error_count=$(apploggers telemetry query \
-    --source logs --severity error --from "$from" \
-    --output json | jq '.count')
+    --source logs --min-severity error --environment production \
+    --from "$from" --output json | jq '.count')
 
   if [ "$error_count" -gt "$ALERT_THRESHOLD_ERRORS" ]; then
     echo "ALERT: High error rate ($error_count errors/24h)"
@@ -225,9 +230,36 @@ LOG_FILE="/var/log/applogger-monitor.log"
       | mail -s "AppLogger: High Error Rate" "$ALERT_EMAIL"
   fi
 
+  # Stats rápidas para el dashboard
+  apploggers telemetry stats \
+    --source logs --environment production --from "$from" \
+    --output json >> /var/log/applogger-stats.jsonl
+
+  # NOTA: siempre especifica --from en stats. Sin él, el CLI agrega TODOS los
+  # datos históricos (puede ser lento y semánticamente incorrecto para dashboards).
+
   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Health check complete"
 } >> "$LOG_FILE" 2>&1
 ```
+
+#### Referencia de filtros disponibles (CLI 0.2.0)
+
+| Flag | Aplica a | Descripción |
+|---|---|---|
+| `--severity` | logs | Nivel exacto: `debug`, `info`, `warn`, `error`, `critical` |
+| `--min-severity` | logs | Nivel mínimo (incluye todos los superiores) |
+| `--environment` | logs, metrics | Entorno: `production`, `staging`, `development` |
+| `--from` / `--to` | logs, metrics | Rango temporal RFC3339 |
+| `--tag` | logs | Filtro por tag exacto |
+| `--session-id` | logs, metrics | Sesión específica |
+| `--device-id` | logs, metrics | Dispositivo específico |
+| `--sdk-version` | logs, metrics | Versión del SDK |
+| `--anomaly-type` | logs | Tipo de anomalía top-level |
+| `--throwable` | logs | Incluye `throwable_type`, `throwable_msg`, `stack_trace` |
+| `--extra-key/--extra-value` | logs | Filtro JSONB ad-hoc en `extra` |
+| `--offset` | logs, metrics | Paginación (saltar N registros) |
+| `--order` | logs, metrics | `asc` o `desc` (default: `desc`) |
+| `--name` | metrics | Nombre de métrica exacto |
 
 ---
 
@@ -378,9 +410,11 @@ jobs:
 - [ ] `~/.apploggers/cli.json` configurado con `url` y `api_key` (service_role)
 - [ ] Archivo no versionado (en `.gitignore`)
 - [ ] Permisos restringidos en Linux/macOS (`chmod 600`)
-- [ ] Health check automatizado (cada 6 horas)
+- [ ] Migraciones 001–009 aplicadas en Supabase (incluye columnas `environment`, `anomaly_type` e índices de rendimiento)
+- [ ] Health check con `--deep` automatizado (cada 6 horas)
 - [ ] Logging estructurado (JSON, no plaintext)
-- [ ] Alertas configuradas (errores > threshold)
+- [ ] Alertas configuradas con `--min-severity error --environment production`
+- [ ] `telemetry stats` en cron para dashboard diario
 - [ ] Retry logic implementado (exponential backoff)
 - [ ] Rate limiting configurado
 - [ ] Rotación de credenciales (30-90 días)

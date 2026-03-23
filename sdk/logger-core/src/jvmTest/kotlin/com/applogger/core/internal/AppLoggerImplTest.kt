@@ -117,7 +117,7 @@ class AppLoggerImplTest {
         assertEquals(1, fakeTransport.sentEvents.size)
         val event = fakeTransport.sentEvents[0]
         assertNotNull(event.throwableInfo)
-        assertEquals("RuntimeException", event.throwableInfo?.type)
+        assertEquals("java.lang.RuntimeException", event.throwableInfo?.type)
         assertEquals("payment failed", event.throwableInfo?.message)
     }
 
@@ -310,7 +310,7 @@ class AppLoggerImplTest {
         assertEquals(1, fakeTransport.sentEvents.size)
         val event = fakeTransport.sentEvents[0]
         assertNotNull(event.throwableInfo)
-        assertEquals("IllegalStateException", event.throwableInfo?.type)
+        assertEquals("java.lang.IllegalStateException", event.throwableInfo?.type)
         assertEquals("unexpected state", event.throwableInfo?.message)
     }
 
@@ -324,7 +324,7 @@ class AppLoggerImplTest {
 
         assertEquals(1, fakeTransport.sentEvents.size)
         assertNotNull(fakeTransport.sentEvents[0].throwableInfo)
-        assertEquals("RuntimeException", fakeTransport.sentEvents[0].throwableInfo?.type)
+        assertEquals("java.lang.RuntimeException", fakeTransport.sentEvents[0].throwableInfo?.type)
     }
 
     @Test
@@ -337,7 +337,7 @@ class AppLoggerImplTest {
 
         val event = fakeTransport.sentEvents[0]
         assertNotNull(event.throwableInfo)
-        assertEquals("Exception", event.throwableInfo?.type)
+        assertEquals("java.lang.Exception", event.throwableInfo?.type)
         assertEquals("HIGH_LATENCY", event.extra?.get("anomaly_type")?.jsonPrimitive?.content)
     }
 
@@ -423,8 +423,37 @@ class AppLoggerImplTest {
         assertNull(fakeTransport.sentEvents[0].extra)
     }
 
-    // ── minLevel ──────────────────────────────────────────────────────────────
+    // ── environment ───────────────────────────────────────────────────────────
 
+    @Test
+    fun `environment is attached to every event`() = runBlocking {
+        val config = buildConfig(debugMode = false).let {
+            AppLoggerConfig.Builder()
+                .debugMode(false)
+                .environment("staging")
+                .batchSize(100)
+                .flushIntervalSeconds(300)
+                .build()
+        }
+        logger = createLogger(config)
+        logger.info("TAG", "staging event")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals("staging", fakeTransport.sentEvents[0].environment)
+    }
+
+    @Test
+    fun `environment defaults to production`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.info("TAG", "prod event")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals("production", fakeTransport.sentEvents[0].environment)
+    }
+
+    // ── minLevel ──────────────────────────────────────────────────────────────
     @Test
     fun `minLevel WARN discards DEBUG and INFO events`() = runBlocking {
         logger = createLogger(buildConfig(debugMode = true, minLevel = LogMinLevel.WARN))

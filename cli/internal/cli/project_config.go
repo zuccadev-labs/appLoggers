@@ -196,7 +196,8 @@ func writeExampleConfigIfAbsent(configPath string) {
 	if _, err := os.Stat(configPath); err == nil {
 		return
 	}
-	_ = os.WriteFile(configPath, []byte(exampleConfigJSON), 0644)
+	// 0600: solo el propietario puede leer/escribir — el archivo contiene service_role key
+	_ = os.WriteFile(configPath, []byte(exampleConfigJSON), 0600)
 }
 
 func resolveProjectAPIKey(profile cliProjectProfile, configPath string) string {

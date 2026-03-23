@@ -24,13 +24,16 @@ func buildTelemetryAgentResponse(resp telemetryQueryResponse, previewLimit int) 
 	}
 
 	hints := []string{
-		"Use telemetry query with --output json for complete raw payloads.",
-		"Use --aggregate hour|severity|tag|session|name for compact summaries.",
+		"Use telemetry query --output json for complete raw payloads.",
+		"Use --aggregate hour|day|week|severity|tag|session|name|environment for compact summaries.",
+		"Use --offset N for pagination beyond the first page.",
+		"Use --environment production|staging|development to isolate environments.",
 	}
 	if resp.Source == "metrics" {
 		hints = append(hints, "For metrics insights, prefer --aggregate name.")
 	} else {
-		hints = append(hints, "For log triage, prefer --aggregate severity and --severity filters.")
+		hints = append(hints, "For log triage, prefer --aggregate severity and --min-severity error.")
+		hints = append(hints, "Use --throwable to include stack traces in the response.")
 	}
 
 	return telemetryAgentResponse{

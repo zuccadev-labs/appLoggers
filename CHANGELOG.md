@@ -16,6 +16,180 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [Docs patch — 2026-03-23 auditoría completa]
+
+### Fixed
+- **README.md**: tabla "Backend — Supabase Setup" actualizada con migraciones 007, 008, 009. Sección "Documentación → Backend" actualizada con las mismas.
+- **docs/ES/cli/README.md**: columnas `environment` y `anomaly_type` agregadas como top-level en tabla de `app_logs`. `anomaly_type` removido de `extra` (es columna top-level desde migración 007). Tabla de flags completada con `--min-severity`, `--environment`, `--sdk-version`, `--throwable`, `--extra-key/--extra-value`, `--offset`, `--order`. Modos de agregación `day`, `week`, `environment` agregados. Secciones `stream`, `tail`, `stats` agregadas con referencia completa de flags y campos de respuesta. Nota sobre `--throwable` en columnas sin flag CLI.
+- **docs/ES/cli/SUPABASE_CONFIGURATION.md**: orden de migraciones actualizado con 007, 008, 009.
+- **docs/ES/agents/applogger-supabase-mcp-configuration/references/mcp-configuration-flow.md**: migración 009 agregada al orden de aplicación.
+- **docs/ES/agents/applogger-cli-live-configuration/references/cli-live-setup-runbook.md**: validación `health --deep` actualizada para mencionar migración 009.
+
+---
+
+## [CLI patch — 2026-03-23 ronda 4]
+
+### Fixed
+- **B1**: `supabaseHTTPClient` se creaba en cada intento del retry loop — el cliente ahora se crea una vez en `doQueryWithRetry` y se pasa a `doQuery`. El TCP connection pool se reutiliza entre reintentos.
+- **B2**: Migración 009 creaba `idx_app_metrics_device_id` que ya existía desde migración 002 — eliminado el índice duplicado.
+- **B3**: Override del default de `--limit` en `telemetry stats` usaba `cmd.Flags().Set()` con `_ = err` suprimiendo el error — reemplazado por acceso directo al `Flag.Value` con nil-check.
+- **B4**: `doQueryWithRetry` no respetaba el header `Retry-After` de HTTP 429 — `classifyHTTPError` ahora retorna `retryAfterDuration` y el loop de retry lo aplica si es mayor que el backoff por defecto. Consistente con el comportamiento del SDK (`SupabaseTransport`).
+
+---
+
+## [CLI patch — 2026-03-23 ronda 3]
+
+### Fixed
+- **M1**: Comentario en migración 001 decía que `anomaly_type` era un campo JSONB conocido en `extra` — corregido para reflejar que fue promovido a columna top-level en migración 007.
+- **C6**: `writeExampleConfigIfAbsent` creaba `cli.json` con permisos `0644` — corregido a `0600`. El archivo contiene `service_role key` y solo debe ser legible por el propietario.
+- **C2**: `telemetry stats` sin `--from` ahora emite advertencia en stderr indicando que se están agregando todos los datos históricos y sugiriendo un rango temporal.
+
+### Added
+- **Migración 009** (`009_add_missing_indexes.sql`): índices faltantes para filtros frecuentes del CLI:
+  - `idx_app_logs_sdk_version` — soporta `--sdk-version` en logs (partial index, excluye `0.0.0`)
+  - `idx_app_logs_user_id` — soporta `--user-id` en logs (partial index, excluye NULLs)
+  - `idx_app_metrics_sdk_version` — soporta `--sdk-version` en métricas (partial index)
+  - `idx_app_metrics_device_id` — soporta `--device-id` en métricas
+- **BEST_PRACTICES.md**: nota sobre permisos `0600` automáticos en `cli.json`; advertencia sobre `--from` obligatorio en `telemetry stats`; checklist actualizado a migraciones 001–009.
+
+---
+
+## [CLI 0.2.0] — 2026-03-23
+
+### Added
+
+**Nuevos comandos:**
+- **`telemetry stream`** — emite un flujo continuo en formato `text/event-stream` (SSE) para consumo por frontends vía `EventSource`. Polling configurable (1..300s), cursor automático para evitar re-emisión de eventos, heartbeat entre polls, evento `error` sin crashear el stream.
+- **`telemetry tail`** — modo follow en tiempo real, equivalente a `tail -f`. Imprime nuevos eventos en formato legible por humanos con columna de entorno. Polling configurable (1..60s).
+- **`telemetry stats`** — resumen estadístico rápido: `total_events`, `error_rate_pct`, `by_severity`, `by_tag`, `by_hour`, `by_environment`, `by_name` (métricas). Útil para dashboards y agentes que necesitan contexto rápido.
+- **`health --deep`** — deep probe real contra Supabase: verifica conectividad, mide latencia (`latency_ms`), confirma accesibilidad de `app_logs` y `app_metrics`. Retorna `status: degraded` si alguna tabla falla.
+
+**Nuevos flags en `telemetry query` y `telemetry agent-response`:**
+- **`--environment`** — filtra por entorno (`production|staging|development`) en logs y métricas. Columna `environment` ahora incluida en `SELECT` de ambas tablas.
+- **`--min-severity`** — filtra logs en el nivel especificado o superior (ej: `--min-severity error` captura `ERROR` y `CRITICAL`). Mutuamente excluyente con `--severity`.
+- **`--extra-key / --extra-value`** — filtro JSONB genérico ad-hoc sobre cualquier campo de `extra` (ej: `--extra-key screen_name --extra-value PlayerScreen`). Deben usarse juntos.
+- **`--sdk-version`** — filtra eventos por versión del SDK que los generó (ej: `--sdk-version 0.2.0`).
+- **`--throwable`** — incluye columnas `throwable_type`, `throwable_msg` y `stack_trace` en la respuesta (logs únicamente).
+- **`--offset`** — paginación real basada en offset (ej: `--offset 100` para la segunda página). Permite exportar datasets > 1000 eventos.
+- **`--order desc|asc`** — controla el orden de `created_at`. Default: `desc`. `asc` es el default interno para `stream` y `tail`.
+
+**Nuevos modos de agregación:**
+- **`--aggregate day`** — agrupa por día UTC (ej: `2026-03-23`).
+- **`--aggregate week`** — agrupa por semana (lunes de la semana, ej: `2026-03-23`).
+- **`--aggregate environment`** — agrupa por entorno (`production`, `staging`, `development`).
+
+**Columnas añadidas al SELECT:**
+- `app_logs`: `environment`, `anomaly_type` (columna top-level, nullable hasta SDK 0.3.0), `throwable_type`, `throwable_msg`, `stack_trace` (con `--throwable`).
+- `app_metrics`: `environment` (columna nueva, migración 008), `tags` (columna existente — nombre correcto que el SDK escribe).
+
+**Resiliencia:**
+- Retry automático en HTTP 429 y 503 con backoff (0s → 2s → 6s, máximo 3 intentos).
+- Errores HTTP diferenciados con mensajes accionables: 401 (credenciales), 403 (RLS), 404 (tabla no existe), 429 (rate limit), 503 (servicio caído).
+
+**Refactoring:**
+- Flags de telemetría extraídos a `addTelemetryFlags(cmd, flags)` — elimina la duplicación que existía entre `query` y `agent-response`.
+- `agent schema` actualizado a `contract_version: 2.0.0` con todos los nuevos comandos documentados.
+- `capabilities` actualizado con las 5 nuevas capacidades.
+
+### Fixed (ronda 1)
+- `anomaly_type` era filtrado via `extra->>anomaly_type`; corregido a columna top-level (requiere migración 007).
+- `app_metrics` select corregido: el SDK escribe `tags` (no `metric_tags`) — el CLI ahora selecciona `tags` consistentemente con `SupabaseMetricEntry`.
+
+### Fixed (ronda 2 — auditoría forense)
+- **F1**: `stats` no usaba `addTelemetryFlags()` — ahora tiene todos los filtros estándar (`--environment`, `--min-severity`, `--session-id`, etc.).
+- **F3**: Cursor SSE usaba `time.RFC3339Nano` — corregido a `time.RFC3339`. Lógica extraída a `advanceCursor()` helper compartido por `stream` y `tail`.
+- **F4**: `tail` no soportaba `--output json` — ahora emite el response completo como JSON por poll.
+- **F6**: `health --deep` tenía leak de contexto — `cancel()` ahora se llama explícitamente con `defer`.
+- **F7**: `severityRank` incluía `"metric"` incorrectamente — eliminado. `--min-severity error` ya no incluye `METRIC`.
+- **Q1**: `http.Client` se creaba en cada request — centralizado en `supabaseHTTPClient(cfg)` para reutilizar TCP connection pool.
+- **Q2**: `marshalJSON` función muerta en `root.go` — eliminada.
+- **Q3**: Lógica de cursor duplicada en `stream` y `tail` — extraída a `advanceCursor()` + `latestTimestamp()`.
+- **Q4**: `writeSSEEvent`, `writeSSEHeartbeat`, `writeSSEError`, `printTailRow` usan `io.Writer` en lugar de interfaz inline.
+- **Q7**: `downloadURL` en `upgrade.go` sin límite de body — protegido con `io.LimitReader(32MB)`.
+- **I2**: `stream` y `tail` validan `--output` con `validateOutputFormat()`.
+- **I3**: 6 tests nuevos en `contract_test.go`: `TestStatsHasAllTelemetryFlags`, `TestTailSupportsOutputJSON`, `TestStreamValidatesOutput`, `TestSeverityRankExcludesMetric`, `TestAdvanceCursorRFC3339`, `TestCapabilitiesIncludesUpgrade`.
+- **I5/I6**: `upgrade` aparece en `agent schema` y `capabilities` — visible para agentes IA.
+
+---
+
+## [SDK 0.2.0] — 2026-03-23
+
+### Added
+
+**Core pipeline — nuevas capacidades:**
+- **`AppLogger.addGlobalExtra(key, value)` / `removeGlobalExtra(key)` / `clearGlobalExtra()`** — adjunta pares clave-valor a todos los eventos posteriores. Per-call `extra` tiene precedencia en colisión de clave.
+- **`AppLoggerConfig.environment`** — etiqueta de entorno (`"production"`, `"staging"`, `"development"`) adjunta a cada evento. Permite filtrar QA vs producción en Supabase JSONB.
+- **`AppLoggerConfig.minLevel` (`LogMinLevel`)** — descarta eventos por debajo del nivel configurado antes del pipeline, sin coste de serialización ni red. METRIC siempre pasa.
+- **`AppLoggerConfig.validate()`** — retorna lista de problemas de configuración accionables: endpoint en blanco, sin HTTPS en producción, apiKey sin formato JWT, environment en blanco, combinación batchSize/flushInterval problemática, `isDebugMode=true` con `environment="production"`.
+- **`AppLoggerConfig.bufferSizeStrategy` (`BufferSizeStrategy`)** — `FIXED` (default), `ADAPTIVE_TO_RAM`, `ADAPTIVE_TO_LOG_RATE`.
+- **`AppLoggerConfig.bufferOverflowPolicy` (`BufferOverflowPolicy`)** — `DISCARD_OLDEST` (default), `DISCARD_NEWEST`, `PRIORITY_AWARE`.
+- **`AppLoggerConfig.offlinePersistenceMode` (`OfflinePersistenceMode`)** — `NONE` (default), `CRITICAL_ONLY`, `ALL`.
+- **`AppLoggerHealthProvider` interface** — contrato inyectable para `AppLoggerHealth`. Permite `FakeHealthProvider` en tests sin depender del singleton.
+- **`HealthStatus.lastSuccessfulFlushTimestamp`** — epoch millis del último flush exitoso. Detecta outages silenciosos.
+- **`HealthStatus.snapshotTimestamp`** — epoch millis cuando se tomó el snapshot.
+- **`HealthStatus.isStale(maxAgeMs)`** — retorna `true` si el snapshot tiene más de `maxAgeMs` ms.
+- **`HealthStatus.consecutiveFailures`** — se resetea solo en flush completamente exitoso (no en éxito parcial).
+- **`LogEvent.environment`** — campo de entorno en cada evento, propagado desde `AppLoggerConfig`.
+- **`LogEvent.deviceId`** — identificador estable del dispositivo, separado del `userId` opcional.
+- **`LogEvent.extra` como `Map<String, JsonElement>`** — tipos nativos (Int, Long, Double, Boolean) preservados como primitivos JSON. Elimina la conversión a String y habilita queries tipadas en Supabase JSONB.
+- **`LogEvent.metricName/Value/Unit/Tags`** — campos tipados para eventos de tipo METRIC.
+- **`TransportResult.Failure.retryAfterMs`** — delay mínimo antes del reintento. `BatchProcessor` lo respeta en lugar del backoff exponencial cuando está presente (ej. HTTP 429 con `Retry-After`).
+- **`BatchProcessor` con `Mutex` (sendMutex)** — previene solapamiento de envíos concurrentes. Un solo `sendBatch()` activo a la vez.
+- **`AppLoggerSDK.newSession()`** — fuerza inicio de nueva sesión inmediatamente (login/logout).
+- **`AppLoggerSDK.setDeviceId()` / `clearDeviceId()`** — sobreescribe el device_id calculado por el SDK.
+- **`AppLoggerIos.shared.newSession()`** — equivalente iOS de `newSession()`.
+- **`AppLoggerIos.shared.addGlobalExtra/removeGlobalExtra/clearGlobalExtra()`** — global extra en iOS.
+- **`androidNetworkAvailabilityProvider(context)`** — función pública que retorna una lambda de conectividad basada en `ConnectivityManager`. Pasar a `SupabaseTransport` para evitar retry loops offline.
+- **iOS `connectionType` via `Network.framework`** — `IosDeviceInfoProvider` reporta el tipo de conexión real (WiFi, Cellular, etc.).
+- **`APPLOGGER_DEBUG` en `Info.plist` (iOS)** — equivalente al manifest meta-data de Android. Activa debug mode sin cambiar código.
+- **`SqliteOfflineStorage`** — campo `environment` persistido y restaurado correctamente en el schema SQLite.
+
+**Extension functions (`AppLoggerExtensions.kt` — commonMain):**
+- **`AppLogger.withTag(tag: String): TaggedLogger`** — wrapper con tag fijo para toda la clase.
+- **`AppLogger.withTag(receiver: Any): TaggedLogger`** — infiere el tag del receiver.
+- **`TaggedLogger`** — clase con métodos `d/i/w/e/c/metric/flush` que fijan el tag.
+- **`AppLogger.timed(name, unit, tags, block): T`** — mide latencia del bloque y registra métrica.
+- **`Any.timed(logger, name, unit, tags, block): T`** — igual con "source" tag automático.
+- **`AppLogger.logCatching(tag, context, extra, block): T?`** — ejecuta bloque, loguea excepción como ERROR, retorna null si falla.
+- **`Any.logCatching(logger, context, extra, block): T?`** — igual con tag inferido.
+- **`AppLogger.logM(name, value, unit, tags)`** — shorthand para `metric()`.
+- **`Any.logM(logger, name, value, unit, tags)`** — igual con "source" tag automático.
+- **`inline fun <reified T : Any> loggerTag(): String`** — tag desde companion objects.
+
+**Módulo `logger-test`:**
+- **`InMemoryLogger.addGlobalExtra()`** — funcional (antes era no-op). Mezcla global extra en cada evento almacenado.
+- **`FakeTransport.retryAfterMs`** — expone el campo para simular respuestas 429 con `Retry-After`.
+- **`NoOpTestLogger`** — alias público documentado de `NoOpLogger` interno.
+
+**Correcciones de bugs:**
+- **`SqliteOfflineStorage`** — campo `environment` no se persistía ni restauraba. Corregido en schema `.sq` y en `persist()`/`drain()`.
+- **`SampleApplication`** — credenciales hardcodeadas reemplazadas con `BuildConfig.LOGGER_URL` / `BuildConfig.LOGGER_KEY`.
+- **`AppLoggerConfig.validate()`** — detecta `isDebugMode=true` con `environment="production"` como error de configuración.
+- **HTTP 429/503/4xx/5xx diferenciados** en `SupabaseTransport` — 429 respeta `Retry-After`, 4xx no retryable, 5xx retryable.
+- **`consecutiveFailures`** — no se resetea prematuramente; solo en flush completamente exitoso.
+- **`APPLOGGER_DEBUG`** en Android — leído de `NSBundle.mainBundle.infoDictionary` en iOS (B1).
+
+### Changed
+- `AppLoggerConfig.Builder` — nuevos métodos: `environment()`, `minLevel()`, `bufferSizeStrategy()`, `bufferOverflowPolicy()`, `offlinePersistenceMode()`.
+- `AppLoggerSDK.initialize()` — acepta `transport: LogTransport?` como parámetro (antes construía el transporte internamente).
+- `AppLoggerHealth` — implementa `AppLoggerHealthProvider`. Todos los campos de `HealthStatus` disponibles.
+- `LogEvent.extra` — tipo cambiado de `Map<String, String>?` a `Map<String, JsonElement>?`.
+
+### Documentation
+- `docs/ES/paquete/architecture.md` — reescritura completa (600 líneas): refleja SDK real al 100%.
+- `docs/ES/desarrollo/integration-guide.md` — secciones 3.5, 4.1, 5, 6.3, 8, 9.2, 11.1 actualizadas.
+- `docs/ES/paquete/testing.md` — reescritura completa: `NoOpTestLogger`, `FakeTransport` con `retryAfterMs`, `InMemoryLogger` con global extra, `FakeHealthProvider`.
+- `docs/ES/agents/applogger-runtime-troubleshooting/references/health-diagnostics.md` — todos los campos de `HealthStatus`, `lastSuccessfulFlushTimestamp`, `isStale()`.
+- `docs/ES/agents/applogger-production-hardening/references/runtime-tuning.md` — `minLevel`, `environment`, `offlinePersistenceMode`, perfiles por caso de uso.
+- `docs/ES/agents/applogger-guided-setup/references/android-setup.md` — `environment()`, `validate()`, `androidNetworkAvailabilityProvider`, `newSession()`, `addGlobalExtra()`.
+- `docs/ES/agents/applogger-guided-setup/references/ios-kmp-setup.md` — `APPLOGGER_DEBUG` en `Info.plist`, `newSession()`, `addGlobalExtra()`, `flush()` manual.
+- `docs/ES/agents/applogger-instrumentation-design/references/event-taxonomy.md` — ejemplos reales con API actual, `timed{}`, `logCatching{}`.
+- `docs/ES/agents/applogger-instrumentation-design/references/metric-guidelines.md` — `timed{}`, `logM`, `withTag`, catálogo completo.
+- `docs/ES/agents/applogger-instrumentation-design/references/tag-conventions.md` — `loggerTag<T>()`, `withTag()`, `logTag()`, `TaggedLogger`.
+- SKILL.md de `guided-setup`, `instrumentation-design`, `production-hardening`, `runtime-troubleshooting` — constraints actualizadas.
+
+---
+
 ## [CLI 0.1.3] — 2026-03-22
 
 ### Added

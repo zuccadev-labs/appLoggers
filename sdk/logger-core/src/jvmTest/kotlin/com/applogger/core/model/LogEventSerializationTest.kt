@@ -146,4 +146,29 @@ class LogEventSerializationTest {
         val encoded = json.encodeToString(event)
         assertTrue(encoded.contains("device-custom-001"))
     }
+
+    @Test
+    fun `LogEvent environment field serializes and defaults to production`() {
+        val event = LogEvent(
+            id = "uuid-env", timestamp = 0L, level = LogLevel.INFO,
+            tag = "T", message = "m", deviceInfo = testDeviceInfo,
+            sessionId = "s"
+        )
+        val encoded = json.encodeToString(event)
+        assertTrue(encoded.contains("\"environment\":\"production\""))
+
+        val decoded = json.decodeFromString<LogEvent>(encoded)
+        assertEquals("production", decoded.environment)
+    }
+
+    @Test
+    fun `LogEvent environment staging serializes correctly`() {
+        val event = LogEvent(
+            id = "uuid-staging", timestamp = 0L, level = LogLevel.INFO,
+            tag = "T", message = "m", deviceInfo = testDeviceInfo,
+            sessionId = "s", environment = "staging"
+        )
+        val encoded = json.encodeToString(event)
+        assertTrue(encoded.contains("\"environment\":\"staging\""))
+    }
 }

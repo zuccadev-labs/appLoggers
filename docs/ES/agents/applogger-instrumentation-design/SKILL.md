@@ -20,6 +20,11 @@ Use this skill when the user needs:
 3. Keep naming stable and searchable.
 4. All log levels (`debug`, `info`, `warn`, `error`, `critical`) accept an optional `throwable: Throwable?` parameter — recommend it for any error or anomaly event.
 5. For classes that hold an `AppLogger` reference, recommend `Any.logD/I/W/E/C(logger, ...)` from `AppLoggerExtensions` to avoid repeating the tag manually.
+6. Recommend `withTag()` for classes that always log under the same domain tag.
+7. Recommend `timed{}` for measuring latency of any operation.
+8. Recommend `logCatching{}` to replace try/catch boilerplate around operations that should log on failure.
+9. Recommend `loggerTag<T>()` for companion objects to avoid string literal tags.
+10. `extra` values accept `Map<String, Any>` — Int, Long, Double, Boolean are preserved as native JSON primitives in Supabase JSONB, enabling typed queries.
 
 ## Workflow
 

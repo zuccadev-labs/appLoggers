@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS offline_logs (
     device_id TEXT NOT NULL DEFAULT '',
     session_id TEXT NOT NULL,
     user_id TEXT,
+    environment TEXT NOT NULL DEFAULT 'production',
     extra TEXT,
     sdk_version TEXT NOT NULL DEFAULT '0.0.0',
     metric_name TEXT,
@@ -27,11 +28,11 @@ insert:
 INSERT OR REPLACE INTO offline_logs(
     id, timestamp, level, tag, message,
     throwable_type, throwable_msg, stack_trace,
-    device_info, device_id, session_id, user_id, extra, sdk_version,
+    device_info, device_id, session_id, user_id, environment, extra, sdk_version,
     metric_name, metric_value, metric_unit, metric_tags,
     created_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectOldest:
 SELECT * FROM offline_logs ORDER BY created_at ASC LIMIT ?;

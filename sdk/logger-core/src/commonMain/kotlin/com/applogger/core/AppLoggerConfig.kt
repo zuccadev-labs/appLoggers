@@ -28,6 +28,9 @@ package com.applogger.core
  *
  * @property endpoint     Supabase project URL (HTTPS required in production).
  * @property apiKey       Supabase anon key for authentication.
+ * @property environment  Deployment environment label (e.g. "production", "staging", "development").
+ *                        Attached to every event — enables filtering QA vs production in Supabase.
+ *                        Default: `"production"`.
  * @property isDebugMode  Enables debug logging and relaxes HTTPS requirement.
  *                        Automatically true when `APPLOGGER_DEBUG=true`.
  * @property consoleOutput Prints events to logcat/console when true AND [isDebugMode] is true.
@@ -46,6 +49,7 @@ package com.applogger.core
 data class AppLoggerConfig(
     val endpoint: String,
     val apiKey: String,
+    val environment: String,
     val isDebugMode: Boolean,
     val consoleOutput: Boolean,
     val minLevel: LogMinLevel,
@@ -61,6 +65,7 @@ data class AppLoggerConfig(
     class Builder {
         private var endpoint: String = ""
         private var apiKey: String = ""
+        private var environment: String = "production"
         private var isDebugMode: Boolean = false
         private var consoleOutput: Boolean = true
         private var minLevel: LogMinLevel = LogMinLevel.DEBUG
@@ -75,6 +80,7 @@ data class AppLoggerConfig(
 
         fun endpoint(url: String) = apply { endpoint = url }
         fun apiKey(key: String) = apply { apiKey = key }
+        fun environment(env: String) = apply { environment = env.trim().ifBlank { "production" } }
         fun debugMode(debug: Boolean) = apply { isDebugMode = debug }
         fun consoleOutput(enabled: Boolean) = apply { consoleOutput = enabled }
         fun minLevel(level: LogMinLevel) = apply { minLevel = level }
@@ -94,6 +100,7 @@ data class AppLoggerConfig(
             return AppLoggerConfig(
                 endpoint = endpoint,
                 apiKey = apiKey,
+                environment = environment,
                 isDebugMode = isDebugMode,
                 consoleOutput = consoleOutput,
                 minLevel = minLevel,
@@ -107,6 +114,59 @@ data class AppLoggerConfig(
                 offlinePersistenceMode = offlinePersistenceMode
             )
         }
+    }
+
+    /**
+     * Returns a list of human-readable validation warnings/errors for this config.
+     *
+     * An empty list means the config is valid. Non-empty list contains actionable messages
+     * that should be logged or surfaced to the developer during initialization.
+     *
+     * ```kotlin
+     * val issues = config.validate()
+     * if (issues.isNotEmpty()) {
+     *     issues.forEach { Log.w("AppLogger", "Config issue: $it") }
+     * }
+     * ```
+     */
+    fun validate(): List<String> {
+        val issues = mutableListOf<String>()
+
+        // Endpoint checks
+        if (endpoint.isBlank()) {
+            issues += "endpoint is blank — events will not be delivered"
+        } else if (!endpoint.startsWith("https://") && !isDebugMode) {
+            issues += "endpoint '$endpoint' does not use HTTPS — required in production"
+        } else if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
+            issues += "endpoint '$endpoint' does not look like a valid URL"
+        }
+
+        // API key checks
+        if (apiKey.isBlank()) {
+            issues += "apiKey is blank — Supabase requests will be rejected (401)"
+        } else if (!apiKey.startsWith("eyJ")) {
+            issues += "apiKey does not look like a JWT (expected to start with 'eyJ') — verify your Supabase anon key"
+        }
+
+        // Environment label
+        if (environment.isBlank()) {
+            issues += "environment is blank — events will have no environment label"
+        }
+
+        // Batch size vs flush interval coherence
+        if (batchSize >= 50 && flushIntervalSeconds <= 10) {
+            issues += "batchSize=$batchSize with flushIntervalSeconds=$flushIntervalSeconds may cause large bursts — consider increasing flushIntervalSeconds or reducing batchSize"
+        }
+        if (batchSize == 1) {
+            issues += "batchSize=1 disables batching — every event triggers a network request; use only for debugging"
+        }
+
+        // Debug mode in production warning
+        if (isDebugMode && environment == "production") {
+            issues += "isDebugMode=true with environment='production' — debug mode should not be active in production builds"
+        }
+
+        return issues
     }
 
     /**

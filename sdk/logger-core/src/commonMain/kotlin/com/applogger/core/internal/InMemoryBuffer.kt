@@ -60,6 +60,8 @@ internal class InMemoryBuffer(
 
     override fun size(): Int = platformSynchronized(buffer) { buffer.size }
 
+    override fun isEmpty(): Boolean = platformSynchronized(buffer) { buffer.isEmpty() }
+
     override fun clear() {
         platformSynchronized(buffer) { buffer.clear() }
     }

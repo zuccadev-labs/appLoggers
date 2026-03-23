@@ -246,5 +246,5 @@ func downloadURL(url string) ([]byte, error) {
 		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024)) // 32 MB max
 }

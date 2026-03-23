@@ -37,4 +37,30 @@ class NoOpLoggerTest {
             repeat(100) { logger.flush() }
         }
     }
+
+    @Test
+    fun `addGlobalExtra does not throw`() {
+        assertDoesNotThrow { logger.addGlobalExtra("key", "value") }
+    }
+
+    @Test
+    fun `removeGlobalExtra does not throw`() {
+        assertDoesNotThrow { logger.removeGlobalExtra("key") }
+    }
+
+    @Test
+    fun `clearGlobalExtra does not throw`() {
+        assertDoesNotThrow { logger.clearGlobalExtra() }
+    }
+
+    @Test
+    fun `global extra methods are safe before initialize`() {
+        // Simulates calling global extra before SDK.initialize() — must never crash
+        assertDoesNotThrow {
+            logger.addGlobalExtra("experiment", "group_b")
+            logger.addGlobalExtra("ab_test", "checkout_v2")
+            logger.removeGlobalExtra("experiment")
+            logger.clearGlobalExtra()
+        }
+    }
 }

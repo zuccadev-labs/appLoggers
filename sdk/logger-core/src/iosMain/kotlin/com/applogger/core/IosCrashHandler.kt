@@ -15,9 +15,23 @@ internal class IosCrashHandler(
         NSSetUncaughtExceptionHandler { exception ->
             exception?.let { nsEx ->
                 try {
+                    // callStackSymbols contiene el stack trace nativo de iOS
+                    val stackFrames = nsEx.callStackSymbols
+                        ?.filterIsInstance<String>()
+                        ?.take(50)
+                        ?: emptyList()
+
+                    val crashMessage = buildString {
+                        append(nsEx.reason ?: "NSException: ${nsEx.name}")
+                        if (stackFrames.isNotEmpty()) {
+                            append("\n")
+                            append(stackFrames.joinToString("\n"))
+                        }
+                    }
+
                     logger.critical(
                         tag = "IOS_CRASH",
-                        message = nsEx.reason ?: "NSException: ${nsEx.name}"
+                        message = crashMessage
                     )
                     runBlocking(Dispatchers.Default) {
                         logger.flush()

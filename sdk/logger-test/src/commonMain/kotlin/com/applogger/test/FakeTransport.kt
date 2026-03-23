@@ -9,11 +9,13 @@ import com.applogger.core.model.LogEvent
  *
  * @param shouldSucceed  If `true`, [send] returns [TransportResult.Success].
  * @param retryable      Included in [TransportResult.Failure] when `shouldSucceed` is `false`.
+ * @param retryAfterMs   Optional delay hint included in [TransportResult.Failure] (e.g. HTTP 429).
  * @param throwException If `true`, [send] throws a [RuntimeException] instead of returning a result.
  */
 class FakeTransport(
     private val shouldSucceed: Boolean = true,
     private val retryable: Boolean = false,
+    private val retryAfterMs: Long? = null,
     private val throwException: Boolean = false
 ) : LogTransport {
 
@@ -36,7 +38,8 @@ class FakeTransport(
         } else {
             TransportResult.Failure(
                 reason = "FakeTransport simulated failure",
-                retryable = retryable
+                retryable = retryable,
+                retryAfterMs = retryAfterMs
             )
         }
     }

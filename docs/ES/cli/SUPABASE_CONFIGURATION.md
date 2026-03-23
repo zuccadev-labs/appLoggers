@@ -34,6 +34,9 @@ Orden recomendado:
 4. `004_rls_policies.sql`
 5. `005_retention_policy.sql`
 6. `006_harden_authenticated_read_policies.sql`
+7. `007_add_environment_anomaly_type.sql` — agrega `environment` y `anomaly_type` top-level en `app_logs`
+8. `008_add_metrics_environment.sql` — agrega `environment` top-level en `app_metrics`
+9. `009_add_missing_indexes.sql` — índices adicionales de performance
 
 Checklist post-migración:
 

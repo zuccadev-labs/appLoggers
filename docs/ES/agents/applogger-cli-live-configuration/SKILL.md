@@ -154,37 +154,49 @@ All query filters are CLI flags — they are NOT configured in `cli.json`. The j
 | Flag | Column / field | Match type | Notes |
 |---|---|---|---|
 | `--severity` | `level` (top-level) | exact, UPPERCASE | `debug`, `info`, `warn`, `error`, `critical`, `metric` |
+| `--min-severity` | `level` (top-level) | `IN (level+)` | Captures level and all above. Mutually exclusive with `--severity`. |
+| `--environment` | `environment` (top-level) | exact | `production`, `staging`, `development` |
 | `--tag` | `tag` (top-level) | exact | UPPERCASE by convention: `AUTH`, `NETWORK`, `PAYMENT`, `PLAYER`, `BOOT` |
 | `--session-id` | `session_id` (top-level) | exact UUID | |
 | `--device-id` | `device_id` (top-level) | exact | |
 | `--user-id` | `user_id` (top-level) | exact UUID | NULL by default, only populated with user consent |
 | `--contains` | `message` (top-level) | ilike substring | case-insensitive |
 | `--from` / `--to` | `created_at` (top-level) | gte / lte | RFC3339 |
+| `--sdk-version` | `sdk_version` (top-level) | exact | e.g. `0.2.0` |
+| `--anomaly-type` | `anomaly_type` (top-level) | exact | e.g. `slow_response`, `memory_leak` |
 | `--package` | `extra->>package_name` (JSONB) | exact | e.g. `com.company.billing` |
 | `--error-code` | `extra->>error_code` (JSONB) | exact | e.g. `E-42`, `AUTH_FAILED` |
-| `--anomaly-type` | `extra->>anomaly_type` (JSONB) | exact | e.g. `slow_response`, `memory_leak` |
+| `--extra-key / --extra-value` | `extra->>KEY` (JSONB) | exact | Ad-hoc filter on any extra field. Both flags required together. |
+| `--throwable` | adds `throwable_type`, `throwable_msg`, `stack_trace` | — | Flag only — adds columns to SELECT, no filter |
+| `--offset` | — | — | Pagination offset (0-based). Use with `--limit`. |
+| `--order` | `created_at` | `desc` or `asc` | Default: `desc` |
 
 ### `app_metrics` — filterable columns
 
 | Flag | Column | Match type | Notes |
 |---|---|---|---|
 | `--name` | `name` (top-level) | exact | e.g. `response_time_ms`, `frame_drop_count` |
+| `--environment` | `environment` (top-level) | exact | `production`, `staging`, `development` |
 | `--session-id` | `session_id` (top-level) | exact UUID | |
 | `--device-id` | `device_id` (top-level) | exact | |
+| `--sdk-version` | `sdk_version` (top-level) | exact | e.g. `0.2.0` |
 | `--from` / `--to` | `created_at` (top-level) | gte / lte | RFC3339 |
+| `--offset` | — | — | Pagination offset (0-based) |
+| `--order` | `created_at` | `desc` or `asc` | Default: `desc` |
 
 ### Aggregation modes
 
 | Mode | Source | Groups by |
 |---|:---:|---|
 | `none` | both | No grouping — returns individual rows |
-| `hour` | both | UTC hour truncated from `created_at` |
+| `hour` | both | UTC hour truncated from `created_at` (e.g. `2026-03-23T10:00Z`) |
+| `day` | both | UTC day (e.g. `2026-03-23`) |
+| `week` | both | Monday of the week (e.g. `2026-03-23`) |
 | `severity` | logs | `level` value |
 | `tag` | logs | `tag` value |
 | `session` | both | `session_id` |
 | `name` | metrics | `name` |
-
-All active flags combine with AND. `--package`, `--error-code`, `--anomaly-type` filter inside the JSONB `extra` field — they are not top-level columns.
+| `environment` | both | `environment` value |
 
 ---
 
