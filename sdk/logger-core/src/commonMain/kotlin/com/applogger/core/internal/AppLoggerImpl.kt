@@ -4,6 +4,24 @@ import com.applogger.core.*
 import com.applogger.core.model.*
 import kotlin.concurrent.Volatile
 
+// Orden de severidad para comparar contra minLevel
+private val LEVEL_ORDINAL = mapOf(
+    LogLevel.DEBUG    to 0,
+    LogLevel.INFO     to 1,
+    LogLevel.WARN     to 2,
+    LogLevel.ERROR    to 3,
+    LogLevel.CRITICAL to 4,
+    LogLevel.METRIC   to 5  // METRIC siempre pasa
+)
+
+private val MIN_LEVEL_ORDINAL = mapOf(
+    LogMinLevel.DEBUG    to 0,
+    LogMinLevel.INFO     to 1,
+    LogMinLevel.WARN     to 2,
+    LogMinLevel.ERROR    to 3,
+    LogMinLevel.CRITICAL to 4
+)
+
 /**
  * Implementación core del pipeline de eventos.
  */
@@ -61,6 +79,7 @@ internal class AppLoggerImpl(
 
     override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) {
         try {
+            // METRIC siempre pasa minLevel — pero respeta consoleOutput/isDebugMode para logcat
             if (config.isDebugMode && config.consoleOutput) {
                 platformLog("AppLogger/METRIC", "[METRIC] $name=$value $unit")
             }
@@ -168,8 +187,19 @@ internal class AppLoggerImpl(
         extra: Map<String, Any>? = null
     ) {
         try {
+            // DEBUG suprimido en producción
             if (level == LogLevel.DEBUG && !config.isDebugMode) return
 
+            // minLevel: descarta eventos por debajo del umbral configurado.
+            // METRIC siempre pasa (ordinal 5 > cualquier minLevel).
+            if (level != LogLevel.METRIC) {
+                val eventOrdinal = LEVEL_ORDINAL[level] ?: 0
+                val minOrdinal = MIN_LEVEL_ORDINAL[config.minLevel] ?: 0
+                if (eventOrdinal < minOrdinal) return
+            }
+
+            // Logcat/consoleOutput solo cuando isDebugMode está activo.
+            // APPLOGGER_DEBUG=true activa isDebugMode en AppLoggerSDK.initialize().
             if (config.isDebugMode && config.consoleOutput) {
                 platformLog("AppLogger/$tag", "[${level.name}] $message")
             }

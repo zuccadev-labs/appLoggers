@@ -22,7 +22,12 @@ class InMemoryLogger : AppLogger {
         val tag: String,
         val message: String,
         val throwable: Throwable? = null,
-        val extra: Map<String, Any>? = null
+        val extra: Map<String, Any>? = null,
+        // Campos de métrica — solo populados cuando level == METRIC
+        val metricName: String? = null,
+        val metricValue: Double? = null,
+        val metricUnit: String? = null,
+        val metricTags: Map<String, String>? = null
     )
 
     private val _logs = mutableListOf<LogEntry>()
@@ -65,7 +70,17 @@ class InMemoryLogger : AppLogger {
     }
 
     override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) {
-        _logs.add(LogEntry(LogLevel.METRIC, "METRIC", "$name=$value $unit"))
+        _logs.add(
+            LogEntry(
+                level = LogLevel.METRIC,
+                tag = "METRIC",
+                message = "$name=$value $unit",
+                metricName = name,
+                metricValue = value,
+                metricUnit = unit,
+                metricTags = tags
+            )
+        )
     }
 
     override fun flush() = Unit
@@ -81,6 +96,26 @@ class InMemoryLogger : AppLogger {
     fun assertNotLogged(level: LogLevel) {
         val found = _logs.any { it.level == level }
         check(!found) { "Expected no log with level=$level but found ${_logs.count { it.level == level }}" }
+    }
+
+    /**
+     * Verifica que se registró una métrica con el nombre dado.
+     * Opcionalmente valida valor, unidad y tags específicos.
+     */
+    fun assertMetric(
+        name: String,
+        value: Double? = null,
+        unit: String? = null,
+        tag: String? = null
+    ) {
+        val found = _logs.any { entry ->
+            entry.level == LogLevel.METRIC &&
+                entry.metricName == name &&
+                (value == null || entry.metricValue == value) &&
+                (unit == null || entry.metricUnit == unit) &&
+                (tag == null || entry.metricTags?.containsValue(tag) == true)
+        }
+        check(found) { "Expected metric name=$name value=$value unit=$unit but none found" }
     }
 
     fun clear() {

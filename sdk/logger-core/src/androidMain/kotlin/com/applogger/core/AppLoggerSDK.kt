@@ -43,9 +43,23 @@ object AppLoggerSDK : AppLogger {
     @Volatile
     private var implRef: AppLoggerImpl? = null
 
+    @Volatile
+    private var sessionManagerRef: SessionManager? = null
+
     /**
      * Initializes the SDK. Must be called exactly once, in `Application.onCreate()`.
      * Subsequent calls are silently ignored (idempotent).
+     *
+     * ## Debug mode via APPLOGGER_DEBUG
+     * If the app's `AndroidManifest.xml` (or `gradle.properties`) define
+     * `APPLOGGER_DEBUG=true` as a manifest placeholder or BuildConfig field,
+     * the SDK activates debug mode and logcat output automatically.
+     * When absent or `false`, logcat is suppressed regardless of [AppLoggerConfig.consoleOutput].
+     *
+     * ```xml
+     * <!-- AndroidManifest.xml -->
+     * <meta-data android:name="APPLOGGER_DEBUG" android:value="${APPLOGGER_DEBUG}" />
+     * ```
      *
      * @param context   Android [Context]; the application context will be extracted.
      * @param config    SDK configuration built via [AppLoggerConfig.Builder].
@@ -59,8 +73,18 @@ object AppLoggerSDK : AppLogger {
         if (!isInitialized.compareAndSet(false, true)) return
 
         val appContext = context.applicationContext
+
+        // Lee APPLOGGER_DEBUG del manifest meta-data para activar debug mode sin cambiar código
+        val appLoggerDebug = readAppLoggerDebugFlag(appContext)
+        val resolvedDebugMode = config.isDebugMode || appLoggerDebug
+        val effectiveConfig = if (resolvedDebugMode != config.isDebugMode) {
+            config.copy(isDebugMode = resolvedDebugMode)
+        } else {
+            config
+        }
+
         val platform = PlatformDetector.detect(appContext)
-        val resolvedConfig = if (platform.isLowResource) config.resolveForLowResource() else config
+        val resolvedConfig = if (platform.isLowResource) effectiveConfig.resolveForLowResource() else effectiveConfig
 
         val deviceInfoProvider = AndroidDeviceInfoProvider(appContext, platform)
         val deviceInfo = deviceInfoProvider.get()
@@ -96,6 +120,7 @@ object AppLoggerSDK : AppLogger {
 
         instance = impl
         implRef = impl
+        sessionManagerRef = sessionManager
 
         updateHealthReferences(processor, resolvedTransport, buffer, bufferCapacity)
 
@@ -105,7 +130,18 @@ object AppLoggerSDK : AppLogger {
         }
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(
-            AppLoggerLifecycleObserver { impl.flush() }
+            AppLoggerLifecycleObserver {
+                // flush en background + notificar al SessionManager
+                impl.flush()
+                sessionManager.onBackground()
+            }
+        )
+
+        // Notificar foreground para rotación de sesión por timeout
+        ProcessLifecycleOwner.get().lifecycle.addObserver(
+            AppLoggerForegroundObserver {
+                sessionManager.onForeground()
+            }
         )
     }
 
@@ -163,6 +199,22 @@ object AppLoggerSDK : AppLogger {
     }
 
     /**
+     * Fuerza el inicio de una nueva sesión inmediatamente.
+     *
+     * Útil en eventos de login/logout, inicio de onboarding, o cuando el producto
+     * necesita separar sesiones lógicas independientemente del tiempo en background.
+     *
+     * ```kotlin
+     * // Al hacer login
+     * AppLoggerSDK.setAnonymousUserId(user.id)
+     * AppLoggerSDK.newSession()
+     * ```
+     */
+    fun newSession() {
+        sessionManagerRef?.rotate()
+    }
+
+    /**
      * Resets the SDK to its uninitialized state.
      *
      * **FOR TESTING ONLY.** Allows re-initialization between test cases.
@@ -173,10 +225,38 @@ object AppLoggerSDK : AppLogger {
         isInitialized.set(false)
         instance = NoOpLogger()
         implRef = null
+        sessionManagerRef = null
         AppLoggerHealth.initialized = false
         AppLoggerHealth.processor = null
         AppLoggerHealth.transport = null
         AppLoggerHealth.buffer = null
+    }
+
+    /**
+     * Lee el flag APPLOGGER_DEBUG del manifest meta-data.
+     * Permite activar debug mode sin cambiar código — solo con una variable de entorno
+     * o manifest placeholder en el build.
+     *
+     * Configuración en AndroidManifest.xml:
+     * ```xml
+     * <meta-data android:name="APPLOGGER_DEBUG" android:value="${APPLOGGER_DEBUG}" />
+     * ```
+     *
+     * Configuración en build.gradle:
+     * ```groovy
+     * manifestPlaceholders = [APPLOGGER_DEBUG: System.getenv("APPLOGGER_DEBUG") ?: "false"]
+     * ```
+     */
+    private fun readAppLoggerDebugFlag(context: Context): Boolean {
+        return try {
+            val appInfo = context.packageManager.getApplicationInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_META_DATA
+            )
+            appInfo.metaData?.getString("APPLOGGER_DEBUG")?.equals("true", ignoreCase = true) ?: false
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun computeBufferCapacity(

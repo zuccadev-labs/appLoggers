@@ -10,11 +10,18 @@ package com.applogger.core
  *
  * In production mode ([isDebugMode] = false), [endpoint] must use HTTPS.
  *
+ * ## Debug mode via environment variable
+ * Setting `APPLOGGER_DEBUG=true` in the build environment (or as a manifest
+ * placeholder) activates debug mode and logcat output automatically, without
+ * changing code. When `APPLOGGER_DEBUG` is absent or `false`, logcat output
+ * is suppressed regardless of [consoleOutput].
+ *
  * ## Example
  * ```kotlin
  * val config = AppLoggerConfig.Builder()
  *     .endpoint("https://xyz.supabase.co")
  *     .apiKey("eyJ...")
+ *     .minLevel(LogMinLevel.WARN)   // solo WARN, ERROR, CRITICAL en producción
  *     .batchSize(10)
  *     .build()
  * ```
@@ -22,7 +29,11 @@ package com.applogger.core
  * @property endpoint     Supabase project URL (HTTPS required in production).
  * @property apiKey       Supabase anon key for authentication.
  * @property isDebugMode  Enables debug logging and relaxes HTTPS requirement.
- * @property consoleOutput Prints events to logcat/console when true.
+ *                        Automatically true when `APPLOGGER_DEBUG=true`.
+ * @property consoleOutput Prints events to logcat/console when true AND [isDebugMode] is true.
+ *                         In production ([isDebugMode]=false) logcat is always suppressed.
+ * @property minLevel     Minimum level to process. Events below this level are discarded
+ *                        before entering the pipeline. Default: [LogMinLevel.DEBUG] (all events).
  * @property batchSize    Number of events per transport batch (1–100).
  * @property flushIntervalSeconds Seconds between periodic flushes (5–300).
  * @property maxStackTraceLines Maximum stack trace lines per event (1–100).
@@ -37,6 +48,7 @@ data class AppLoggerConfig(
     val apiKey: String,
     val isDebugMode: Boolean,
     val consoleOutput: Boolean,
+    val minLevel: LogMinLevel,
     val batchSize: Int,
     val flushIntervalSeconds: Int,
     val maxStackTraceLines: Int,
@@ -51,6 +63,7 @@ data class AppLoggerConfig(
         private var apiKey: String = ""
         private var isDebugMode: Boolean = false
         private var consoleOutput: Boolean = true
+        private var minLevel: LogMinLevel = LogMinLevel.DEBUG
         private var batchSize: Int = 20
         private var flushIntervalSeconds: Int = 30
         private var maxStackTraceLines: Int = 50
@@ -64,6 +77,7 @@ data class AppLoggerConfig(
         fun apiKey(key: String) = apply { apiKey = key }
         fun debugMode(debug: Boolean) = apply { isDebugMode = debug }
         fun consoleOutput(enabled: Boolean) = apply { consoleOutput = enabled }
+        fun minLevel(level: LogMinLevel) = apply { minLevel = level }
         fun batchSize(size: Int) = apply { batchSize = size }
         fun flushIntervalSeconds(sec: Int) = apply { flushIntervalSeconds = sec }
         fun maxStackTraceLines(lines: Int) = apply { maxStackTraceLines = lines }
@@ -82,6 +96,7 @@ data class AppLoggerConfig(
                 apiKey = apiKey,
                 isDebugMode = isDebugMode,
                 consoleOutput = consoleOutput,
+                minLevel = minLevel,
                 batchSize = batchSize.coerceIn(1, 100),
                 flushIntervalSeconds = flushIntervalSeconds.coerceIn(5, 300),
                 maxStackTraceLines = maxStackTraceLines.coerceIn(1, 100),
@@ -105,6 +120,30 @@ data class AppLoggerConfig(
             flushOnlyWhenIdle = true
         )
     }
+}
+
+/**
+ * Nivel mínimo de log que el SDK procesa.
+ *
+ * Eventos por debajo de este nivel son descartados antes de entrar al pipeline,
+ * sin coste de serialización ni red.
+ *
+ * | Valor       | Eventos procesados                        |
+ * |-------------|-------------------------------------------|
+ * | DEBUG       | Todos (default en debug mode)             |
+ * | INFO        | INFO, WARN, ERROR, CRITICAL, METRIC       |
+ * | WARN        | WARN, ERROR, CRITICAL, METRIC             |
+ * | ERROR       | ERROR, CRITICAL, METRIC                   |
+ * | CRITICAL    | Solo CRITICAL y METRIC                    |
+ *
+ * METRIC siempre pasa independientemente del nivel configurado.
+ */
+enum class LogMinLevel {
+    DEBUG,
+    INFO,
+    WARN,
+    ERROR,
+    CRITICAL
 }
 
 /**

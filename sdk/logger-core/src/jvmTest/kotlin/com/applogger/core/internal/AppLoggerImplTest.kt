@@ -26,11 +26,13 @@ class AppLoggerImplTest {
     private fun buildConfig(
         debugMode: Boolean = false,
         batchSize: Int = 100,
-        flushIntervalSeconds: Int = 300
+        flushIntervalSeconds: Int = 300,
+        minLevel: LogMinLevel = LogMinLevel.DEBUG
     ) = AppLoggerConfig.Builder()
         .debugMode(debugMode)
         .batchSize(batchSize)
         .flushIntervalSeconds(flushIntervalSeconds)
+        .minLevel(minLevel)
         .build()
 
     @BeforeEach
@@ -412,6 +414,79 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         assertNull(fakeTransport.sentEvents[0].extra)
+    }
+
+    // ── minLevel ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `minLevel WARN discards DEBUG and INFO events`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = true, minLevel = LogMinLevel.WARN))
+        logger.debug("TAG", "debug")
+        logger.info("TAG", "info")
+        logger.warn("TAG", "warn")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals(1, fakeTransport.sentEvents.size)
+        assertEquals(LogLevel.WARN, fakeTransport.sentEvents[0].level)
+    }
+
+    @Test
+    fun `minLevel ERROR discards DEBUG INFO WARN but keeps ERROR and CRITICAL`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = true, minLevel = LogMinLevel.ERROR))
+        logger.debug("TAG", "debug")
+        logger.info("TAG", "info")
+        logger.warn("TAG", "warn")
+        logger.error("TAG", "error")
+        logger.critical("TAG", "critical")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals(2, fakeTransport.sentEvents.size)
+        assertEquals(LogLevel.ERROR, fakeTransport.sentEvents[0].level)
+        assertEquals(LogLevel.CRITICAL, fakeTransport.sentEvents[1].level)
+    }
+
+    @Test
+    fun `METRIC always passes regardless of minLevel`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false, minLevel = LogMinLevel.CRITICAL))
+        logger.info("TAG", "info — should be discarded")
+        logger.metric("cpu_usage", 42.0, "percent")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals(1, fakeTransport.sentEvents.size)
+        assertEquals(LogLevel.METRIC, fakeTransport.sentEvents[0].level)
+    }
+
+    // ── SessionManager rotation ───────────────────────────────────────────────
+
+    @Test
+    fun `SessionManager rotate generates new sessionId`() {
+        val sm = SessionManager()
+        val first = sm.sessionId
+        sm.rotate()
+        assertNotEquals(first, sm.sessionId)
+    }
+
+    @Test
+    fun `SessionManager onForeground rotates session after timeout`() {
+        val sm = SessionManager(sessionTimeoutMs = 100L)
+        val first = sm.sessionId
+        sm.onBackground()
+        Thread.sleep(150)
+        sm.onForeground()
+        assertNotEquals(first, sm.sessionId)
+    }
+
+    @Test
+    fun `SessionManager onForeground does NOT rotate before timeout`() {
+        val sm = SessionManager(sessionTimeoutMs = 60_000L)
+        val first = sm.sessionId
+        sm.onBackground()
+        Thread.sleep(50)
+        sm.onForeground()
+        assertEquals(first, sm.sessionId)
     }
 
     /**
