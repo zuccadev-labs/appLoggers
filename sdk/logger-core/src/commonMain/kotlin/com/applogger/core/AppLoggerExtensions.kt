@@ -93,3 +93,63 @@ fun Any.logE(logger: AppLogger, message: String, throwable: Throwable? = null, e
 /** Logs a critical event, inferring the tag from the receiver's class name. */
 fun Any.logC(logger: AppLogger, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
     logger.critical(logTag(), message, throwable, extra)
+
+// ─── Metric shorthands ────────────────────────────────────────────────────────
+
+/**
+ * Records a metric. Shorthand for [AppLogger.metric].
+ *
+ * ```kotlin
+ * logger.logM("screen_load_time", 320.0, "ms", mapOf("screen" to "Home"))
+ * ```
+ */
+fun AppLogger.logM(name: String, value: Double, unit: String = "count", tags: Map<String, String>? = null) =
+    metric(name, value, unit, tags)
+
+/**
+ * Records a metric, inferring a context tag from the receiver's class name
+ * and adding it automatically to the tags map.
+ *
+ * ```kotlin
+ * class HomeScreen(private val logger: AppLogger) {
+ *     fun onResume() {
+ *         this.logM(logger, "screen_load_time", 320.0, "ms")
+ *         // tags will include "source" -> "HomeScreen" automatically
+ *     }
+ * }
+ * ```
+ */
+fun Any.logM(
+    logger: AppLogger,
+    name: String,
+    value: Double,
+    unit: String = "count",
+    tags: Map<String, String>? = null
+) {
+    val enriched = buildMap {
+        tags?.forEach { (k, v) -> put(k, v) }
+        putIfAbsent("source", logTag())
+    }
+    logger.metric(name, value, unit, enriched)
+}
+
+// ─── Companion object helper ──────────────────────────────────────────────────
+
+/**
+ * Returns a tag string derived from the enclosing class of a companion object,
+ * or from the class itself. Designed for use in companion objects:
+ *
+ * ```kotlin
+ * class NetworkRepository(private val logger: AppLogger) {
+ *     companion object {
+ *         val TAG = loggerTag<NetworkRepository>()
+ *     }
+ *
+ *     fun fetch() {
+ *         logger.logI(TAG, "Fetching data")
+ *     }
+ * }
+ * ```
+ */
+inline fun <reified T : Any> loggerTag(): String =
+    T::class.simpleName?.take(100) ?: "Anonymous"

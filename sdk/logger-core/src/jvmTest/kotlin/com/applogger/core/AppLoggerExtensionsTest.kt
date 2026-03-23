@@ -17,8 +17,16 @@ class AppLoggerExtensionsTest {
         val extra: Map<String, Any>? = null
     )
 
+    data class MetricCapture(
+        val name: String,
+        val value: Double,
+        val unit: String,
+        val tags: Map<String, String>?
+    )
+
     class SpyLogger : AppLogger {
         val calls = mutableListOf<Capture>()
+        val metrics = mutableListOf<MetricCapture>()
         override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) =
             calls.add(Capture(LogLevel.DEBUG, tag, message, throwable, extra)).let {}
         override fun info(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) =
@@ -29,7 +37,8 @@ class AppLoggerExtensionsTest {
             calls.add(Capture(LogLevel.ERROR, tag, message, throwable, extra)).let {}
         override fun critical(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) =
             calls.add(Capture(LogLevel.CRITICAL, tag, message, throwable, extra)).let {}
-        override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) = Unit
+        override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) =
+            metrics.add(MetricCapture(name, value, unit, tags)).let {}
         override fun flush() = Unit
     }
 
@@ -158,5 +167,75 @@ class AppLoggerExtensionsTest {
     fun `null throwable results in null in captured call`() {
         this.logI(spy, "no exception", throwable = null)
         assertNull(spy.calls[0].throwable)
+    }
+
+    // ── logM shorthand ────────────────────────────────────────────────────────
+
+    @Test
+    fun `logM delegates to metric with correct fields`() {
+        spy.logM("screen_load_time", 320.0, "ms", mapOf("screen" to "Home"))
+        assertEquals(1, spy.metrics.size)
+        spy.metrics[0].also {
+            assertEquals("screen_load_time", it.name)
+            assertEquals(320.0, it.value)
+            assertEquals("ms", it.unit)
+            assertEquals("Home", it.tags?.get("screen"))
+        }
+    }
+
+    @Test
+    fun `logM uses count as default unit`() {
+        spy.logM("frame_drop", 3.0)
+        assertEquals("count", spy.metrics[0].unit)
+    }
+
+    @Test
+    fun `logM with null tags passes null to metric`() {
+        spy.logM("cpu_usage", 45.0, "percent")
+        assertNull(spy.metrics[0].tags)
+    }
+
+    // ── Any.logM tag-inferring ─────────────────────────────────────────────────
+
+    @Test
+    fun `Any logM infers source tag and merges with provided tags`() {
+        this.logM(spy, "render_time", 16.0, "ms", mapOf("frame" to "60fps"))
+        assertEquals(1, spy.metrics.size)
+        spy.metrics[0].also {
+            assertEquals("render_time", it.name)
+            assertEquals(16.0, it.value)
+            assertEquals("ms", it.unit)
+            assertEquals("60fps", it.tags?.get("frame"))
+            assertEquals("AppLoggerExtensionsTest", it.tags?.get("source"))
+        }
+    }
+
+    @Test
+    fun `Any logM with null tags still adds source tag`() {
+        this.logM(spy, "memory_usage", 128.0, "mb")
+        assertEquals("AppLoggerExtensionsTest", spy.metrics[0].tags?.get("source"))
+    }
+
+    @Test
+    fun `Any logM does not override explicit source tag`() {
+        // If caller explicitly passes "source", it should NOT be overridden
+        this.logM(spy, "custom_metric", 1.0, "count", mapOf("source" to "CustomSource"))
+        assertEquals("CustomSource", spy.metrics[0].tags?.get("source"))
+    }
+
+    // ── loggerTag<T>() ────────────────────────────────────────────────────────
+
+    @Test
+    fun `loggerTag returns simple class name of type parameter`() {
+        val tag = loggerTag<AppLoggerExtensionsTest>()
+        assertEquals("AppLoggerExtensionsTest", tag)
+    }
+
+    @Test
+    fun `loggerTag can be used as a constant in companion-style pattern`() {
+        val tag = loggerTag<SpyLogger>()
+        assertEquals("SpyLogger", tag)
+        spy.logI(tag, "using companion tag")
+        assertEquals("SpyLogger", spy.calls[0].tag)
     }
 }
