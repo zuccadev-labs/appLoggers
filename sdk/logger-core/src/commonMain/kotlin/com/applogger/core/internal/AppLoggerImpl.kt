@@ -255,8 +255,8 @@ internal class AppLoggerImpl(
         try {
             if (level == LogLevel.DEBUG && !config.isDebugMode) return
             if (level != LogLevel.METRIC) {
-                val eventOrdinal = LEVEL_ORDINAL.getOrDefault(level, 0)
-                val minOrdinal   = MIN_LEVEL_ORDINAL.getOrDefault(config.minLevel, 0)
+                val eventOrdinal = LEVEL_ORDINAL.getValue(level)
+                val minOrdinal   = MIN_LEVEL_ORDINAL.getValue(config.minLevel)
                 if (eventOrdinal < minOrdinal) return
             }
             if (config.isDebugMode && config.consoleOutput) {
