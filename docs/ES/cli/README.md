@@ -70,7 +70,9 @@ Al instalar o ejecutar el CLI por primera vez, se crea automáticamente `~/.appl
     {
       "name": "my-app",
       "display_name": "My Application",
-      "workspace_roots": [],
+      "workspace_roots": [
+        "/home/user/workspace/my-app"
+      ],
       "supabase": {
         "url": "https://your-project.supabase.co",
         "api_key_env": "APPLOGGER_SUPABASE_KEY",
@@ -83,6 +85,78 @@ Al instalar o ejecutar el CLI por primera vez, se crea automáticamente `~/.appl
   ]
 }
 ```
+
+#### Campos del archivo de proyectos
+
+| Campo | Requerido | Descripción |
+|---|:---:|---|
+| `default_project` | ✅ | Nombre del proyecto que se usa cuando no hay otro criterio de selección |
+| `projects[].name` | ✅ | Identificador único del proyecto (usado con `--project` o `APPLOGGER_PROJECT`) |
+| `projects[].display_name` | ❌ | Nombre legible para humanos (solo informativo) |
+| `projects[].workspace_roots` | ❌ | Rutas locales del workspace. Si el directorio actual está dentro de alguna de estas rutas, el proyecto se selecciona automáticamente |
+| `supabase.url` | ✅ | URL del proyecto Supabase (ej: `https://xxxx.supabase.co`) |
+| `supabase.api_key_env` | ✅* | **Nombre** de la variable de entorno que contiene el `service_role` key. El CLI lee `os.Getenv(api_key_env)` en tiempo de ejecución. Nunca pongas el valor del JWT aquí — pon el nombre de la variable |
+| `supabase.api_key` | ✅* | Valor directo del `service_role` key. Solo usar en entornos donde no es posible usar variables de entorno. Evitar en archivos versionados |
+| `supabase.schema` | ❌ | Esquema PostgreSQL donde están las tablas. Default: `public`. Cambiar solo si migraste las tablas a un esquema custom |
+| `supabase.logs_table` | ❌ | Nombre de la tabla de logs. Default: `app_logs`. Cambiar solo si usaste un nombre distinto en las migraciones |
+| `supabase.metrics_table` | ❌ | Nombre de la tabla de métricas. Default: `app_metrics`. Cambiar solo si usaste un nombre distinto en las migraciones |
+| `supabase.timeout_seconds` | ❌ | Timeout HTTP en segundos (1-120). Default: `15` |
+
+> `api_key_env` y `api_key` son mutuamente excluyentes. Si ambos están presentes, `api_key_env` tiene precedencia.
+
+#### Error frecuente — `api_key_env` con el valor del JWT
+
+```json
+// ❌ INCORRECTO — api_key_env recibe el nombre de la variable, no el valor
+"api_key_env": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+// ✅ CORRECTO — api_key_env recibe el nombre de la variable de entorno
+"api_key_env": "APPLOGGER_SUPABASE_KEY"
+```
+
+Luego exportás la variable en tu shell antes de usar el CLI:
+
+```bash
+# Linux / macOS
+export APPLOGGER_SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Windows PowerShell
+$env:APPLOGGER_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+#### Ejemplo multi-proyecto
+
+```json
+{
+  "default_project": "klinema",
+  "projects": [
+    {
+      "name": "klinema",
+      "display_name": "Klinema Mobile",
+      "workspace_roots": [
+        "D:/workspace/klinema-app"
+      ],
+      "supabase": {
+        "url": "https://klinema.supabase.co",
+        "api_key_env": "APPLOGGER_KLINEMA_KEY"
+      }
+    },
+    {
+      "name": "klinematv",
+      "display_name": "Klinema TV",
+      "workspace_roots": [
+        "D:/workspace/klinematv"
+      ],
+      "supabase": {
+        "url": "https://klinematv.supabase.co",
+        "api_key_env": "APPLOGGER_KLINEMATV_KEY"
+      }
+    }
+  ]
+}
+```
+
+Cuando `schema`, `logs_table` y `metrics_table` se omiten, el CLI usa los defaults (`public`, `app_logs`, `app_metrics`). Solo especificalos si tu setup de Supabase usa nombres distintos a los de las migraciones estándar del proyecto.
 
 Usando `api_key_env` el secreto nunca queda en el archivo — se lee desde la variable de entorno que indiques.
 
