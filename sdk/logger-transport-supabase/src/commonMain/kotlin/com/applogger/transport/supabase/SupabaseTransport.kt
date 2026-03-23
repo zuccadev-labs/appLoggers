@@ -16,6 +16,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 private const val HTTP_TOO_MANY_REQUESTS = 429
@@ -201,6 +202,13 @@ internal data class SupabaseLogEntry(
     @SerialName("throwable_type") val throwableType: String? = null,
     @SerialName("throwable_msg") val throwableMsg: String? = null,
     @SerialName("stack_trace") val stackTrace: List<String>? = null,
+    // Pillar 3 — Column Matcher: anomaly_type es una columna de primer nivel en app_logs,
+    // no un campo dentro del JSONB extra. El transporte extrae este valor del mapa extra
+    // (donde lo inyectó el SDK en Pillar 1) y lo promueve al payload raíz de la petición.
+    @SerialName("anomaly_type") val anomalyType: String? = null,
+    // Distributed tracing: allows correlating events across devices (mobile → TV → backend).
+    // Filter in Supabase: SELECT * FROM app_logs WHERE trace_id = 'abc-123' ORDER BY timestamp
+    @SerialName("trace_id") val traceId: String? = null,
     @SerialName("device_info") val deviceInfo: Map<String, String>,
     @SerialName("api_level") val apiLevel: Int,
     @SerialName("sdk_version") val sdkVersion: String,
@@ -222,33 +230,47 @@ internal data class SupabaseMetricEntry(
     @SerialName("sdk_version") val sdkVersion: String
 )
 
-private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
-    level = level.name,
-    tag = tag,
-    message = message,
-    environment = environment,
-    throwableType = throwableInfo?.type,
-    throwableMsg = throwableInfo?.message,
-    stackTrace = throwableInfo?.stackTrace,
-    deviceInfo = mapOf(
-        "brand" to deviceInfo.brand,
-        "model" to deviceInfo.model,
-        "os_version" to deviceInfo.osVersion,
-        "api_level" to deviceInfo.apiLevel.toString(),
-        "platform" to deviceInfo.platform,
-        "app_version" to deviceInfo.appVersion,
-        "app_build" to deviceInfo.appBuild.toString(),
-        "is_low_ram" to deviceInfo.isLowRamDevice.toString(),
-        "is_tv" to deviceInfo.isTV.toString(),
-        "connection_type" to deviceInfo.connectionType
-    ),
-    apiLevel = deviceInfo.apiLevel,
-    sdkVersion = sdkVersion,
-    sessionId = sessionId,
-    deviceId = deviceId,
-    userId = userId,
-    extra = extra?.toJsonObject()
-)
+private fun LogEvent.toSupabaseLog(): SupabaseLogEntry {
+    // Pillar 3 — Column Matcher:
+    // Extrae anomaly_type del mapa extra y lo promueve a columna de primer nivel.
+    // Esto evita que el valor quede enterrado en el JSONB extra y permite queries
+    // directas: SELECT * FROM app_logs WHERE anomaly_type = 'error'
+    val anomalyType = (extra?.get("anomaly_type") as? JsonPrimitive)?.content
+    val filteredExtra = extra
+        ?.filterKeys { it != "anomaly_type" }
+        ?.takeIf { it.isNotEmpty() }
+        ?.toJsonObject()
+
+    return SupabaseLogEntry(
+        level = level.name,
+        tag = tag,
+        message = message,
+        environment = environment,
+        throwableType = throwableInfo?.type,
+        throwableMsg = throwableInfo?.message,
+        stackTrace = throwableInfo?.stackTrace,
+        anomalyType = anomalyType,
+        traceId = traceId,
+        deviceInfo = mapOf(
+            "brand" to deviceInfo.brand,
+            "model" to deviceInfo.model,
+            "os_version" to deviceInfo.osVersion,
+            "api_level" to deviceInfo.apiLevel.toString(),
+            "platform" to deviceInfo.platform,
+            "app_version" to deviceInfo.appVersion,
+            "app_build" to deviceInfo.appBuild.toString(),
+            "is_low_ram" to deviceInfo.isLowRamDevice.toString(),
+            "is_tv" to deviceInfo.isTV.toString(),
+            "connection_type" to deviceInfo.connectionType
+        ),
+        apiLevel = deviceInfo.apiLevel,
+        sdkVersion = sdkVersion,
+        sessionId = sessionId,
+        deviceId = deviceId,
+        userId = userId,
+        extra = filteredExtra
+    )
+}
 
 private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
     return SupabaseMetricEntry(

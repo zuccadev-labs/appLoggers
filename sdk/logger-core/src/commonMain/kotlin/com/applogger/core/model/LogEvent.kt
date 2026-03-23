@@ -60,5 +60,8 @@ data class LogEvent(
     val metricName: String? = null,
     val metricValue: Double? = null,
     val metricUnit: String? = null,
-    val metricTags: Map<String, String>? = null
+    val metricTags: Map<String, String>? = null,
+    // Distributed tracing — optionally propagated across devices (mobile → TV gRPC flows).
+    // Set via AppLoggerSDK.setTraceId(id). Appears as trace_id column in Supabase.
+    val traceId: String? = null
 )

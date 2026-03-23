@@ -63,7 +63,26 @@ data class AppLoggerConfig(
     val verboseTransportLogging: Boolean,
     val bufferSizeStrategy: BufferSizeStrategy,
     val bufferOverflowPolicy: BufferOverflowPolicy,
-    val offlinePersistenceMode: OfflinePersistenceMode
+    val offlinePersistenceMode: OfflinePersistenceMode,
+    /**
+     * Deduplication window for identical errors (same level + tag + message + throwable type).
+     * Within this window, only the first occurrence is sent; subsequent duplicates are suppressed
+     * and the final event is enriched with `occurrence_count = N`.
+     *
+     * Solves high-frequency event loops (e.g. playback ticks, sync polling) that would otherwise
+     * flood the backend with thousands of identical rows.
+     *
+     * Set to `0` to disable deduplication entirely. Default: `10_000` ms (10 seconds).
+     */
+    val deduplicationWindowMs: Long = 10_000L,
+    /**
+     * Number of breadcrumbs (user interaction records) retained in the circular buffer.
+     * Breadcrumbs are automatically attached to ERROR and CRITICAL events as a JSON array
+     * in the `breadcrumbs` extra field, giving full "what the user did before the crash" context.
+     *
+     * Set to `0` to disable. Default: `10`.
+     */
+    val breadcrumbCapacity: Int = 10
 ) {
     class Builder {
         private var endpoint: String = ""
@@ -80,6 +99,8 @@ data class AppLoggerConfig(
         private var bufferSizeStrategy: BufferSizeStrategy = BufferSizeStrategy.FIXED
         private var bufferOverflowPolicy: BufferOverflowPolicy = BufferOverflowPolicy.DISCARD_OLDEST
         private var offlinePersistenceMode: OfflinePersistenceMode = OfflinePersistenceMode.NONE
+        private var deduplicationWindowMs: Long = 10_000L
+        private var breadcrumbCapacity: Int = 10
 
         fun endpoint(url: String) = apply { endpoint = url }
         fun apiKey(key: String) = apply { apiKey = key }
@@ -95,6 +116,10 @@ data class AppLoggerConfig(
         fun bufferSizeStrategy(strategy: BufferSizeStrategy) = apply { bufferSizeStrategy = strategy }
         fun bufferOverflowPolicy(policy: BufferOverflowPolicy) = apply { bufferOverflowPolicy = policy }
         fun offlinePersistenceMode(mode: OfflinePersistenceMode) = apply { offlinePersistenceMode = mode }
+        /** @see AppLoggerConfig.deduplicationWindowMs */
+        fun deduplicationWindowMs(ms: Long) = apply { deduplicationWindowMs = maxOf(0L, ms) }
+        /** @see AppLoggerConfig.breadcrumbCapacity */
+        fun breadcrumbCapacity(n: Int) = apply { breadcrumbCapacity = maxOf(0, n) }
 
         fun build(): AppLoggerConfig {
             require(endpoint.startsWith("https://") || isDebugMode || endpoint.isEmpty()) {
@@ -114,7 +139,9 @@ data class AppLoggerConfig(
                 verboseTransportLogging = verboseTransportLogging,
                 bufferSizeStrategy = bufferSizeStrategy,
                 bufferOverflowPolicy = bufferOverflowPolicy,
-                offlinePersistenceMode = offlinePersistenceMode
+                offlinePersistenceMode = offlinePersistenceMode,
+                deduplicationWindowMs = deduplicationWindowMs,
+                breadcrumbCapacity = breadcrumbCapacity
             )
         }
     }
@@ -183,7 +210,10 @@ data class AppLoggerConfig(
             batchSize = minOf(batchSize, 5),
             flushIntervalSeconds = maxOf(flushIntervalSeconds, 60),
             maxStackTraceLines = minOf(maxStackTraceLines, 5),
-            flushOnlyWhenIdle = true
+            flushOnlyWhenIdle = true,
+            // On TV/low-RAM devices, reduce breadcrumb buffer to save memory.
+            // Deduplication window stays: it *saves* memory by collapsing duplicate events.
+            breadcrumbCapacity = minOf(breadcrumbCapacity, 5)
         )
     }
 }

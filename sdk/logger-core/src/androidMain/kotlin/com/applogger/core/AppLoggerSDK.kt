@@ -6,6 +6,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.applogger.core.internal.*
 import kotlin.concurrent.Volatile
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineName
 
 private const val LOW_RESOURCE_BUFFER_CAPACITY = 100
 private const val DEFAULT_BUFFER_CAPACITY = 1000
@@ -98,7 +100,8 @@ object AppLoggerSDK : AppLogger {
             sessionManager = sessionManager,
             filter = filter,
             processor = processor,
-            config = resolvedConfig
+            config = resolvedConfig,
+            systemSnapshotProvider = buildSystemSnapshotProvider(appContext)
         )
 
         instance = impl
@@ -170,6 +173,67 @@ object AppLoggerSDK : AppLogger {
         implRef?.clearDeviceId()
     }
 
+    /**
+     * Sets the distributed trace ID attached to every subsequent event.
+     *
+     * Use this to correlate events across devices — e.g. pass the same `traceId` to
+     * the TV app via gRPC when the mobile app initiates a playback session. In Supabase:
+     * ```sql
+     * SELECT * FROM app_logs WHERE trace_id = 'abc-123' ORDER BY timestamp;
+     * -- Returns the full mobile→TV→backend event sequence in chronological order.
+     * ```
+     */
+    fun setTraceId(id: String) {
+        implRef?.setTraceId(id)
+    }
+
+    /** Clears the distributed trace ID. Call after the traced operation completes. */
+    fun clearTraceId() {
+        implRef?.clearTraceId()
+    }
+
+    /**
+     * Records a user interaction breadcrumb in the circular buffer.
+     *
+     * The last [AppLoggerConfig.breadcrumbCapacity] breadcrumbs are automatically attached
+     * to ERROR and CRITICAL events as a `"breadcrumbs"` JSON array, giving the full
+     * "what the user did before the crash" sequence without manual instrumentation at the
+     * error call site.
+     *
+     * ```kotlin
+     * // In your click handlers / navigation callbacks:
+     * AppLoggerSDK.recordBreadcrumb("tap_play",       screen = "ContentDetail")
+     * AppLoggerSDK.recordBreadcrumb("tap_settings",   screen = "HomeScreen")
+     * AppLoggerSDK.recordBreadcrumb("tap_disney_plus", screen = "SettingsScreen",
+     *     metadata = mapOf("content_id" to contentId))
+     * ```
+     */
+    fun recordBreadcrumb(
+        action: String,
+        screen: String? = null,
+        metadata: Map<String, String>? = null
+    ) {
+        implRef?.recordBreadcrumb(action, screen, metadata)
+    }
+
+    /**
+     * Creates a [ScopedAppLogger] that automatically merges [attributes] into every event.
+     *
+     * Useful for isolating logs from a specific feature flow (playback session, checkout,
+     * onboarding) without polluting global state via [addGlobalExtra].
+     *
+     * ```kotlin
+     * val log = AppLoggerSDK.newScope(
+     *     "content_id"  to contentId,
+     *     "stream_type" to "4K_HDR"
+     * )
+     * log.error("Player", "Codec failed", exception)
+     * // → event includes content_id and stream_type automatically
+     * ```
+     */
+    fun newScope(vararg attributes: Pair<String, Any>): ScopedAppLogger =
+        instance.newScope(*attributes)
+
     override fun addGlobalExtra(key: String, value: String) {
         implRef?.addGlobalExtra(key, value)
     }
@@ -180,6 +244,42 @@ object AppLoggerSDK : AppLogger {
 
     override fun clearGlobalExtra() {
         implRef?.clearGlobalExtra()
+    }
+
+    /**
+     * [CoroutineExceptionHandler] que captura excepciones no manejadas en coroutines
+     * y las registra como errores con contexto completo (nombre de coroutine + stack trace).
+     *
+     * ## Problema que resuelve
+     * Los fallos silenciosos en coroutines de background se pierden sin dejar rastro.
+     * Con este handler, el SDK los captura y los envía a Supabase automáticamente.
+     *
+     * ## Uso
+     * ```kotlin
+     * // Scope de pantalla o repositorio:
+     * val scope = CoroutineScope(Dispatchers.IO + AppLoggerSDK.exceptionHandler)
+     *
+     * // Scope de ViewModel (con SupervisorJob para no cancelar hermanos):
+     * val scope = CoroutineScope(
+     *     Dispatchers.Main + SupervisorJob() + AppLoggerSDK.exceptionHandler
+     * )
+     * ```
+     *
+     * El SDK adjuntará automáticamente:
+     * - `anomaly_type = "coroutine_crash"` (promovido a columna en Supabase)
+     * - `coroutine_name` = nombre del CoroutineName del contexto (si aplica)
+     * - stack trace completo de la excepción
+     */
+    val exceptionHandler: CoroutineExceptionHandler = CoroutineExceptionHandler { context, throwable ->
+        instance.error(
+            tag = "CoroutineException",
+            message = throwable.message ?: "Unhandled coroutine exception",
+            throwable = throwable,
+            extra = buildMap {
+                put("anomaly_type", "coroutine_crash")
+                context[CoroutineName]?.name?.let { put("coroutine_name", it) }
+            }
+        )
     }
 
     /**
@@ -214,6 +314,7 @@ object AppLoggerSDK : AppLogger {
         AppLoggerHealth.processor = null
         AppLoggerHealth.transport = null
         AppLoggerHealth.buffer = null
+        // traceId, breadcrumbs, debouncer are owned by implRef and GC'd with it.
     }
 
     /**
@@ -240,6 +341,85 @@ object AppLoggerSDK : AppLogger {
             appInfo.metaData?.getString("APPLOGGER_DEBUG")?.equals("true", ignoreCase = true) ?: false
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /**
+     * Builds the system snapshot provider for Android.
+     *
+     * Captures real-time platform diagnostics at the moment an ERROR/CRITICAL event is logged:
+     * - `memory_usage_pct`: Percentage of total RAM in use (all API levels).
+     * - `thermal_status`: Current thermal status string (API 29+: NONE/LIGHT/MODERATE/SEVERE/CRITICAL/EMERGENCY/SHUTDOWN).
+     * - `network_type`: Active connection type (wifi / ethernet / cellular / none / unknown).
+     *
+     * Critical for TV debugging: thermal throttling causes filter failures and codec crashes —
+     * knowing the thermal state at error time is the first clue in a forensic investigation.
+     *
+     * The lambda is called from the SDK's internal background thread; all APIs used here
+     * are documented as safe for off-main-thread access.
+     */
+    private fun buildSystemSnapshotProvider(context: Context): () -> Map<String, String> {
+        val appContext = context.applicationContext
+        return {
+            @Suppress("TooGenericExceptionCaught")
+            buildMap {
+                // 1. Memory usage
+                try {
+                    val am = appContext.getSystemService(Context.ACTIVITY_SERVICE)
+                        as? android.app.ActivityManager
+                    if (am != null) {
+                        val mem = android.app.ActivityManager.MemoryInfo()
+                        am.getMemoryInfo(mem)
+                        if (mem.totalMem > 0L) {
+                            val usedPct = ((mem.totalMem - mem.availMem) * 100L / mem.totalMem).toInt()
+                            put("memory_usage_pct", usedPct.toString())
+                        }
+                    }
+                } catch (_: Exception) { /* non-fatal */ }
+
+                // 2. Thermal status (API 29+)
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        val pm = appContext.getSystemService(Context.POWER_SERVICE)
+                            as? android.os.PowerManager
+                        if (pm != null) {
+                            val status = when (pm.currentThermalStatus) {
+                                android.os.PowerManager.THERMAL_STATUS_NONE         -> "none"
+                                android.os.PowerManager.THERMAL_STATUS_LIGHT        -> "light"
+                                android.os.PowerManager.THERMAL_STATUS_MODERATE     -> "moderate"
+                                android.os.PowerManager.THERMAL_STATUS_SEVERE       -> "severe"
+                                android.os.PowerManager.THERMAL_STATUS_CRITICAL     -> "critical"
+                                android.os.PowerManager.THERMAL_STATUS_EMERGENCY    -> "emergency"
+                                android.os.PowerManager.THERMAL_STATUS_SHUTDOWN     -> "shutdown"
+                                else -> "unknown"
+                            }
+                            put("thermal_status", status)
+                        }
+                    }
+                } catch (_: Exception) { /* non-fatal */ }
+
+                // 3. Network type
+                try {
+                    val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+                        as? android.net.ConnectivityManager
+                    if (cm != null) {
+                        val networkType = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                            when {
+                                caps == null -> "none"
+                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)     -> "wifi"
+                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                                else -> "unknown"
+                            }
+                        } else {
+                            @Suppress("DEPRECATION")
+                            cm.activeNetworkInfo?.typeName?.lowercase() ?: "none"
+                        }
+                        put("network_type", networkType)
+                    }
+                } catch (_: Exception) { /* non-fatal */ }
+            }
         }
     }
 
