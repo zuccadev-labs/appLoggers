@@ -73,46 +73,26 @@ object AppLoggerSDK : AppLogger {
         if (!isInitialized.compareAndSet(false, true)) return
 
         val appContext = context.applicationContext
-
-        // Lee APPLOGGER_DEBUG del manifest meta-data para activar debug mode sin cambiar código
-        val appLoggerDebug = readAppLoggerDebugFlag(appContext)
-        val resolvedDebugMode = config.isDebugMode || appLoggerDebug
-        val effectiveConfig = if (resolvedDebugMode != config.isDebugMode) {
-            config.copy(isDebugMode = resolvedDebugMode)
-        } else {
-            config
-        }
-
+        val resolvedConfig = resolveConfig(appContext, config)
         val platform = PlatformDetector.detect(appContext)
-        val resolvedConfig = if (platform.isLowResource) effectiveConfig.resolveForLowResource() else effectiveConfig
 
-        val deviceInfoProvider = AndroidDeviceInfoProvider(appContext, platform)
-        val deviceInfo = deviceInfoProvider.get()
+        val deviceInfo = AndroidDeviceInfoProvider(appContext, platform).get()
         val sessionManager = SessionManager()
         val filter = ChainedLogFilter(
             listOf(RateLimitFilter(if (platform.isLowResource) 30 else 120))
         )
-
         val bufferCapacity = computeBufferCapacity(appContext, platform, resolvedConfig)
-
         val buffer = InMemoryBuffer(
             maxCapacity = bufferCapacity,
             overflowPolicy = resolvedConfig.bufferOverflowPolicy
         )
-
-        val resolvedTransport = transport ?: NoOpTransport()
-        val formatter = JsonLogFormatter()
-
-        val offlineStorage: OfflineStorage = buildOfflineStorage(appContext, resolvedConfig)
-
         val processor = BatchProcessor(
             buffer = buffer,
-            transport = resolvedTransport,
-            formatter = formatter,
+            transport = transport ?: NoOpTransport(),
+            formatter = JsonLogFormatter(),
             config = resolvedConfig,
-            offlineStorage = offlineStorage
+            offlineStorage = buildOfflineStorage(appContext, resolvedConfig)
         )
-
         val impl = AppLoggerImpl(
             deviceInfo = deviceInfo,
             sessionManager = sessionManager,
@@ -124,27 +104,28 @@ object AppLoggerSDK : AppLogger {
         instance = impl
         implRef = impl
         sessionManagerRef = sessionManager
+        updateHealthReferences(processor, transport ?: NoOpTransport(), buffer, bufferCapacity)
 
-        updateHealthReferences(processor, resolvedTransport, buffer, bufferCapacity)
+        if (!resolvedConfig.isDebugMode) AndroidCrashHandler(impl).install()
+        registerLifecycleObservers(impl, sessionManager)
+    }
 
-        if (!resolvedConfig.isDebugMode) {
-            val crashHandler = AndroidCrashHandler(impl)
-            crashHandler.install()
-        }
+    private fun resolveConfig(appContext: Context, config: AppLoggerConfig): AppLoggerConfig {
+        val debugFlag = readAppLoggerDebugFlag(appContext)
+        val withDebug = if (debugFlag && !config.isDebugMode) config.copy(isDebugMode = true) else config
+        val platform = PlatformDetector.detect(appContext)
+        return if (platform.isLowResource) withDebug.resolveForLowResource() else withDebug
+    }
 
+    private fun registerLifecycleObservers(impl: AppLoggerImpl, sessionManager: SessionManager) {
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             AppLoggerLifecycleObserver {
-                // flush en background + notificar al SessionManager
                 impl.flush()
                 sessionManager.onBackground()
             }
         )
-
-        // Notificar foreground para rotación de sesión por timeout
         ProcessLifecycleOwner.get().lifecycle.addObserver(
-            AppLoggerForegroundObserver {
-                sessionManager.onForeground()
-            }
+            AppLoggerForegroundObserver { sessionManager.onForeground() }
         )
     }
 
