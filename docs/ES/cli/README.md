@@ -1,6 +1,5 @@
 # AppLoggers CLI — Guía de Uso y Referencia
 
-**Última actualización**: 2026-03-22
 **Plataformas soportadas**: Windows, macOS, Linux (x86_64, ARM64)
 
 ---
@@ -30,7 +29,7 @@
 - [Modos de Salida](#modos-de-salida)
 - [Ejemplos Corporativos](#ejemplos-corporativos)
 - [Integración con Agentes](#integración-con-agentes)
-- [Variables de Entorno](#variables-de-entorno)
+- [Variables de Control](#variables-de-control)
 - [Códigos de Salida](#códigos-de-salida)
 - [Referencia](#referencia)
 
@@ -54,14 +53,21 @@ Ver [INSTALLATION.md](./INSTALLATION.md) para instalación manual, compilación 
 
 ## Configuración
 
-El CLI resuelve la configuración de Supabase en este orden de prioridad:
+### `~/.apploggers/cli.json` — fuente 
 
-1. Archivo de proyectos `~/.apploggers/cli.json` (recomendado)
-2. Variables de entorno directas
+El CLI crea `~/.apploggers/cli.json` automáticamente en el primer run con un template completo. Este archivo es la única fuente de configuración para uso local, agentes IA y SSE. No hay nada más que configurar.
 
-### Opción recomendada: archivo de proyectos
+Editar ese archivo es todo lo que se necesita.
 
-Al instalar o ejecutar el CLI por primera vez, se crea automáticamente `~/.apploggers/cli.json` con un template de ejemplo. Edita ese archivo con los datos de tu proyecto:
+```
+Windows : C:\Users\<usuario>\.apploggers\cli.json
+Linux   : /home/<usuario>/.apploggers/cli.json
+macOS   : /Users/<usuario>/.apploggers/cli.json
+```
+
+---
+
+### Estructura del archivo
 
 ```json
 {
@@ -70,32 +76,131 @@ Al instalar o ejecutar el CLI por primera vez, se crea automáticamente `~/.appl
     {
       "name": "my-app",
       "display_name": "My Application",
-      "workspace_roots": [],
+      "workspace_roots": ["D:/workspace/my-app"],
       "supabase": {
         "url": "https://your-project.supabase.co",
-        "api_key_env": "APPLOGGER_SUPABASE_KEY",
-        "schema": "public",
-        "logs_table": "app_logs",
-        "metrics_table": "app_metrics",
-        "timeout_seconds": 15
+        "api_key": "eyJhbGci..."
       }
     }
   ]
 }
 ```
 
-Usando `api_key_env` el secreto nunca queda en el archivo — se lee desde la variable de entorno que indiques.
+Reemplazar `url` con la URL del proyecto Supabase y `api_key` con el `service_role` key. El archivo no debe versionarse.
 
-### Opción alternativa: variables de entorno
+---
 
-Para entornos simples o CI/CD sin archivo de proyectos:
+### Resolución del API key — `api_key` vs `api_key_env`
 
-```bash
-export appLogger_supabaseUrl="https://your-project.supabase.co"
-export appLogger_supabaseKey="your-service-role-key"
+Dentro de `supabase`, hay dos formas de proveer la credencial. El CLI aplica esta prioridad:
+
+1. **`api_key_env`** — si está definido y la variable de entorno referenciada está exportada y no vacía, se usa ese valor.
+2. **`api_key`** — si `api_key_env` no está definido, o la variable está vacía/no exportada, se usa el valor directo.
+3. Ambos vacíos → error con mensaje accionable indicando qué configurar.
+
+#### `api_key` — valor directo (recomendado para la mayoría de los casos)
+
+```json
+"supabase": {
+  "url": "https://your-project.supabase.co",
+  "api_key": "eyJhbGci..."
+}
 ```
 
-Ver la sección [Variables de Entorno](#variables-de-entorno) para la lista completa.
+El key vive en el archivo. El archivo no se versiona. No hay nada más que hacer — el CLI lo lee directamente en cada ejecución, sin importar el contexto (terminal, agente IA, proceso SSE, MCP).
+
+#### `api_key_env` — indirección por variable de entorno (opcional, para quienes prefieren no tener el key en el archivo)
+
+`api_key_env` recibe el **nombre** de la variable de entorno, no el valor del key. El CLI llama a `os.Getenv(api_key_env)` en tiempo de ejecución. La URL siempre va en el json — no existe variable de entorno para la URL en este path.
+
+```json
+"supabase": {
+  "url": "https://your-project.supabase.co",
+  "api_key_env": "APPLOGGER_SUPABASE_KEY"
+}
+```
+
+Solo el key se exporta como variable de entorno:
+
+```bash
+# Linux / macOS
+export APPLOGGER_SUPABASE_KEY="eyJhbGci..."
+
+# Windows PowerShell
+$env:APPLOGGER_SUPABASE_KEY = "eyJhbGci..."
+```
+
+> `api_key_env` debe contener el **nombre** de la variable (ej: `"APPLOGGER_SUPABASE_KEY"`), nunca el JWT directamente. Si se pone el JWT en `api_key_env`, el CLI falla con: `project "X" requires secret env eyJhbGci...`
+
+Si `api_key_env` está definido pero la variable no está exportada o está vacía, el CLI cae automáticamente a `api_key`. Ambos campos pueden coexistir.
+
+---
+
+### Campos del archivo de proyectos
+
+El archivo `cli.json` configura **la conexión al proyecto Supabase** — no los filtros de consulta. Los filtros son siempre flags de línea de comandos.
+
+| Campo | Requerido | Descripción |
+|---|:---:|---|
+| `default_project` | ✅ | Nombre del proyecto activo cuando no hay otro criterio de selección |
+| `projects[].name` | ✅ | Identificador único del proyecto (case-insensitive) |
+| `projects[].display_name` | ❌ | Nombre legible, solo informativo |
+| `projects[].workspace_roots` | ❌ | Rutas locales para autodetección de proyecto según directorio de trabajo |
+| `supabase.url` | ✅ | URL del proyecto Supabase (`https://xxxx.supabase.co`) |
+| `supabase.api_key` | ✅* | Valor directo del `service_role` key. No versionar. |
+| `supabase.api_key_env` | ✅* | Nombre de la variable de entorno UPPERCASE que contiene el `service_role` key |
+| `supabase.schema` | ❌ | Esquema PostgreSQL. Default: `public` |
+| `supabase.logs_table` | ❌ | Nombre de la tabla de logs. Default: `app_logs` |
+| `supabase.metrics_table` | ❌ | Nombre de la tabla de métricas. Default: `app_metrics` |
+| `supabase.timeout_seconds` | ❌ | Timeout HTTP en segundos (1-120). Default: `15` |
+
+`*` Al menos uno de `api_key` o `api_key_env` debe resolver a un valor no vacío.
+
+`schema`, `logs_table` y `metrics_table` solo se especifican si las migraciones usaron nombres distintos a los defaults. En la mayoría de los casos se omiten.
+
+---
+
+### Ejemplo multi-proyecto
+
+```json
+{
+  "default_project": "klinema",
+  "projects": [
+    {
+      "name": "klinema",
+      "display_name": "Klinema Mobile",
+      "workspace_roots": ["D:/workspace/klinema-app"],
+      "supabase": {
+        "url": "https://klinema.supabase.co",
+        "api_key": "eyJhbGci..."
+      }
+    },
+    {
+      "name": "klinematv",
+      "display_name": "Klinema TV",
+      "workspace_roots": ["D:/workspace/klinematv"],
+      "supabase": {
+        "url": "https://klinematv.supabase.co",
+        "api_key": "eyJhbGci..."
+      }
+    }
+  ]
+}
+```
+
+Con `workspace_roots` configurado, el CLI detecta automáticamente el proyecto activo según el directorio de trabajo. No hace falta pasar `--project` en cada comando.
+
+---
+
+### Casos de uso
+
+| Escenario | Configuración |
+|---|---|
+| **Uso local / desarrollador** | `cli.json` con `api_key` directo |
+| **Agente IA** | `cli.json` con `api_key` directo — el agente lee/escribe el archivo sin gestionar env vars del shell |
+| **SSE / proceso Go con frontend** | `cli.json` con `api_key` directo — el proceso hereda el archivo del sistema |
+| **Multi-proyecto** | `cli.json` con múltiples entradas + `workspace_roots` para autodetección |
+| **Preferencia de no tener key en archivo** | `cli.json` con `api_key_env` apuntando a variable UPPERCASE exportada |
 
 Para configuración corporativa completa (migraciones, RLS, hardening), ver [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md).
 
@@ -103,18 +208,19 @@ Para configuración corporativa completa (migraciones, RLS, hardening), ver [SUP
 
 ## Selección de Proyecto
 
-El CLI soporta operación multi-proyecto. Precedencia de resolución:
+Cuando existe `~/.apploggers/cli.json`, la selección del proyecto activo sigue esta precedencia:
 
-1. `--project <nombre>`
-2. `APPLOGGER_PROJECT`
-3. Detección automática por `workspace_roots` en `~/.apploggers/cli.json`
+1. `--project <nombre>` (flag de línea de comandos)
+2. `APPLOGGER_PROJECT` (variable de entorno)
+3. Detección automática por `workspace_roots` — si el directorio actual está dentro de alguna ruta configurada
 4. `default_project` en el archivo de configuración
-5. Único proyecto configurado
-6. Variables de entorno legacy (`appLogger_supabase*`, `APPLOGGER_SUPABASE_*`, `SUPABASE_*`)
+5. Único proyecto configurado (si solo hay uno)
+
+Si ningún criterio aplica y hay múltiples proyectos, el CLI falla con un error indicando los proyectos disponibles.
 
 ```bash
 # Selección explícita de proyecto
-apploggers --project my-app telemetry query --source logs --severity error --output json
+apploggers --project klinema telemetry query --source logs --severity error --output json
 ```
 
 ---
@@ -127,25 +233,13 @@ Actualiza el binario a la última release publicada.
 
 ```bash
 apploggers upgrade
-```
-
-Versión específica:
-
-```bash
-apploggers upgrade --version apploggers-vX.Y.Z
-```
-
-Forzar reinstalación aunque ya coincida la versión:
-
-```bash
-apploggers upgrade --force
+apploggers upgrade --version apploggers-vX.Y.Z   # versión específica
+apploggers upgrade --force                         # forzar reinstalación
 ```
 
 ---
 
 ### `apploggers version`
-
-Muestra la versión del CLI.
 
 ```bash
 apploggers version
@@ -156,8 +250,6 @@ apploggers version --output json
 
 ### `apploggers capabilities`
 
-Muestra capacidades disponibles del CLI y contratos de automatización.
-
 ```bash
 apploggers capabilities --output json
 ```
@@ -165,8 +257,6 @@ apploggers capabilities --output json
 ---
 
 ### `apploggers health`
-
-Verifica la salud del CLI y servicios backend.
 
 ```bash
 apploggers health --output json
@@ -176,8 +266,6 @@ apploggers health --output json
 
 ### `apploggers agent schema`
 
-Muestra el esquema de datos para consumo de agentes.
-
 ```bash
 apploggers agent schema --output json
 ```
@@ -186,11 +274,70 @@ apploggers agent schema --output json
 
 ## Consultas de Telemetría
 
+### Modelo de datos — qué columnas existen
+
+Antes de filtrar, es importante entender la estructura real de las tablas.
+
+**`app_logs`** — columnas top-level:
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | UUID | Identificador único del evento |
+| `created_at` | TIMESTAMPTZ | Timestamp del evento (UTC) |
+| `level` | VARCHAR | Severidad: `DEBUG`, `INFO`, `WARN`, `ERROR`, `CRITICAL`, `METRIC` |
+| `tag` | VARCHAR | Dominio del evento (ej: `AUTH`, `PAYMENT`, `NETWORK`, `PLAYER`, `BOOT`) |
+| `message` | TEXT | Mensaje descriptivo del evento |
+| `session_id` | TEXT | Identificador de sesión del usuario |
+| `device_id` | TEXT | Identificador del dispositivo (string opaco generado por el SDK) |
+| `user_id` | TEXT | Identificador anónimo del usuario (NULL por defecto, solo con consentimiento) |
+| `sdk_version` | VARCHAR | Versión del SDK que generó el evento |
+| `extra` | JSONB | Campos adicionales de contexto (ver abajo) |
+
+**`app_logs.extra`** — campos JSONB accesibles via filtros:
+
+| Campo en `extra` | Flag del CLI | Descripción |
+|---|---|---|
+| `extra.package_name` | `--package` | Paquete o módulo que generó el evento (ej: `com.company.billing`) |
+| `extra.error_code` | `--error-code` | Código de error de negocio (ej: `E-42`, `AUTH_FAILED`) |
+| `extra.anomaly_type` | `--anomaly-type` | Tipo de anomalía detectada (ej: `slow_response`, `memory_leak`) |
+
+**`app_metrics`** — columnas top-level:
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | UUID | Identificador único |
+| `created_at` | TIMESTAMPTZ | Timestamp de la métrica (UTC) |
+| `name` | VARCHAR | Nombre de la métrica (ej: `response_time_ms`, `frame_drop_count`) |
+| `value` | DOUBLE | Valor numérico de la métrica |
+| `unit` | VARCHAR | Unidad de medida (ej: `ms`, `count`, `bytes`) |
+| `tags` | JSONB | Contexto de la métrica: `platform`, `app_version`, `device_model`, `screen_name` |
+| `device_id` | TEXT | Identificador del dispositivo |
+| `session_id` | TEXT | Identificador de sesión |
+| `sdk_version` | VARCHAR | Versión del SDK |
+
+---
+
+### Tags — convención de valores
+
+El campo `tag` en `app_logs` identifica el dominio del evento. Los valores son UPPERCASE por convención:
+
+| Tag | Dominio |
+|---|---|
+| `AUTH` | Autenticación y autorización |
+| `NETWORK` | Conectividad y requests HTTP |
+| `PAYMENT` | Flujos de pago y transacciones |
+| `PLAYER` | Reproducción de contenido multimedia |
+| `BOOT` | Ciclo de vida de inicio de la app |
+
+El conjunto de tags es finito y estable — los valores dinámicos van en `extra`, no en `tag`.
+
+---
+
 ### `apploggers telemetry query`
 
-Consulta logs o métricas con filtrado y agregación opcionales.
+Todos los filtros son flags de línea de comandos. No se configuran en `cli.json` — el archivo solo define la conexión al proyecto Supabase.
 
-#### Sintaxis
+#### Sintaxis completa
 
 ```bash
 apploggers telemetry query \
@@ -198,138 +345,126 @@ apploggers telemetry query \
   [--from TIMESTAMP] \
   [--to TIMESTAMP] \
   [--aggregate MODE] \
-  [--severity LEVEL] \          # logs only
-  [--tag NAME] \                # logs only
-  [--anomaly-type TYPE] \       # logs only (extra.anomaly_type)
-  [--session-id SESSION_ID] \
-  [--device-id DEVICE_ID] \
-  [--user-id USER_ID] \         # logs only
-  [--package PACKAGE_NAME] \    # logs only (extra.package_name)
-  [--error-code CODE] \         # logs only (extra.error_code)
-  [--contains TEXT] \           # logs only (message ilike)
-  [--name METRIC_NAME] \        # metrics only
+  [--severity LEVEL] \
+  [--tag TAG] \
+  [--session-id UUID] \
+  [--device-id ID] \
+  [--user-id UUID] \
+  [--contains TEXT] \
+  [--package PACKAGE_NAME] \
+  [--error-code CODE] \
+  [--anomaly-type TYPE] \
+  [--name METRIC_NAME] \
   [--limit N] \
   [--output FORMAT]
 ```
 
-#### Parámetros
+#### Referencia de flags
 
-| Parámetro | Requerido | Valores | Ejemplo |
+| Flag | Fuente | Columna / campo | Valores | Default |
+|---|:---:|---|---|---|
+| `--source` | ambas | — | `logs`, `metrics` | `logs` |
+| `--from` | ambas | `created_at >= valor` | RFC3339 | — |
+| `--to` | ambas | `created_at <= valor` | RFC3339 | — |
+| `--aggregate` | ambas | — | `none`, `hour`, `severity`, `tag`, `session`, `name` | `none` |
+| `--severity` | logs | `level = UPPERCASE(valor)` | `debug`, `info`, `warn`, `error`, `critical`, `metric` | — |
+| `--tag` | logs | `tag = valor` (exact match) | texto libre, UPPERCASE por convención | — |
+| `--session-id` | ambas | `session_id = valor` | UUID | — |
+| `--device-id` | ambas | `device_id = valor` | UUID o string | — |
+| `--user-id` | logs | `user_id = valor` | UUID | — |
+| `--contains` | logs | `message ilike *valor*` | texto libre (substring) | — |
+| `--package` | logs | `extra->>package_name = valor` | nombre de paquete | — |
+| `--error-code` | logs | `extra->>error_code = valor` | código de error | — |
+| `--anomaly-type` | logs | `extra->>anomaly_type = valor` | tipo de anomalía | — |
+| `--name` | metrics | `name = valor` | nombre de métrica | — |
+| `--limit` | ambas | — | 1-1000 | `100` |
+| `--output` | — | — | `text`, `json`, `agent` | `text` |
+
+#### Modos de agregación
+
+| Modo | Fuente | Agrupa por | Columna |
 |---|:---:|---|---|
-| `--source` | ✅ | `logs`, `metrics` | `--source logs` |
-| `--from` | ❌ | RFC3339 | `--from 2026-01-01T00:00:00Z` |
-| `--to` | ❌ | RFC3339 | `--to 2026-01-02T00:00:00Z` |
-| `--aggregate` | ❌ | `none`, `hour`, `severity`, `tag`, `session`, `name` | `--aggregate severity` |
-| `--severity` | ❌ (logs) | `debug`, `info`, `warn`, `error`, `critical`, `metric` | `--severity error` |
-| `--tag` | ❌ (logs) | texto libre | `--tag PAYMENT` |
-| `--anomaly-type` | ❌ (logs) | texto libre | `--anomaly-type slow_response` |
-| `--session-id` | ❌ | texto libre | `--session-id <uuid>` |
-| `--device-id` | ❌ | texto libre | `--device-id <id>` |
-| `--user-id` | ❌ (logs) | texto libre | `--user-id <id>` |
-| `--package` | ❌ (logs) | texto libre | `--package com.company.billing` |
-| `--error-code` | ❌ (logs) | texto libre | `--error-code E-42` |
-| `--contains` | ❌ (logs) | texto libre | `--contains timeout` |
-| `--name` | ❌ (metrics) | texto libre | `--name response_time_ms` |
-| `--limit` | ❌ | 1-1000 (default: 100) | `--limit 50` |
-| `--output` | ❌ | `text`, `json`, `agent` | `--output json` |
+| `none` | ambas | Sin agrupación — devuelve filas individuales | — |
+| `hour` | ambas | Hora truncada UTC | `created_at` |
+| `severity` | logs | Nivel de severidad | `level` |
+| `tag` | logs | Tag de dominio | `tag` |
+| `session` | ambas | Sesión | `session_id` |
+| `name` | metrics | Nombre de métrica | `name` |
 
 #### Ejemplos
 
-**A. Logs de error recientes**
 ```bash
-apploggers telemetry query \
-  --source logs \
-  --severity error \
-  --limit 50
-```
+# Logs de error recientes
+apploggers telemetry query --source logs --severity error --limit 50
 
-**B. Logs agregados por severidad en un rango de fechas**
-```bash
+# Logs de un dominio específico, agregados por hora
 apploggers telemetry query \
-  --source logs \
-  --aggregate severity \
-  --from 2026-01-01T00:00:00Z \
-  --to 2026-01-02T00:00:00Z \
+  --source logs --tag PAYMENT --aggregate hour \
+  --from 2026-01-01T00:00:00Z --to 2026-01-01T23:59:59Z \
   --output json
-```
 
-**C. Métricas de una sesión específica**
-```bash
+# Distribución de severidades en las últimas 24h
 apploggers telemetry query \
-  --source metrics \
-  --session-id <session-uuid> \
-  --aggregate name \
-  --limit 100 \
+  --source logs --aggregate severity \
+  --from 2026-01-01T00:00:00Z --to 2026-01-02T00:00:00Z \
   --output json
-```
 
-**D. Logs con tag PAYMENT agregados por hora**
-```bash
+# Reconstrucción completa de una sesión
 apploggers telemetry query \
-  --source logs \
-  --tag PAYMENT \
-  --aggregate hour \
-  --from 2026-01-01T00:00:00Z \
-  --to 2026-01-01T23:59:59Z
-```
+  --source logs --session-id <uuid> --limit 1000 --output json
 
-**E. Warnings por tipo de anomalía**
-```bash
+# Métricas de una sesión, agrupadas por nombre
 apploggers telemetry query \
-  --source logs \
-  --severity warn \
-  --anomaly-type slow_response \
-  --limit 25 \
-  --output json
-```
+  --source metrics --session-id <uuid> --aggregate name --output json
 
-**F. Segmentación por paquete y código de error**
-```bash
+# Logs de un dispositivo específico con anomalías de red
 apploggers telemetry query \
-  --source logs \
-  --package com.company.billing \
-  --error-code E-42 \
-  --contains timeout \
-  --severity error \
-  --limit 50 \
-  --output json
+  --source logs --device-id <id> --tag NETWORK \
+  --anomaly-type slow_response --output json
+
+# Búsqueda por texto en mensajes + código de error
+apploggers telemetry query \
+  --source logs --contains timeout \
+  --error-code E-42 --severity error \
+  --package com.company.billing --limit 50 --output json
+
+# Métricas de performance por nombre
+apploggers telemetry query \
+  --source metrics --name response_time_ms --aggregate name --output json
 ```
 
-Notas operativas:
+> Los filtros se combinan con AND — todos los flags activos deben cumplirse simultáneamente.
+> `--package`, `--error-code` y `--anomaly-type` filtran dentro del campo JSONB `extra`, no son columnas top-level.
 
-- Las consultas de `logs` devuelven el campo `extra` cuando existe.
-- `anomaly_type` no es una columna top-level; vive dentro de `extra.anomaly_type`.
+---
+
+### Columnas presentes en la DB pero no expuestas como flags
+
+Estas columnas existen en las tablas pero el CLI no tiene flags para filtrarlas directamente. Son accesibles via Supabase Dashboard o queries SQL directas.
+
+**`app_logs` — columnas sin flag CLI:**
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `throwable_type` | VARCHAR | Tipo de excepción (ej: `NullPointerException`) |
+| `throwable_msg` | TEXT | Mensaje de la excepción |
+| `stack_trace` | TEXT[] | Array de líneas del stack trace |
+| `device_info` | JSONB | Metadatos del dispositivo: `brand`, `model`, `os_version`, `platform`, `app_version`, `connection_type`, `is_tv`, `is_low_ram` |
+| `api_level` | INTEGER | Nivel API del dispositivo (Android: `Build.VERSION.SDK_INT`; iOS/JVM: `0`) |
+
+**`app_metrics` — campo sin flag CLI:**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `tags` | JSONB | Contexto de la métrica: `platform`, `app_version`, `device_model`, `screen_name` |
+
+> Filtrar por `tags` de métricas (ej: solo métricas de `platform=android`) requiere query SQL directa en Supabase. No hay flag CLI para ello.
 
 ---
 
 ### `apploggers telemetry agent-response`
 
-Salida compacta optimizada para agentes IA y automatización (formato TOON).
-
-#### Sintaxis
-
-```bash
-apploggers telemetry agent-response \
-  --source <logs|metrics> \
-  [--aggregate MODE] \
-  [--from TIMESTAMP] \
-  [--to TIMESTAMP] \
-  [--severity LEVEL] \
-  [--tag NAME] \
-  [--anomaly-type TYPE] \
-  [--session-id SESSION_ID] \
-  [--device-id DEVICE_ID] \
-  [--user-id USER_ID] \
-  [--name METRIC_NAME] \
-  [--limit N] \
-  [--preview-limit 0-50]
-```
-
-| Parámetro | Default | Propósito |
-|---|---|---|
-| `--preview-limit` | 5 | Filas de muestra en `rows_preview` |
-
-#### Ejemplo
+Salida compacta optimizada para agentes IA (formato TOON). Acepta los mismos flags de filtro que `query`, más `--preview-limit`.
 
 ```bash
 apploggers telemetry agent-response \
@@ -339,11 +474,13 @@ apploggers telemetry agent-response \
   --output agent
 ```
 
+| Parámetro | Default | Propósito |
+|---|---|---|
+| `--preview-limit` | 5 | Filas de muestra incluidas en `rows_preview` (0..50) |
+
 ---
 
 ## Modos de Salida
-
-El CLI soporta tres modos con `--output`:
 
 | Modo | Uso | Descripción |
 |---|---|---|
@@ -363,12 +500,9 @@ YESTERDAY=$(date -u -d '-1 day' '+%Y-%m-%dT00:00:00Z')
 TODAY=$(date -u '+%Y-%m-%dT00:00:00Z')
 
 apploggers telemetry query \
-  --source logs \
-  --severity error \
-  --from "$YESTERDAY" \
-  --to "$TODAY" \
-  --aggregate severity \
-  --output json > /tmp/daily-errors.json
+  --source logs --severity error \
+  --from "$YESTERDAY" --to "$TODAY" \
+  --aggregate severity --output json > /tmp/daily-errors.json
 
 jq '.rows | length' /tmp/daily-errors.json
 ```
@@ -377,11 +511,8 @@ jq '.rows | length' /tmp/daily-errors.json
 
 ```bash
 apploggers telemetry query \
-  --source logs \
-  --session-id "$SESSION_ID" \
-  --aggregate tag \
-  --limit 100 \
-  --output json | jq '.summary.buckets'
+  --source logs --session-id "$SESSION_ID" \
+  --aggregate tag --limit 100 --output json | jq '.summary.buckets'
 ```
 
 ### Health Check Automático (Cron)
@@ -394,8 +525,7 @@ if ! apploggers health --output json | jq -e '.ok' > /dev/null; then
 fi
 
 ERROR_COUNT=$(apploggers telemetry query \
-  --source logs \
-  --severity error \
+  --source logs --severity error \
   --from "$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ')" \
   --output json | jq '.count')
 
@@ -412,44 +542,16 @@ Ver [SKILL.md](../agents/applogger-cli-agent-operator/SKILL.md) para operación 
 
 ---
 
-## Variables de Entorno
+## Variables de Control
 
-### Variables primarias
-
-Estas son las variables que el CLI lee directamente. Se usan cuando no hay archivo `~/.apploggers/cli.json` configurado.
-
-| Variable | Requerida | Default | Propósito |
-|---|:---:|---|---|
-| `appLogger_supabaseUrl` | ✅ | — | URL del proyecto Supabase |
-| `appLogger_supabaseKey` | ✅ | — | API key `service_role` (solo backend/operaciones) |
-| `appLogger_supabaseSchema` | ❌ | `public` | Esquema PostgreSQL |
-| `appLogger_supabaseLogTable` | ❌ | `app_logs` | Nombre de la tabla de logs |
-| `appLogger_supabaseMetricTable` | ❌ | `app_metrics` | Nombre de la tabla de métricas |
-| `appLogger_supabaseTimeoutSeconds` | ❌ | `15` | Timeout HTTP en segundos (1-120) |
-
-### Variables de control de proyecto
+Estas variables controlan el comportamiento del CLI y son independientes de `cli.json`:
 
 | Variable | Propósito |
 |---|---|
-| `APPLOGGER_CONFIG` | Ruta al archivo JSON de proyectos (override de `~/.apploggers/cli.json`) |
-| `APPLOGGER_PROJECT` | Nombre del proyecto activo |
+| `APPLOGGER_CONFIG` | Ruta alternativa al archivo de proyectos (override de `~/.apploggers/cli.json`) |
+| `APPLOGGER_PROJECT` | Nombre del proyecto activo (override de `default_project`) |
 
-### Aliases de compatibilidad
-
-El CLI acepta estas variables como fallback en el mismo orden:
-
-| Alias | Variable primaria equivalente |
-|---|---|
-| `APPLOGGER_SUPABASE_URL` | `appLogger_supabaseUrl` |
-| `APPLOGGER_SUPABASE_KEY` | `appLogger_supabaseKey` |
-| `APPLOGGER_SUPABASE_SCHEMA` | `appLogger_supabaseSchema` |
-| `APPLOGGER_SUPABASE_LOG_TABLE` | `appLogger_supabaseLogTable` |
-| `APPLOGGER_SUPABASE_METRIC_TABLE` | `appLogger_supabaseMetricTable` |
-| `APPLOGGER_SUPABASE_TIMEOUT_SECONDS` | `appLogger_supabaseTimeoutSeconds` |
-| `SUPABASE_URL` | `appLogger_supabaseUrl` |
-| `SUPABASE_KEY` | `appLogger_supabaseKey` |
-
-> El CLI requiere `service_role` para consultas `SELECT` con RLS activa. No uses anon/publishable key en `appLogger_supabaseKey`.
+> Las variables de entorno directas para URL y key (`APPLOGGER_SUPABASE_URL`, `APPLOGGER_SUPABASE_KEY`, etc.) están deprecadas para uso local. Solo se mantienen por compatibilidad hacia atrás y se leen únicamente cuando `~/.apploggers/cli.json` no existe. Configurar siempre a través del archivo.
 
 ---
 
@@ -465,26 +567,9 @@ El CLI acepta estas variables como fallback en el mismo orden:
 
 ## Referencia
 
-### Agregaciones Disponibles
-
-| Modo | Fuente | Agrupa por |
-|---|---|---|
-| `none` | logs, metrics | Sin agrupación — devuelve filas individuales |
-| `hour` | logs, metrics | Hora (`created_at`) |
-| `severity` | logs | Nivel (`level`) |
-| `tag` | logs | Tag (`tag`) |
-| `session` | logs, metrics | Sesión (`session_id`) |
-| `name` | metrics | Nombre de métrica (`name`) |
-
 ### Formato de Timestamp
 
 Los filtros `--from` y `--to` usan RFC3339 (ISO 8601):
-
-```
-2026-01-01T10:30:45Z        ← UTC exacto
-2026-01-01T10:30:45+00:00   ← UTC con offset
-2026-01-01T10:30:45-05:00   ← Hora local (convertida a UTC internamente)
-```
 
 ```bash
 # Fecha actual en RFC3339

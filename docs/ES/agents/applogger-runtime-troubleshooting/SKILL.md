@@ -25,6 +25,9 @@ Do not use this skill when:
 2. Prioritize smallest reversible fix first.
 3. Verify `local.properties` keys and add only missing AppLogger keys if needed.
 4. Never modify unrelated existing variables in `local.properties`.
+5. When diagnosing health, always check `lastSuccessfulFlushTimestamp` to detect silent outages.
+6. `consecutiveFailures` resets only on a fully successful flush — a partial success does not reset it.
+7. `isStale()` on the snapshot indicates the health data may be outdated — re-call `snapshot()` if stale.
 
 ## Workflow
 

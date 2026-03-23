@@ -2,6 +2,7 @@ package com.applogger.core.internal
 
 import com.applogger.core.model.LogEvent
 import com.applogger.core.model.LogLevel
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -69,7 +70,12 @@ class JsonLogFormatterTest {
 
     @Test
     fun `format handles event with extra data`() {
-        val event = buildEvent().copy(extra = mapOf("key1" to "val1", "key2" to "val2"))
+        val event = buildEvent().copy(
+            extra = mapOf(
+                "key1" to JsonPrimitive("val1"),
+                "key2" to JsonPrimitive("val2")
+            )
+        )
         val json = formatter.format(event)
         assertTrue(json.contains("\"key1\":\"val1\""))
         assertTrue(json.contains("\"key2\":\"val2\""))

@@ -8,10 +8,16 @@ CREATE TABLE IF NOT EXISTS offline_logs (
     throwable_msg TEXT,
     stack_trace TEXT,
     device_info TEXT NOT NULL DEFAULT '{}',
+    device_id TEXT NOT NULL DEFAULT '',
     session_id TEXT NOT NULL,
     user_id TEXT,
+    environment TEXT NOT NULL DEFAULT 'production',
     extra TEXT,
     sdk_version TEXT NOT NULL DEFAULT '0.0.0',
+    metric_name TEXT,
+    metric_value REAL,
+    metric_unit TEXT,
+    metric_tags TEXT,
     created_at INTEGER NOT NULL DEFAULT 0
 );
 
@@ -19,11 +25,14 @@ CREATE INDEX IF NOT EXISTS idx_offline_logs_created_at ON offline_logs(created_a
 CREATE INDEX IF NOT EXISTS idx_offline_logs_level ON offline_logs(level);
 
 insert:
-INSERT OR REPLACE INTO offline_logs(id, timestamp, level, tag, message, throwable_type, throwable_msg, stack_trace, device_info, session_id, user_id, extra, sdk_version, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-
-selectAll:
-SELECT * FROM offline_logs ORDER BY created_at ASC;
+INSERT OR REPLACE INTO offline_logs(
+    id, timestamp, level, tag, message,
+    throwable_type, throwable_msg, stack_trace,
+    device_info, device_id, session_id, user_id, environment, extra, sdk_version,
+    metric_name, metric_value, metric_unit, metric_tags,
+    created_at
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectOldest:
 SELECT * FROM offline_logs ORDER BY created_at ASC LIMIT ?;

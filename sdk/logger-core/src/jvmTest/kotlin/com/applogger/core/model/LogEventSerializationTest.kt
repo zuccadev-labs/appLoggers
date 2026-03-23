@@ -2,6 +2,7 @@ package com.applogger.core.model
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -75,7 +76,10 @@ class LogEventSerializationTest {
             message = "Started",
             deviceInfo = testDeviceInfo,
             sessionId = "session-ghi",
-            extra = mapOf("content_id" to "movie_123", "quality" to "4K")
+            extra = mapOf(
+                "content_id" to JsonPrimitive("movie_123"),
+                "quality" to JsonPrimitive("4K")
+            )
         )
 
         val encoded = json.encodeToString(event)
@@ -141,5 +145,30 @@ class LogEventSerializationTest {
         )
         val encoded = json.encodeToString(event)
         assertTrue(encoded.contains("device-custom-001"))
+    }
+
+    @Test
+    fun `LogEvent environment field serializes and defaults to production`() {
+        val event = LogEvent(
+            id = "uuid-env", timestamp = 0L, level = LogLevel.INFO,
+            tag = "T", message = "m", deviceInfo = testDeviceInfo,
+            sessionId = "s"
+        )
+        val encoded = json.encodeToString(event)
+        assertTrue(encoded.contains("\"environment\":\"production\""))
+
+        val decoded = json.decodeFromString<LogEvent>(encoded)
+        assertEquals("production", decoded.environment)
+    }
+
+    @Test
+    fun `LogEvent environment staging serializes correctly`() {
+        val event = LogEvent(
+            id = "uuid-staging", timestamp = 0L, level = LogLevel.INFO,
+            tag = "T", message = "m", deviceInfo = testDeviceInfo,
+            sessionId = "s", environment = "staging"
+        )
+        val encoded = json.encodeToString(event)
+        assertTrue(encoded.contains("\"environment\":\"staging\""))
     }
 }

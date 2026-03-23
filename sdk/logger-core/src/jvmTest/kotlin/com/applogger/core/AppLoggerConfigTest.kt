@@ -14,6 +14,7 @@ class AppLoggerConfigTest {
 
         assertEquals("", config.endpoint)
         assertEquals("", config.apiKey)
+        assertEquals("production", config.environment)
         assertTrue(config.isDebugMode)
         assertTrue(config.consoleOutput)
         assertEquals(20, config.batchSize)
@@ -28,6 +29,7 @@ class AppLoggerConfigTest {
         val config = AppLoggerConfig.Builder()
             .endpoint("https://example.supabase.co")
             .apiKey("test-key")
+            .environment("staging")
             .debugMode(false)
             .consoleOutput(false)
             .batchSize(50)
@@ -39,6 +41,7 @@ class AppLoggerConfigTest {
 
         assertEquals("https://example.supabase.co", config.endpoint)
         assertEquals("test-key", config.apiKey)
+        assertEquals("staging", config.environment)
         assertFalse(config.isDebugMode)
         assertFalse(config.consoleOutput)
         assertEquals(50, config.batchSize)
@@ -154,5 +157,103 @@ class AppLoggerConfigTest {
         val config1 = AppLoggerConfig.Builder().debugMode(true).build()
         val config2 = AppLoggerConfig.Builder().debugMode(true).build()
         assertEquals(config1, config2)
+    }
+
+    @Test
+    fun `environment defaults to production`() {
+        val config = AppLoggerConfig.Builder().debugMode(true).build()
+        assertEquals("production", config.environment)
+    }
+
+    @Test
+    fun `environment can be set to staging`() {
+        val config = AppLoggerConfig.Builder().environment("staging").debugMode(true).build()
+        assertEquals("staging", config.environment)
+    }
+
+    @Test
+    fun `environment blank string falls back to production`() {
+        val config = AppLoggerConfig.Builder().environment("   ").debugMode(true).build()
+        assertEquals("production", config.environment)
+    }
+
+    // --- validate() tests (C2) ---
+
+    @Test
+    fun `validate returns empty list for valid production config`() {
+        val config = AppLoggerConfig.Builder()
+            .endpoint("https://xyz.supabase.co")
+            .apiKey("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
+            .environment("production")
+            .debugMode(false)
+            .build()
+        assertTrue(config.validate().isEmpty())
+    }
+
+    @Test
+    fun `validate warns when endpoint is blank`() {
+        val config = AppLoggerConfig.Builder().debugMode(true).build()
+        val issues = config.validate()
+        assertTrue(issues.any { it.contains("endpoint is blank") })
+    }
+
+    @Test
+    fun `validate warns when apiKey is blank`() {
+        val config = AppLoggerConfig.Builder()
+            .endpoint("https://xyz.supabase.co")
+            .debugMode(true)
+            .build()
+        val issues = config.validate()
+        assertTrue(issues.any { it.contains("apiKey is blank") })
+    }
+
+    @Test
+    fun `validate warns when apiKey does not look like JWT`() {
+        val config = AppLoggerConfig.Builder()
+            .endpoint("https://xyz.supabase.co")
+            .apiKey("not-a-jwt")
+            .debugMode(true)
+            .build()
+        val issues = config.validate()
+        assertTrue(issues.any { it.contains("does not look like a JWT") })
+    }
+
+    @Test
+    fun `validate warns when debug mode is true in production environment`() {
+        val config = AppLoggerConfig.Builder()
+            .endpoint("https://xyz.supabase.co")
+            .apiKey("eyJtest")
+            .environment("production")
+            .debugMode(true)
+            .build()
+        val issues = config.validate()
+        assertTrue(issues.any { it.contains("isDebugMode=true") && it.contains("production") })
+    }
+
+    @Test
+    fun `validate warns on large batchSize with short flushInterval`() {
+        val config = AppLoggerConfig.Builder()
+            .endpoint("https://xyz.supabase.co")
+            .apiKey("eyJtest")
+            .environment("staging")
+            .debugMode(false)
+            .batchSize(50)
+            .flushIntervalSeconds(5)
+            .build()
+        val issues = config.validate()
+        assertTrue(issues.any { it.contains("batchSize=50") })
+    }
+
+    @Test
+    fun `validate warns when batchSize is 1`() {
+        val config = AppLoggerConfig.Builder()
+            .endpoint("https://xyz.supabase.co")
+            .apiKey("eyJtest")
+            .environment("staging")
+            .debugMode(true)
+            .batchSize(1)
+            .build()
+        val issues = config.validate()
+        assertTrue(issues.any { it.contains("batchSize=1") })
     }
 }

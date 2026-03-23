@@ -1,6 +1,7 @@
 package com.applogger.core
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.applogger.core.internal.*
 import kotlin.concurrent.Volatile
@@ -42,9 +43,23 @@ object AppLoggerSDK : AppLogger {
     @Volatile
     private var implRef: AppLoggerImpl? = null
 
+    @Volatile
+    private var sessionManagerRef: SessionManager? = null
+
     /**
      * Initializes the SDK. Must be called exactly once, in `Application.onCreate()`.
      * Subsequent calls are silently ignored (idempotent).
+     *
+     * ## Debug mode via APPLOGGER_DEBUG
+     * If the app's `AndroidManifest.xml` (or `gradle.properties`) define
+     * `APPLOGGER_DEBUG=true` as a manifest placeholder or BuildConfig field,
+     * the SDK activates debug mode and logcat output automatically.
+     * When absent or `false`, logcat is suppressed regardless of [AppLoggerConfig.consoleOutput].
+     *
+     * ```xml
+     * <!-- AndroidManifest.xml -->
+     * <meta-data android:name="APPLOGGER_DEBUG" android:value="${APPLOGGER_DEBUG}" />
+     * ```
      *
      * @param context   Android [Context]; the application context will be extracted.
      * @param config    SDK configuration built via [AppLoggerConfig.Builder].
@@ -58,33 +73,26 @@ object AppLoggerSDK : AppLogger {
         if (!isInitialized.compareAndSet(false, true)) return
 
         val appContext = context.applicationContext
+        val resolvedConfig = resolveConfig(appContext, config)
         val platform = PlatformDetector.detect(appContext)
-        val resolvedConfig = if (platform.isLowResource) config.resolveForLowResource() else config
 
-        val deviceInfoProvider = AndroidDeviceInfoProvider(appContext, platform)
-        val deviceInfo = deviceInfoProvider.get()
+        val deviceInfo = AndroidDeviceInfoProvider(appContext, platform).get()
         val sessionManager = SessionManager()
         val filter = ChainedLogFilter(
             listOf(RateLimitFilter(if (platform.isLowResource) 30 else 120))
         )
-
         val bufferCapacity = computeBufferCapacity(appContext, platform, resolvedConfig)
-
         val buffer = InMemoryBuffer(
             maxCapacity = bufferCapacity,
             overflowPolicy = resolvedConfig.bufferOverflowPolicy
         )
-
-        val resolvedTransport = transport ?: NoOpTransport()
-        val formatter = JsonLogFormatter()
-
         val processor = BatchProcessor(
             buffer = buffer,
-            transport = resolvedTransport,
-            formatter = formatter,
-            config = resolvedConfig
+            transport = transport ?: NoOpTransport(),
+            formatter = JsonLogFormatter(prettyPrint = resolvedConfig.isDebugMode),
+            config = resolvedConfig,
+            offlineStorage = buildOfflineStorage(appContext, resolvedConfig)
         )
-
         val impl = AppLoggerImpl(
             deviceInfo = deviceInfo,
             sessionManager = sessionManager,
@@ -95,16 +103,29 @@ object AppLoggerSDK : AppLogger {
 
         instance = impl
         implRef = impl
+        sessionManagerRef = sessionManager
+        updateHealthReferences(processor, transport ?: NoOpTransport(), buffer, bufferCapacity)
 
-        updateHealthReferences(processor, resolvedTransport, buffer, bufferCapacity)
+        if (!resolvedConfig.isDebugMode) AndroidCrashHandler(impl).install()
+        registerLifecycleObservers(impl, sessionManager)
+    }
 
-        if (!resolvedConfig.isDebugMode) {
-            val crashHandler = AndroidCrashHandler(impl)
-            crashHandler.install()
-        }
+    private fun resolveConfig(appContext: Context, config: AppLoggerConfig): AppLoggerConfig {
+        val debugFlag = readAppLoggerDebugFlag(appContext)
+        val withDebug = if (debugFlag && !config.isDebugMode) config.copy(isDebugMode = true) else config
+        val platform = PlatformDetector.detect(appContext)
+        return if (platform.isLowResource) withDebug.resolveForLowResource() else withDebug
+    }
 
+    private fun registerLifecycleObservers(impl: AppLoggerImpl, sessionManager: SessionManager) {
         ProcessLifecycleOwner.get().lifecycle.addObserver(
-            AppLoggerLifecycleObserver { impl.flush() }
+            AppLoggerLifecycleObserver {
+                impl.flush()
+                sessionManager.onBackground()
+            }
+        )
+        ProcessLifecycleOwner.get().lifecycle.addObserver(
+            AppLoggerForegroundObserver { sessionManager.onForeground() }
         )
     }
 
@@ -148,6 +169,85 @@ object AppLoggerSDK : AppLogger {
     fun clearDeviceId() {
         implRef?.clearDeviceId()
     }
+
+    override fun addGlobalExtra(key: String, value: String) {
+        implRef?.addGlobalExtra(key, value)
+    }
+
+    override fun removeGlobalExtra(key: String) {
+        implRef?.removeGlobalExtra(key)
+    }
+
+    override fun clearGlobalExtra() {
+        implRef?.clearGlobalExtra()
+    }
+
+    /**
+     * Fuerza el inicio de una nueva sesión inmediatamente.
+     *
+     * Útil en eventos de login/logout, inicio de onboarding, o cuando el producto
+     * necesita separar sesiones lógicas independientemente del tiempo en background.
+     *
+     * ```kotlin
+     * // Al hacer login
+     * AppLoggerSDK.setAnonymousUserId(user.id)
+     * AppLoggerSDK.newSession()
+     * ```
+     */
+    fun newSession() {
+        sessionManagerRef?.rotate()
+    }
+
+    /**
+     * Resets the SDK to its uninitialized state.
+     *
+     * **FOR TESTING ONLY.** Allows re-initialization between test cases.
+     * Never call this in production code.
+     */
+    @VisibleForTesting
+    fun reset() {
+        isInitialized.set(false)
+        instance = NoOpLogger()
+        implRef = null
+        sessionManagerRef = null
+        AppLoggerHealth.initialized = false
+        AppLoggerHealth.processor = null
+        AppLoggerHealth.transport = null
+        AppLoggerHealth.buffer = null
+    }
+
+    /**
+     * Lee el flag APPLOGGER_DEBUG del manifest meta-data.
+     * Permite activar debug mode sin cambiar código — solo con una variable de entorno
+     * o manifest placeholder en el build.
+     *
+     * Configuración en AndroidManifest.xml:
+     * ```xml
+     * <meta-data android:name="APPLOGGER_DEBUG" android:value="${APPLOGGER_DEBUG}" />
+     * ```
+     *
+     * Configuración en build.gradle:
+     * ```groovy
+     * manifestPlaceholders = [APPLOGGER_DEBUG: System.getenv("APPLOGGER_DEBUG") ?: "false"]
+     * ```
+     */
+    private fun readAppLoggerDebugFlag(context: Context): Boolean {
+        return try {
+            val appInfo = context.packageManager.getApplicationInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_META_DATA
+            )
+            appInfo.metaData?.getString("APPLOGGER_DEBUG")?.equals("true", ignoreCase = true) ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun buildOfflineStorage(context: Context, config: AppLoggerConfig): OfflineStorage =
+        when (config.offlinePersistenceMode) {
+            OfflinePersistenceMode.NONE -> NoOpOfflineStorage
+            else -> SqliteOfflineStorage(context)
+        }
 
     private fun computeBufferCapacity(
         appContext: Context,
@@ -203,4 +303,41 @@ internal class NoOpTransport : LogTransport {
     override suspend fun send(events: List<com.applogger.core.model.LogEvent>): TransportResult =
         TransportResult.Success
     override fun isAvailable(): Boolean = false
+}
+
+/**
+ * Returns a network availability provider backed by Android's [ConnectivityManager].
+ *
+ * Pass this to [com.applogger.transport.supabase.SupabaseTransport] to avoid
+ * retry loops when the device is offline:
+ *
+ * ```kotlin
+ * val transport = SupabaseTransport(
+ *     endpoint = url,
+ *     apiKey = key,
+ *     networkAvailabilityProvider = androidNetworkAvailabilityProvider(context)
+ * )
+ * AppLoggerSDK.initialize(context, config, transport)
+ * ```
+ *
+ * The returned lambda uses cached network state — no I/O on the calling thread.
+ */
+fun androidNetworkAvailabilityProvider(context: Context): () -> Boolean {
+    val appContext = context.applicationContext
+    return {
+        try {
+            val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+                as? android.net.ConnectivityManager
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val network = cm?.activeNetwork
+                val caps = cm?.getNetworkCapabilities(network)
+                caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            } else {
+                @Suppress("DEPRECATION")
+                cm?.activeNetworkInfo?.isConnected == true
+            }
+        } catch (_: Exception) {
+            true // Fail open — let the transport attempt and handle the error
+        }
+    }
 }

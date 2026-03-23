@@ -1,5 +1,8 @@
 package com.applogger.core
 
+private const val LARGE_BATCH_THRESHOLD = 50
+private const val SHORT_FLUSH_THRESHOLD = 10
+
 /**
  * Immutable configuration for the AppLogger SDK.
  *
@@ -10,19 +13,33 @@ package com.applogger.core
  *
  * In production mode ([isDebugMode] = false), [endpoint] must use HTTPS.
  *
+ * ## Debug mode via environment variable
+ * Setting `APPLOGGER_DEBUG=true` in the build environment (or as a manifest
+ * placeholder) activates debug mode and logcat output automatically, without
+ * changing code. When `APPLOGGER_DEBUG` is absent or `false`, logcat output
+ * is suppressed regardless of [consoleOutput].
+ *
  * ## Example
  * ```kotlin
  * val config = AppLoggerConfig.Builder()
  *     .endpoint("https://xyz.supabase.co")
  *     .apiKey("eyJ...")
+ *     .minLevel(LogMinLevel.WARN)   // solo WARN, ERROR, CRITICAL en producción
  *     .batchSize(10)
  *     .build()
  * ```
  *
  * @property endpoint     Supabase project URL (HTTPS required in production).
  * @property apiKey       Supabase anon key for authentication.
+ * @property environment  Deployment environment label (e.g. "production", "staging", "development").
+ *                        Attached to every event — enables filtering QA vs production in Supabase.
+ *                        Default: `"production"`.
  * @property isDebugMode  Enables debug logging and relaxes HTTPS requirement.
- * @property consoleOutput Prints events to logcat/console when true.
+ *                        Automatically true when `APPLOGGER_DEBUG=true`.
+ * @property consoleOutput Prints events to logcat/console when true AND [isDebugMode] is true.
+ *                         In production ([isDebugMode]=false) logcat is always suppressed.
+ * @property minLevel     Minimum level to process. Events below this level are discarded
+ *                        before entering the pipeline. Default: [LogMinLevel.DEBUG] (all events).
  * @property batchSize    Number of events per transport batch (1–100).
  * @property flushIntervalSeconds Seconds between periodic flushes (5–300).
  * @property maxStackTraceLines Maximum stack trace lines per event (1–100).
@@ -35,8 +52,10 @@ package com.applogger.core
 data class AppLoggerConfig(
     val endpoint: String,
     val apiKey: String,
+    val environment: String,
     val isDebugMode: Boolean,
     val consoleOutput: Boolean,
+    val minLevel: LogMinLevel,
     val batchSize: Int,
     val flushIntervalSeconds: Int,
     val maxStackTraceLines: Int,
@@ -49,8 +68,10 @@ data class AppLoggerConfig(
     class Builder {
         private var endpoint: String = ""
         private var apiKey: String = ""
+        private var environment: String = "production"
         private var isDebugMode: Boolean = false
         private var consoleOutput: Boolean = true
+        private var minLevel: LogMinLevel = LogMinLevel.DEBUG
         private var batchSize: Int = 20
         private var flushIntervalSeconds: Int = 30
         private var maxStackTraceLines: Int = 50
@@ -62,8 +83,10 @@ data class AppLoggerConfig(
 
         fun endpoint(url: String) = apply { endpoint = url }
         fun apiKey(key: String) = apply { apiKey = key }
+        fun environment(env: String) = apply { environment = env.trim().ifBlank { "production" } }
         fun debugMode(debug: Boolean) = apply { isDebugMode = debug }
         fun consoleOutput(enabled: Boolean) = apply { consoleOutput = enabled }
+        fun minLevel(level: LogMinLevel) = apply { minLevel = level }
         fun batchSize(size: Int) = apply { batchSize = size }
         fun flushIntervalSeconds(sec: Int) = apply { flushIntervalSeconds = sec }
         fun maxStackTraceLines(lines: Int) = apply { maxStackTraceLines = lines }
@@ -80,8 +103,10 @@ data class AppLoggerConfig(
             return AppLoggerConfig(
                 endpoint = endpoint,
                 apiKey = apiKey,
+                environment = environment,
                 isDebugMode = isDebugMode,
                 consoleOutput = consoleOutput,
+                minLevel = minLevel,
                 batchSize = batchSize.coerceIn(1, 100),
                 flushIntervalSeconds = flushIntervalSeconds.coerceIn(5, 300),
                 maxStackTraceLines = maxStackTraceLines.coerceIn(1, 100),
@@ -95,6 +120,62 @@ data class AppLoggerConfig(
     }
 
     /**
+     * Returns a list of human-readable validation warnings/errors for this config.
+     *
+     * An empty list means the config is valid. Non-empty list contains actionable messages
+     * that should be logged or surfaced to the developer during initialization.
+     *
+     * ```kotlin
+     * val issues = config.validate()
+     * if (issues.isNotEmpty()) {
+     *     issues.forEach { Log.w("AppLogger", "Config issue: $it") }
+     * }
+     * ```
+     */
+    fun validate(): List<String> {
+        val issues = mutableListOf<String>()
+
+        // Endpoint checks
+        if (endpoint.isBlank()) {
+            issues += "endpoint is blank — events will not be delivered"
+        } else if (!endpoint.startsWith("https://") && !isDebugMode) {
+            issues += "endpoint '$endpoint' does not use HTTPS — required in production"
+        } else if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
+            issues += "endpoint '$endpoint' does not look like a valid URL"
+        }
+
+        // API key checks
+        if (apiKey.isBlank()) {
+            issues += "apiKey is blank — Supabase requests will be rejected (401)"
+        } else if (!apiKey.startsWith("eyJ")) {
+            issues += "apiKey does not look like a JWT (expected to start with 'eyJ') — verify your Supabase anon key"
+        }
+
+        // Environment label
+        if (environment.isBlank()) {
+            issues += "environment is blank — events will have no environment label"
+        }
+
+        // Batch size vs flush interval coherence
+        if (batchSize >= LARGE_BATCH_THRESHOLD && flushIntervalSeconds <= SHORT_FLUSH_THRESHOLD) {
+            issues += "batchSize=$batchSize with flushIntervalSeconds=$flushIntervalSeconds " +
+                "may cause large bursts — consider increasing flushIntervalSeconds or reducing batchSize"
+        }
+        if (batchSize == 1) {
+            issues += "batchSize=1 disables batching — every event triggers a network request; " +
+                "use only for debugging"
+        }
+
+        // Debug mode in production warning
+        if (isDebugMode && environment == "production") {
+            issues += "isDebugMode=true with environment='production' — " +
+                "debug mode should not be active in production builds"
+        }
+
+        return issues
+    }
+
+    /**
      * Ajusta los valores por defecto según la plataforma detectada.
      */
     internal fun resolveForLowResource(): AppLoggerConfig {
@@ -105,6 +186,30 @@ data class AppLoggerConfig(
             flushOnlyWhenIdle = true
         )
     }
+}
+
+/**
+ * Nivel mínimo de log que el SDK procesa.
+ *
+ * Eventos por debajo de este nivel son descartados antes de entrar al pipeline,
+ * sin coste de serialización ni red.
+ *
+ * | Valor       | Eventos procesados                        |
+ * |-------------|-------------------------------------------|
+ * | DEBUG       | Todos (default en debug mode)             |
+ * | INFO        | INFO, WARN, ERROR, CRITICAL, METRIC       |
+ * | WARN        | WARN, ERROR, CRITICAL, METRIC             |
+ * | ERROR       | ERROR, CRITICAL, METRIC                   |
+ * | CRITICAL    | Solo CRITICAL y METRIC                    |
+ *
+ * METRIC siempre pasa independientemente del nivel configurado.
+ */
+enum class LogMinLevel {
+    DEBUG,
+    INFO,
+    WARN,
+    ERROR,
+    CRITICAL
 }
 
 /**

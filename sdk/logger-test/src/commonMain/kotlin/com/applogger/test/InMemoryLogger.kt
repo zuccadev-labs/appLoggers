@@ -22,11 +22,20 @@ class InMemoryLogger : AppLogger {
         val tag: String,
         val message: String,
         val throwable: Throwable? = null,
-        val extra: Map<String, Any>? = null
+        val extra: Map<String, Any>? = null,
+        val anomalyType: String? = null,
+        // Campos de métrica — solo populados cuando level == METRIC
+        val metricName: String? = null,
+        val metricValue: Double? = null,
+        val metricUnit: String? = null,
+        val metricTags: Map<String, String>? = null
     )
 
     private val _logs = mutableListOf<LogEntry>()
     val logs: List<LogEntry> get() = _logs.toList()
+
+    // Global extra — funcional para que los tests de propagación funcionen
+    private val globalExtra = mutableMapOf<String, String>()
 
     val debugCount get() = _logs.count { it.level == LogLevel.DEBUG }
     val infoCount get() = _logs.count { it.level == LogLevel.INFO }
@@ -39,11 +48,11 @@ class InMemoryLogger : AppLogger {
     val lastCritical get() = _logs.lastOrNull { it.level == LogLevel.CRITICAL }
 
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
-        _logs.add(LogEntry(LogLevel.DEBUG, tag, message, throwable, extra))
+        _logs.add(LogEntry(LogLevel.DEBUG, tag, message, throwable, mergeExtra(extra)))
     }
 
     override fun info(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
-        _logs.add(LogEntry(LogLevel.INFO, tag, message, throwable, extra))
+        _logs.add(LogEntry(LogLevel.INFO, tag, message, throwable, mergeExtra(extra)))
     }
 
     override fun warn(
@@ -53,22 +62,43 @@ class InMemoryLogger : AppLogger {
         anomalyType: String?,
         extra: Map<String, Any>?
     ) {
-        _logs.add(LogEntry(LogLevel.WARN, tag, message, throwable, extra))
+        _logs.add(LogEntry(LogLevel.WARN, tag, message, throwable, mergeExtra(extra), anomalyType = anomalyType))
     }
 
     override fun error(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
-        _logs.add(LogEntry(LogLevel.ERROR, tag, message, throwable, extra))
+        _logs.add(LogEntry(LogLevel.ERROR, tag, message, throwable, mergeExtra(extra)))
     }
 
     override fun critical(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
-        _logs.add(LogEntry(LogLevel.CRITICAL, tag, message, throwable, extra))
+        _logs.add(LogEntry(LogLevel.CRITICAL, tag, message, throwable, mergeExtra(extra)))
     }
 
     override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) {
-        _logs.add(LogEntry(LogLevel.METRIC, "METRIC", "$name=$value $unit"))
+        _logs.add(
+            LogEntry(
+                level = LogLevel.METRIC,
+                tag = "METRIC",
+                message = "$name=$value $unit",
+                metricName = name,
+                metricValue = value,
+                metricUnit = unit,
+                metricTags = tags
+            )
+        )
     }
 
     override fun flush() = Unit
+    override fun addGlobalExtra(key: String, value: String) { globalExtra[key] = value }
+    override fun removeGlobalExtra(key: String) { globalExtra.remove(key) }
+    override fun clearGlobalExtra() { globalExtra.clear() }
+
+    /** Merges globalExtra (lower priority) with per-call extra (higher priority). */
+    private fun mergeExtra(extra: Map<String, Any>?): Map<String, Any>? {
+        if (globalExtra.isEmpty()) return extra
+        val merged = globalExtra.toMutableMap<String, Any>()
+        extra?.forEach { (k, v) -> merged[k] = v }
+        return merged.ifEmpty { null }
+    }
 
     fun assertLogged(level: LogLevel, tag: String? = null) {
         val found = _logs.any { it.level == level && (tag == null || it.tag == tag) }
@@ -78,6 +108,38 @@ class InMemoryLogger : AppLogger {
     fun assertNotLogged(level: LogLevel) {
         val found = _logs.any { it.level == level }
         check(!found) { "Expected no log with level=$level but found ${_logs.count { it.level == level }}" }
+    }
+
+    /**
+     * Verifica que se registró un WARN con el anomalyType dado.
+     */
+    fun assertWarnWithAnomaly(anomalyType: String, tag: String? = null) {
+        val found = _logs.any { entry ->
+            entry.level == LogLevel.WARN &&
+                entry.anomalyType == anomalyType &&
+                (tag == null || entry.tag == tag)
+        }
+        check(found) { "Expected WARN with anomalyType=$anomalyType tag=$tag but none found" }
+    }
+
+    /**
+     * Verifica que se registró una métrica con el nombre dado.
+     * Opcionalmente valida valor, unidad y tags específicos.
+     */
+    fun assertMetric(
+        name: String,
+        value: Double? = null,
+        unit: String? = null,
+        tag: String? = null
+    ) {
+        val found = _logs.any { entry ->
+            entry.level == LogLevel.METRIC &&
+                entry.metricName == name &&
+                (value == null || entry.metricValue == value) &&
+                (unit == null || entry.metricUnit == unit) &&
+                (tag == null || entry.metricTags?.containsValue(tag) == true)
+        }
+        check(found) { "Expected metric name=$name value=$value unit=$unit but none found" }
     }
 
     fun clear() {

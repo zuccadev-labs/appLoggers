@@ -33,13 +33,20 @@ Documentación para desarrolladores que consumen `AppLogger` en sus aplicaciones
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        val transport = SupabaseTransport(
+            endpoint = BuildConfig.LOGGER_URL,
+            apiKey = BuildConfig.LOGGER_KEY,
+            networkAvailabilityProvider = androidNetworkAvailabilityProvider(this)
+        )
         AppLoggerSDK.initialize(
             context = this,
             config = AppLoggerConfig.Builder()
                 .endpoint(BuildConfig.LOGGER_URL)
                 .apiKey(BuildConfig.LOGGER_KEY)
+                .environment("production")
                 .debugMode(BuildConfig.DEBUG)
-                .build()
+                .build(),
+            transport = transport
         )
     }
 }
@@ -194,10 +201,12 @@ Para el pipeline de producción, las credenciales se inyectan como secrets:
 
 | `APPLOGGER_DEBUG` | `appLogger_logToConsole` | Resultado |
 |---|---|---|
-| `true` | `true` | Logs a Logcat + backend (doble envío) |
-| `true` | `false` | Solo a Logcat (desarrollo sin red) |
-| `false` | `true` | Solo a backend (producción con verbose) |
+| `true` | `true` | Logs a Logcat **y** backend (ambos destinos activos) |
+| `true` | `false` | Solo a backend (debug mode sin consola) |
+| `false` | `true` | Solo a backend — Logcat suprimido en producción independientemente de `consoleOutput` |
 | `false` | `false` | Solo a backend (producción normal) |
+
+> En producción (`isDebugMode=false`), Logcat está **siempre suprimido** sin importar el valor de `consoleOutput`. El flag `consoleOutput` solo tiene efecto cuando `isDebugMode=true`.
 
 Para desactivar completamente el envío de datos (modo offline-only), no configurar `APPLOGGER_URL` o dejarlo vacío. El SDK operará solo con SQLite local.
 
@@ -219,10 +228,12 @@ class MyApp : Application() {
                 .apiKey(BuildConfig.LOGGER_KEY)
                 .debugMode(BuildConfig.LOGGER_DEBUG_MODE)
                 .consoleOutput(BuildConfig.LOGGER_CONSOLE_OUTPUT)
+                .environment("production")              // filtra QA vs prod en Supabase
+                .minLevel(LogMinLevel.INFO)             // descarta DEBUG en producción
                 .batchSize(BuildConfig.LOGGER_BATCH_SIZE)
                 .flushIntervalSeconds(BuildConfig.LOGGER_FLUSH_INTERVAL)
                 .maxStackTraceLines(BuildConfig.LOGGER_MAX_STACK)
-                // Opciones avanzadas (nuevas en 0.2.0):
+                // Opciones avanzadas:
                 .bufferSizeStrategy(
                     when (BuildConfig.LOGGER_BUFFER_STRATEGY) {
                         "ADAPTIVE_TO_RAM" -> BufferSizeStrategy.ADAPTIVE_TO_RAM
@@ -244,8 +255,23 @@ class MyApp : Application() {
                         else -> OfflinePersistenceMode.NONE
                     }
                 )
-                .build()
+                .build(),
+            transport = SupabaseTransport(
+                endpoint = BuildConfig.LOGGER_URL,
+                apiKey = BuildConfig.LOGGER_KEY,
+                networkAvailabilityProvider = androidNetworkAvailabilityProvider(this)
+            )
         )
+
+        // Validar configuración en debug — detecta problemas antes de producción
+        if (BuildConfig.DEBUG) {
+            val issues = AppLoggerConfig.Builder()
+                .endpoint(BuildConfig.LOGGER_URL)
+                .apiKey(BuildConfig.LOGGER_KEY)
+                .build()
+                .validate()
+            issues.forEach { Log.w("AppLogger", "Config issue: $it") }
+        }
     }
 }
 ```
@@ -346,12 +372,57 @@ logger.logW("NETWORK", "Timeout", anomalyType = "TIMEOUT")
 | `critical` | Fallos que bloquean la app | Corrupción de estado, fallo de inicialización |
 | `metric` | Datos cuantitativos de performance | Tiempos de carga, uso de memoria, buffer |
 
-### 5.4 Buenas Prácticas de Contenido
+### 5.4 Helpers avanzados — `withTag`, `timed`, `logCatching`
+
+```kotlin
+// withTag — TaggedLogger con tag fijo para toda la clase
+class PaymentRepository(logger: AppLogger) {
+    private val log = logger.withTag("PaymentRepository")
+
+    fun charge(amount: Double) {
+        log.i("Charging card", extra = mapOf("amount_cents" to (amount * 100).toInt()))
+        log.e("Charge failed", throwable = e)
+        log.metric("charge_latency", 120.0, "ms")
+    }
+}
+
+// timed — mide latencia automáticamente
+val user = logger.timed("db_query_user", "ms", mapOf("table" to "users")) {
+    userDao.findById(id)
+}
+
+// logCatching — captura y loguea excepciones sin try/catch
+val result = logger.logCatching("NetworkClient", "fetch user") {
+    api.getUser(id)
+}
+// result es null si lanzó excepción; la excepción ya está logueada como ERROR
+```
+
+### 5.5 Global Extra — Contexto adjunto a todos los eventos
+
+```kotlin
+// Adjuntar contexto global (ej. A/B test, feature flag)
+AppLoggerSDK.addGlobalExtra("ab_test", "checkout_v2")
+AppLoggerSDK.addGlobalExtra("experiment", "group_b")
+
+// Todos los eventos posteriores incluirán estos pares en extra
+AppLoggerSDK.info("PLAYER", "Playback started")  // extra incluye ab_test y experiment
+
+// Remover una clave específica
+AppLoggerSDK.removeGlobalExtra("ab_test")
+
+// Limpiar todo el contexto global
+AppLoggerSDK.clearGlobalExtra()
+```
+
+Los valores per-call en `extra` tienen precedencia sobre los globales en caso de colisión de clave.
+
+### 5.6 Buenas Prácticas de Contenido
 
 ```kotlin
 // ✅ Loguear contexto técnico, no datos del usuario
 AppLoggerSDK.error("STREAM", "HLS segment fetch failed",
-    extra = mapOf("segment_index" to 42, "cdn_region" to "us-east-1"))
+    extra = mapOf("segment_index" to 42, "cdn_region" to "us-east-1", "retry_count" to 2))
 
 // ✅ Usar tags consistentes en todo el módulo
 object LogTags {
@@ -439,10 +510,22 @@ AppLoggerSDK.initialize(
 | `message` | `String` | Mensaje del log (máx 10 000 chars) |
 | `throwableInfo` | `ThrowableInfo?` | Tipo, mensaje y stack trace (si aplica) |
 | `deviceInfo` | `DeviceInfo` | Marca, modelo, OS, API level, plataforma, conexión |
+| `deviceId` | `String` | Identificador estable del dispositivo (SDK-generado por defecto) |
 | `sessionId` | `String` | UUID efímero de la sesión |
 | `userId` | `String?` | UUID anónimo opcional (solo con consentimiento) |
-| `extra` | `Map<String, String>?` | Metadatos adicionales |
+| `environment` | `String` | Entorno de despliegue: "production", "staging", "development" |
+| `extra` | `Map<String, JsonElement>?` | Metadatos adicionales — valores nativos (Int, Long, Double, Boolean, String) |
 | `sdkVersion` | `String` | Versión del SDK que generó el evento |
+| `metricName` | `String?` | Nombre de la métrica (solo cuando level == METRIC) |
+| `metricValue` | `Double?` | Valor numérico de la métrica |
+| `metricUnit` | `String?` | Unidad de la métrica (ej. "ms", "count", "bytes") |
+| `metricTags` | `Map<String, String>?` | Tags contextuales de la métrica (auto-enriquecidos con platform, app_version, device_model) |
+
+> `extra` es `Map<String, JsonElement>?` — no `Map<String, String>?`. Los valores Int, Long, Double y Boolean se preservan como primitivos JSON nativos, habilitando queries directas en Supabase JSONB:
+> ```sql
+> SELECT * FROM app_logs WHERE (extra->>'retry_count')::int > 2;
+> SELECT * FROM app_logs WHERE environment = 'staging';
+> ```
 
 ### 6.4 Comportamiento de retry
 
@@ -508,13 +591,16 @@ El entry point iOS es `AppLoggerIos.shared` (definido en `iosMain`). Es distinto
 // iosMain
 import com.applogger.core.AppLoggerConfig
 import com.applogger.core.AppLoggerIos
+import com.applogger.core.LogMinLevel
 import com.applogger.transport.supabase.SupabaseTransport
 
 fun initializeLoggerIos(url: String, apiKey: String, debugMode: Boolean = false) {
     val config = AppLoggerConfig.Builder()
         .endpoint(url)
         .apiKey(apiKey)
+        .environment("production")          // siempre etiquetar el entorno
         .debugMode(debugMode)
+        .minLevel(LogMinLevel.INFO)          // descarta DEBUG en producción
         .batchSize(20)
         .flushIntervalSeconds(30)
         .maxStackTraceLines(50)
@@ -529,24 +615,43 @@ fun initializeLoggerIos(url: String, apiKey: String, debugMode: Boolean = false)
 }
 ```
 
+> **Debug mode en iOS:** El SDK lee `APPLOGGER_DEBUG` de `Info.plist` automáticamente. Si la clave está presente y es `"true"`, activa `isDebugMode = true` sin cambiar código.
+
 ### 8.2 Uso en iOS desde Kotlin
 
 ```kotlin
 AppLoggerIos.shared.info("PLAYER", "Playback started")
 AppLoggerIos.shared.error("PAYMENT", "Transaction failed", throwable = null)
 AppLoggerIos.shared.metric("buffer_time", 420.0, "ms")
-AppLoggerIos.shared.flush()
+AppLoggerIos.shared.flush()  // llamar manualmente al entrar en background
 ```
 
-### 8.3 Configuración avanzada
+### 8.3 Sesión e identidad en iOS
 
-En Kotlin, `AppLoggerConfig.Builder` soporta opciones de buffer y persistencia offline para ambos targets.
+```kotlin
+// Al hacer login
+AppLoggerIos.shared.setAnonymousUserId(anonymousUUID)
+AppLoggerIos.shared.newSession()
+
+// Al hacer logout
+AppLoggerIos.shared.clearAnonymousUserId()
+AppLoggerIos.shared.newSession()
+
+// Global extra — adjunta a todos los eventos posteriores
+AppLoggerIos.shared.addGlobalExtra("ab_test", "checkout_v2")
+AppLoggerIos.shared.removeGlobalExtra("ab_test")
+AppLoggerIos.shared.clearGlobalExtra()
+```
+
+### 8.4 Configuración avanzada
 
 ```kotlin
 val config = AppLoggerConfig.Builder()
     .endpoint("https://tu-proyecto.supabase.co")
     .apiKey("eyJ...")
+    .environment("production")
     .debugMode(false)
+    .minLevel(LogMinLevel.INFO)
     .bufferSizeStrategy(BufferSizeStrategy.FIXED)
     .bufferOverflowPolicy(BufferOverflowPolicy.DISCARD_OLDEST)
     .offlinePersistenceMode(OfflinePersistenceMode.NONE)
@@ -581,20 +686,41 @@ if (health.bufferUtilizationPercentage > 80) {
 if (health.eventsDroppedDueToBufferOverflow > 0) {
     // Reportar métrica de pérdida de logs
 }
+
+// Detectar outage silencioso — el SDK lleva tiempo sin enviar
+val minutesSinceFlush = (System.currentTimeMillis() - health.lastSuccessfulFlushTimestamp) / 60_000
+if (health.lastSuccessfulFlushTimestamp > 0 && minutesSinceFlush > 5) {
+    Log.w("AppLogger", "Sin flush exitoso en $minutesSinceFlush minutos")
+}
+
+// Verificar que el snapshot no está desactualizado
+if (health.isStale(maxAgeMs = 60_000L)) {
+    // El snapshot tiene más de 1 minuto — volver a llamar snapshot()
+}
 ```
 
-**Campos expuestos:**
+**Campos expuestos por `HealthStatus`:**
 
-| Campo | Descripción |
-|---|---|
-| `isInitialized` | `true` tras `initialize()` exitoso |
-| `transportAvailable` | `true` si el transporte tiene conectividad |
-| `bufferedEvents` | Número de eventos en el buffer pendientes de envío |
-| `deadLetterCount` | Eventos fallidos permanentemente (para análisis) |
-| `consecutiveFailures` | Conteo de fallos consecutivos del transporte |
-| `eventsDroppedDueToBufferOverflow` | Total de eventos descartados por overflow del buffer |
-| `bufferUtilizationPercentage` | Porcentaje de ocupación del buffer (0-100) |
-| `sdkVersion` | Versión del SDK |
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `isInitialized` | `Boolean` | `true` tras `initialize()` exitoso |
+| `transportAvailable` | `Boolean` | `true` si el transporte tiene conectividad |
+| `bufferedEvents` | `Int` | Eventos en el buffer pendientes de envío |
+| `deadLetterCount` | `Int` | Eventos fallidos permanentemente (para análisis) |
+| `consecutiveFailures` | `Int` | Fallos consecutivos del transporte (se resetea solo en éxito) |
+| `eventsDroppedDueToBufferOverflow` | `Long` | Total de eventos descartados por overflow del buffer |
+| `bufferUtilizationPercentage` | `Float` | Porcentaje de ocupación del buffer (0-100) |
+| `sdkVersion` | `String` | Versión del SDK |
+| `snapshotTimestamp` | `Long` | Epoch millis cuando se tomó este snapshot |
+| `lastSuccessfulFlushTimestamp` | `Long` | Epoch millis del último flush exitoso (0 si ninguno aún) |
+
+`AppLoggerHealth` implementa `AppLoggerHealthProvider`, lo que permite inyectar un fake en tests:
+
+```kotlin
+class FakeHealthProvider(private val status: HealthStatus) : AppLoggerHealthProvider {
+    override fun snapshot() = status
+}
+```
 
 ### 9.3 Objetivos operativos de telemetría
 
@@ -629,11 +755,12 @@ Para requisitos más estrictos (ej. banca), se recomienda:
 
 | Comportamiento | Debug (`debugMode = true`) | Producción (`debugMode = false`) |
 |---|---|---|
-| Destino de los logs | Logcat (consola Android) | Base de datos remota (Supabase) |
+| Destino de los logs | Logcat **y** backend (ambos activos) | Solo base de datos remota (Supabase) |
 | `UncaughtExceptionHandler` | No se instala | Sí se instala |
-| Flush automático | No (logs son inmediatos en Logcat) | Sí (batching + intervalo de tiempo) |
-| Nivel de verbosidad | Todos los niveles | Solo INFO, WARN, ERROR, CRITICAL, METRIC |
-| SQLite local (fallback) | No | Sí |
+| Flush automático | Sí (batching activo en ambos modos) | Sí (batching + intervalo de tiempo) |
+| Nivel de verbosidad | Todos los niveles (DEBUG incluido) | Configurable via `minLevel` (default: todos) |
+| SQLite local (fallback) | Según `offlinePersistenceMode` | Según `offlinePersistenceMode` |
+| Logcat | Activo si `consoleOutput=true` | **Siempre suprimido** |
 
 ### 11.2 Control desde BuildConfig
 

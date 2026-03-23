@@ -35,11 +35,16 @@ func buildCapabilitiesPayload() capabilitiesPayload {
 		Capabilities: []capabilityEntry{
 			{Name: "syncbin-metadata", Description: "Emit syncbin metadata envelope", Stability: "stable"},
 			{Name: "version", Description: "Build and version introspection", Stability: "stable"},
+			{Name: "upgrade", Description: "Self-update to latest release with SHA-256 checksum verification", Stability: "stable"},
 			{Name: "capabilities", Description: "Machine-readable CLI capabilities", Stability: "stable"},
 			{Name: "health", Description: "Runtime readiness probe", Stability: "stable"},
-			{Name: "agent schema", Description: "Schema and execution contract for agent clients", Stability: "stable"},
-			{Name: "telemetry query", Description: "Telemetry query endpoint backed by Supabase with optional aggregation and multi-project resolution", Stability: "preview"},
+			{Name: "health --deep", Description: "Deep Supabase connectivity probe with latency measurement", Stability: "stable"},
+			{Name: "agent schema", Description: "Schema and execution contract for agent clients (contract_version 2.0.0)", Stability: "stable"},
+			{Name: "telemetry query", Description: "Full-featured telemetry query: environment, min-severity, extra-key/value, offset, order, throwable, sdk-version, retry on 429/503", Stability: "preview"},
 			{Name: "telemetry agent-response", Description: "Compact TOON response optimized for agent orchestration", Stability: "preview"},
+			{Name: "telemetry stream", Description: "SSE stream (text/event-stream) for frontend EventSource consumers", Stability: "preview"},
+			{Name: "telemetry tail", Description: "Follow mode — prints new events as they arrive (tail -f equivalent), supports --output json", Stability: "preview"},
+			{Name: "telemetry stats", Description: "Quick statistical summary: error rate, top tags, events per hour, by environment — supports all standard filters", Stability: "preview"},
 		},
 	}
 }

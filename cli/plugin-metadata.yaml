@@ -1,6 +1,6 @@
 name: apploggers
-version: 0.1.3
-description: AppLoggers telemetry CLI for operational queries, health checks, and AI agent automation
+version: 0.2.0
+description: AppLoggers telemetry CLI for operational queries, health checks, SSE streaming, and AI agent automation
 author: devzucca
 license: MIT
 homepage: https://github.com/zuccadev-labs/appLoggers
@@ -19,13 +19,18 @@ output_modes:
   - agent       # TOON compact format (machine-native)
 
 capabilities:
-  - syncbin-metadata      # Plugin metadata discovery
-  - version               # CLI version
-  - capabilities          # Available commands
-  - health                # Backend health check
-  - agent-schema          # Data schema for agents
-  - telemetry-query       # Query logs/metrics with filtering
-  - telemetry-agent-response  # Compact agent-optimized response
+  - syncbin-metadata          # Plugin metadata discovery
+  - version                   # CLI version
+  - upgrade                   # Self-update to latest release with SHA-256 checksum verification
+  - capabilities              # Available commands
+  - health                    # Backend readiness probe
+  - health-deep               # Deep Supabase connectivity probe with latency
+  - agent-schema              # Data schema for agents (contract_version 2.0.0)
+  - telemetry-query           # Query logs/metrics with full filter set
+  - telemetry-agent-response  # Compact agent-optimized TOON response
+  - telemetry-stream          # SSE stream (text/event-stream) for frontend EventSource
+  - telemetry-tail            # Follow mode — tail -f equivalent, supports --output json
+  - telemetry-stats           # Quick statistical summary: error rate, top tags, by environment — all standard filters
 
 platforms:
   - windows-amd64

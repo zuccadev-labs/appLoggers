@@ -52,9 +52,6 @@ APPLOGGER_DEBUG=false
 
 ## BuildConfig mapping (required if using `BuildConfig.LOGGER_*`)
 
-If your app does not already define `BuildConfig.LOGGER_URL`,
-`BuildConfig.LOGGER_KEY`, and `BuildConfig.LOGGER_DEBUG`, add them in the Android app module.
-
 ```kotlin
 import java.util.Properties
 
@@ -64,31 +61,45 @@ val appLoggerLocalProps = Properties().apply {
 }
 
 android {
-    buildFeatures {
-        buildConfig = true
-    }
+    buildFeatures { buildConfig = true }
 
     defaultConfig {
-        val loggerUrl = appLoggerLocalProps.getProperty("APPLOGGER_URL", "")
-        val loggerKey = appLoggerLocalProps.getProperty("APPLOGGER_ANON_KEY", "")
+        val loggerUrl   = appLoggerLocalProps.getProperty("APPLOGGER_URL", "")
+        val loggerKey   = appLoggerLocalProps.getProperty("APPLOGGER_ANON_KEY", "")
         val loggerDebug = appLoggerLocalProps.getProperty("APPLOGGER_DEBUG", "false").toBoolean()
 
-        buildConfigField("String", "LOGGER_URL", "\"$loggerUrl\"")
-        buildConfigField("String", "LOGGER_KEY", "\"$loggerKey\"")
+        buildConfigField("String",  "LOGGER_URL",   "\"$loggerUrl\"")
+        buildConfigField("String",  "LOGGER_KEY",   "\"$loggerKey\"")
         buildConfigField("boolean", "LOGGER_DEBUG", loggerDebug.toString())
     }
 }
 ```
 
-If your project already uses another config source (DI/env provider), prefer that source and do not add duplicate BuildConfig fields.
+## Debug mode via APPLOGGER_DEBUG (sin cambiar código)
 
-## Debug output behavior
+El SDK lee `APPLOGGER_DEBUG` del manifest meta-data automáticamente. Si está presente y es `"true"`, activa `isDebugMode = true` sin necesidad de cambiar código:
 
-- Effective rule: Logcat output happens only when `isDebugMode=true` **and** `consoleOutput=true`.
-- `APPLOGGER_DEBUG=true` usually enables Logcat because most setups map it to `debugMode` (and often to `consoleOutput`).
-- No additional Logcat configuration, tag setup, or Android logger wrapper is needed.
-- `APPLOGGER_DEBUG=false` (production default) disables Logcat output in the standard setup; no code change required.
-- Do **not** set `debug=true` in production builds.
+```xml
+<!-- AndroidManifest.xml -->
+<application ...>
+    <meta-data
+        android:name="APPLOGGER_DEBUG"
+        android:value="${APPLOGGER_DEBUG}" />
+</application>
+```
+
+```groovy
+// build.gradle (app module)
+android {
+    defaultConfig {
+        manifestPlaceholders = [
+            APPLOGGER_DEBUG: System.getenv("APPLOGGER_DEBUG") ?: "false"
+        ]
+    }
+}
+```
+
+Regla efectiva: Logcat output ocurre solo cuando `isDebugMode=true` **y** `consoleOutput=true`. En producción (`isDebugMode=false`), Logcat está **siempre suprimido** sin importar `consoleOutput`.
 
 ## Canonical imports (Android)
 
@@ -96,44 +107,77 @@ If your project already uses another config source (DI/env provider), prefer tha
 import com.applogger.core.AppLoggerConfig
 import com.applogger.core.AppLoggerHealth
 import com.applogger.core.AppLoggerSDK
+import com.applogger.core.BufferOverflowPolicy
+import com.applogger.core.BufferSizeStrategy
+import com.applogger.core.LogMinLevel
+import com.applogger.core.OfflinePersistenceMode
 import com.applogger.transport.supabase.SupabaseTransport
 ```
 
 Do not use `com.applogger.sdk.*` imports.
 
-SDK source references (anti-hallucination):
-
-1. `sdk/logger-core/src/commonMain/kotlin/com/applogger/core/internal/AppLoggerImpl.kt` — Logcat/console output guard.
-2. `sdk/logger-core/src/commonMain/kotlin/com/applogger/core/AppLoggerConfig.kt` — default `consoleOutput=true` in Builder.
-
 ## Initialization pattern
 
-Preferred initialization point: custom `Application`.
+Preferred initialization point: custom `Application.onCreate()`.
 
 ```kotlin
-val transport = SupabaseTransport(
-    endpoint = BuildConfig.LOGGER_URL,
-    apiKey = BuildConfig.LOGGER_KEY
-)
+class MyApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
 
-AppLoggerSDK.initialize(
-    context = this,
-    config = AppLoggerConfig.Builder()
-        .endpoint(BuildConfig.LOGGER_URL)
-        .apiKey(BuildConfig.LOGGER_KEY)
-        .debugMode(BuildConfig.LOGGER_DEBUG)
-        .consoleOutput(BuildConfig.LOGGER_DEBUG)
-        .batchSize(20)
-        .flushIntervalSeconds(30)
-        .build(),
-    transport = transport
-)
+        val transport = SupabaseTransport(
+            endpoint = BuildConfig.LOGGER_URL,
+            apiKey = BuildConfig.LOGGER_KEY,
+            networkAvailabilityProvider = androidNetworkAvailabilityProvider(this)
+        )
+
+        AppLoggerSDK.initialize(
+            context = this,
+            config = AppLoggerConfig.Builder()
+                .endpoint(BuildConfig.LOGGER_URL)
+                .apiKey(BuildConfig.LOGGER_KEY)
+                .environment("production")          // "production" | "staging" | "development"
+                .debugMode(BuildConfig.LOGGER_DEBUG)
+                .consoleOutput(BuildConfig.LOGGER_DEBUG)
+                .minLevel(LogMinLevel.INFO)          // descarta DEBUG en producción
+                .batchSize(20)
+                .flushIntervalSeconds(30)
+                .build(),
+            transport = transport
+        )
+
+        // Validar configuración en debug
+        if (BuildConfig.DEBUG) {
+            AppLoggerConfig.Builder()
+                .endpoint(BuildConfig.LOGGER_URL)
+                .apiKey(BuildConfig.LOGGER_KEY)
+                .build()
+                .validate()
+                .forEach { android.util.Log.w("AppLogger", "Config issue: $it") }
+        }
+    }
+}
 ```
 
-Compile guard:
+`androidNetworkAvailabilityProvider(context)` devuelve una lambda que usa `ConnectivityManager` con estado en caché — sin I/O en el hilo llamador.
 
-1. `BuildConfig.LOGGER_*` must exist before using this snippet.
-2. If they do not exist, either add the mapping above or replace with your app's existing config provider.
+## Session and user identity
+
+```kotlin
+// Al hacer login — nueva sesión + user ID
+AppLoggerSDK.setAnonymousUserId(anonymousUUID)
+AppLoggerSDK.newSession()
+
+// Al hacer logout — limpiar identidad
+AppLoggerSDK.clearAnonymousUserId()
+AppLoggerSDK.newSession()
+
+// Global extra — adjunta a todos los eventos posteriores
+AppLoggerSDK.addGlobalExtra("ab_test", "checkout_v2")
+AppLoggerSDK.addGlobalExtra("experiment", "group_b")
+AppLoggerSDK.removeGlobalExtra("ab_test")
+AppLoggerSDK.clearGlobalExtra()
+```
 
 ## Minimal verification
 
@@ -141,11 +185,13 @@ Compile guard:
 AppLoggerSDK.info("BOOT", "AppLogger initialized")
 
 val health = AppLoggerHealth.snapshot()
-println("initialized=${health.isInitialized}, buffered=${health.bufferedEvents}")
+println("initialized=${health.isInitialized}, transport=${health.transportAvailable}, buffered=${health.bufferedEvents}")
 ```
 
 ## Guardrails
 
-1. Do not log PII.
+1. Do not log PII (names, emails, phone numbers, device IMEI).
 2. Do not log tokens or API keys.
-3. Keep `debugMode=false` outside local development.
+3. Keep `debugMode=false` in production builds.
+4. Always set `environment` to distinguish production from staging data.
+5. Call `validate()` during development to catch config issues early.

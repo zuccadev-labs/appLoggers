@@ -63,9 +63,13 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run Unit Tests
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :sample:testDebugUnitTest
 
       - name: Generate Coverage Report
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew jacocoTestReport
 
       - name: Upload Coverage to Codecov
@@ -89,6 +93,8 @@ jobs:
           retention-days: 14
 
       - name: Build
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew assemble
 
   e2e:

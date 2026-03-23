@@ -78,6 +78,13 @@ appLoggers/
 - **Privacidad por diseño** — GDPR, LGPD, CCPA compliant
 - **Offline-first** — buffer FIFO en memoria con reintentos automáticos (backoff exponencial con jitter)
 - **Transporte intercambiable** — backend Supabase incluido; cualquier backend vía `LogTransport` custom
+- **Global extra context** — `addGlobalExtra()` adjunta pares clave-valor a todos los eventos posteriores
+- **Helpers de productividad** — `withTag()`, `timed{}`, `logCatching{}`, `loggerTag<T>()` reducen boilerplate
+- **Health monitoring** — `AppLoggerHealth.snapshot()` expone estado interno en tiempo real via `AppLoggerHealthProvider`
+- **Validación de config** — `AppLoggerConfig.validate()` detecta problemas antes de producción
+- **Filtrado por nivel** — `minLevel` descarta eventos antes del pipeline sin coste de serialización
+- **Entornos** — `environment` etiqueta cada evento para separar producción de staging en Supabase
+- **Debug sin código** — `APPLOGGER_DEBUG=true` en manifest (Android) o `Info.plist` (iOS) activa debug mode
 
 ## Versionado Profesional
 
@@ -225,16 +232,16 @@ Un template está incluido en el repositorio:
 cp local.properties.example local.properties
 ```
 
-> **Variables del SDK vs variables del CLI — diferencias clave**
+> **Variables del SDK vs configuración del CLI — diferencias clave**
 >
-> Este proyecto tiene dos superficies con variables de configuración distintas. Es importante no mezclarlas:
+> Este proyecto tiene dos superficies de configuración distintas. Es importante no mezclarlas:
 >
-> | Superficie | Archivo / Scope | Variables | Formato | Uso |
+> | Superficie | Configuración | Variables | Formato | Uso |
 > |---|---|---|---|---|
 > | **SDK** (Android/iOS/JVM) | `local.properties` → `BuildConfig` | `APPLOGGER_URL`, `APPLOGGER_ANON_KEY`, `APPLOGGER_DEBUG` | UPPERCASE | Instrumentación en la app cliente. Usa **anon key** para INSERT. |
-> | **CLI** (operaciones) | Variables de entorno del shell / CI | `appLogger_supabaseUrl`, `appLogger_supabaseKey` (primarias) · `APPLOGGER_SUPABASE_URL`, `APPLOGGER_SUPABASE_KEY` (aliases) | camelCase primarias / UPPERCASE aliases | Consultas de telemetría y diagnóstico. Usa **service_role key** para SELECT. |
+> | **CLI** (operaciones) | `~/.apploggers/cli.json` (creado automáticamente) | `supabase.url`, `supabase.api_key` en el json | JSON | Consultas de telemetría y diagnóstico. Usa **service_role key** para SELECT. |
 >
-> El CLI acepta ambas formas (camelCase y UPPERCASE) — son equivalentes. Nunca uses la `service_role` key en el SDK ni la `anon` key en el CLI.
+> El CLI se configura editando `~/.apploggers/cli.json` — no requiere exportar variables de entorno. Nunca uses la `service_role` key en el SDK ni la `anon` key en el CLI.
 
 Luego abrí `local.properties` y completá los valores:
 
@@ -353,16 +360,16 @@ dependencies {
 
 `logger-core` genera el artefacto iOS desde `iosMain` usando Kotlin Multiplatform.
 
-En este proyecto, la ruta oficial para iOS es KMP end-to-end: inicialización y uso en Kotlin (`commonMain`/`iosMain`).
-
 ```kotlin
-// iosMain
+// iosMain — entry point: AppLoggerIos.shared (distinto de AppLoggerSDK que es Android-only)
 AppLoggerIos.shared.initialize(
     config = AppLoggerConfig.Builder()
         .endpoint("https://tu-proyecto.supabase.co")
         .apiKey("tu_anon_key")
-        .debugMode(false)
-        .build()
+        .environment("production")
+        .debugMode(false)   // o leer de Info.plist: <key>APPLOGGER_DEBUG</key><string>true</string>
+        .build(),
+    transport = SupabaseTransport(endpoint = url, apiKey = key)
 )
 ```
 
@@ -388,7 +395,8 @@ class MyApp : Application() {
 
         val transport = SupabaseTransport(
             endpoint = BuildConfig.LOGGER_URL,
-            apiKey = BuildConfig.LOGGER_KEY
+            apiKey = BuildConfig.LOGGER_KEY,
+            networkAvailabilityProvider = androidNetworkAvailabilityProvider(this)
         )
 
         AppLoggerSDK.initialize(
@@ -396,8 +404,10 @@ class MyApp : Application() {
             config = AppLoggerConfig.Builder()
                 .endpoint(BuildConfig.LOGGER_URL)
                 .apiKey(BuildConfig.LOGGER_KEY)
+                .environment("production")          // filtra QA vs prod en Supabase
                 .debugMode(BuildConfig.LOGGER_DEBUG)
                 .consoleOutput(BuildConfig.LOGGER_DEBUG)
+                .minLevel(LogMinLevel.INFO)          // descarta DEBUG en producción
                 .batchSize(20)
                 .flushIntervalSeconds(30)
                 .build(),
@@ -412,22 +422,36 @@ class MyApp : Application() {
 // 3. Usar en cualquier lugar — fire-and-forget
 AppLoggerSDK.error("PAYMENT", "Transaction failed", throwable)
 AppLoggerSDK.info("PLAYER", "Playback started", extra = mapOf("content_id" to "movie_123"))
-AppLoggerSDK.info("PLAYER", "Recovering after error", throwable = e)      // throwable opcional
 AppLoggerSDK.warn("NETWORK", "Slow response", throwable = e, anomalyType = "HIGH_LATENCY")
-AppLoggerSDK.debug("TAG", "Solo visible en debug", throwable = e)          // throwable opcional
 AppLoggerSDK.metric("screen_load_time", 1234.0, "ms", tags = mapOf("screen" to "Home"))
 
 // 4. Extension functions — tag inferido automáticamente del nombre de clase
-//    (disponible en todos los targets via AppLoggerExtensions.kt)
 this.logE(logger, "Playback failed", throwable = e)    // tag → nombre de la clase actual
 this.logW(logger, "Buffer low", anomalyType = "BUFFER_LOW")
+
+// 5. Helpers avanzados
+val result = logger.timed("db_query", "ms") { userDao.findById(id) }  // mide latencia
+val data   = logger.logCatching("API", "fetch user") { api.getUser() } // captura excepciones
+val log    = logger.withTag("PaymentRepository")                        // tag fijo para la clase
+log.i("Charging card"); log.e("Charge failed", throwable = e)
+
+// 6. Sesión e identidad
+AppLoggerSDK.setAnonymousUserId(anonymousUUID)
+AppLoggerSDK.newSession()                              // fuerza nueva sesión (login/logout)
+AppLoggerSDK.addGlobalExtra("ab_test", "checkout_v2") // adjunta a todos los eventos
 ```
 
 ### iOS (Kotlin `iosMain`)
 
 ```kotlin
+// Debug mode: leer APPLOGGER_DEBUG de Info.plist automáticamente (sin cambiar código)
+AppLoggerIos.shared.initialize(config = config, transport = transport)
+
 AppLoggerIos.shared.error("PLAYER", "Playback failed", throwable = null)
 AppLoggerIos.shared.metric("buffer_time", 420.0, "ms")
+AppLoggerIos.shared.newSession()
+AppLoggerIos.shared.addGlobalExtra("experiment", "group_b")
+AppLoggerIos.shared.flush()  // llamar al entrar en background
 ```
 
 ---
@@ -444,8 +468,12 @@ AppLoggerIos.shared.metric("buffer_time", 420.0, "ms")
 | 3 | `docs/ES/migraciones/003_create_indexes.sql` | Índices de performance |
 | 4 | `docs/ES/migraciones/004_rls_policies.sql` | Políticas de seguridad (RLS) |
 | 5 | `docs/ES/migraciones/005_retention_policy.sql` | Retención automática de datos |
+| 6 | `docs/ES/migraciones/006_harden_authenticated_read_policies.sql` | Endurecimiento RLS |
+| 7 | `docs/ES/migraciones/007_add_environment_anomaly_type.sql` | Columnas `environment` y `anomaly_type` en `app_logs` |
+| 8 | `docs/ES/migraciones/008_add_metrics_environment.sql` | Columna `environment` en `app_metrics` |
+| 9 | `docs/ES/migraciones/009_add_missing_indexes.sql` | Índices adicionales de performance |
 
-1. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`
+3. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`
 
 ---
 
@@ -532,6 +560,7 @@ El módulo `logger-test` provee utilidades para testing sin red ni dispositivo r
 ```kotlin
 // Verificar que un componente loguea correctamente
 val logger = InMemoryLogger()
+logger.addGlobalExtra("experiment", "group_b")  // global extra funcional
 myComponent.doSomething()
 assertEquals(1, logger.errorCount)
 logger.assertLogged(LogLevel.ERROR, tag = "PAYMENT")
@@ -541,11 +570,14 @@ logger.assertNotLogged(LogLevel.DEBUG)
 val transport = FakeTransport(shouldSucceed = true)
 assertEquals(3, transport.sentEvents.size)
 
-// Simular fallo de red
-val failingTransport = FakeTransport(shouldSucceed = false, retryable = true)
+// Simular fallo de red con Retry-After
+val failingTransport = FakeTransport(shouldSucceed = false, retryable = true, retryAfterMs = 5_000L)
 
 // NoOpTestLogger para tests donde el logger no es el foco
 val logger = NoOpTestLogger()
+
+// FakeHealthProvider para tests de componentes que dependen del estado de salud
+val provider = FakeHealthProvider(HealthStatus(isInitialized = true, transportAvailable = false, ...))
 ```
 
 ### Correr tests
@@ -635,7 +667,10 @@ Cuando el SDK esté estable, se publicará a Maven Central para distribución si
 | [003 - Crear índices](docs/ES/migraciones/003_create_indexes.sql) | Índices de performance |
 | [004 - RLS Policies](docs/ES/migraciones/004_rls_policies.sql) | Políticas de seguridad |
 | [005 - Retention Policy](docs/ES/migraciones/005_retention_policy.sql) | Retención automática |
-| [006 - Harden Authenticated Read](docs/ES/migraciones/006_harden_authenticated_read_policies.sql) | Endurecimiento RLS para evitar lectura global authenticated |
+| [006 - Harden Authenticated Read](docs/ES/migraciones/006_harden_authenticated_read_policies.sql) | Endurecimiento RLS |
+| [007 - Environment + anomaly_type](docs/ES/migraciones/007_add_environment_anomaly_type.sql) | Columnas `environment` y `anomaly_type` en `app_logs` |
+| [008 - Metrics environment](docs/ES/migraciones/008_add_metrics_environment.sql) | Columna `environment` en `app_metrics` |
+| [009 - Índices adicionales](docs/ES/migraciones/009_add_missing_indexes.sql) | Índices adicionales de performance |
 
 ### 📋 Procesos
 

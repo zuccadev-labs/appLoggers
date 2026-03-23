@@ -4,6 +4,7 @@ import com.applogger.core.*
 import com.applogger.core.internal.*
 import com.applogger.core.model.DeviceInfo
 import com.applogger.core.model.LogLevel
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
@@ -82,7 +83,7 @@ class PipelineIntegrationTest {
         assertEquals(1, transport.sentEvents.size)
         val event = transport.sentEvents[0]
         assertNotNull(event.throwableInfo)
-        assertEquals("IOException", event.throwableInfo?.type)
+        assertEquals("java.io.IOException", event.throwableInfo?.type)
     }
 
     @Test
@@ -139,7 +140,11 @@ class PipelineIntegrationTest {
         assertEquals(LogLevel.WARN, transport.sentEvents[1].level)
         assertEquals(LogLevel.ERROR, transport.sentEvents[2].level)
         assertEquals(LogLevel.CRITICAL, transport.sentEvents[3].level)
-        assertEquals(LogLevel.METRIC, transport.sentEvents[4].level)
+        val metric = transport.sentEvents[4]
+        assertEquals(LogLevel.METRIC, metric.level)
+        assertEquals("load_time", metric.metricName)
+        assertEquals(100.0, metric.metricValue)
+        assertEquals("ms", metric.metricUnit)
     }
 
     @Test
@@ -182,6 +187,24 @@ class PipelineIntegrationTest {
         processor.sendBatch()
 
         assertTrue(transport.sentEvents.isNotEmpty())
+    }
+
+    @Test
+    fun `complete flow - consecutiveFailures increments on transport failure`() = runBlocking {
+        val logger = createPipeline()
+        logger.info("TAG", "event")
+        delay(200)
+
+        transport.shouldFail = true
+        transport.retryable = true
+        processor.sendBatch()
+
+        assertTrue(processor.getConsecutiveFailures() > 0)
+
+        // Recovers on success
+        transport.shouldFail = false
+        processor.sendBatch()
+        assertEquals(0, processor.getConsecutiveFailures())
     }
 
     private class RecordingTransport : LogTransport {

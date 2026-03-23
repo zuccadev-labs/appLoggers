@@ -37,6 +37,11 @@ Do not use this skill when:
 13. Treat `BuildConfig.LOGGER_URL`, `BuildConfig.LOGGER_KEY`, and `BuildConfig.LOGGER_DEBUG` as placeholders unless the target app already defines them.
 14. If Android snippets use `BuildConfig.*` and fields are missing, provide the Gradle mapping step before initialization code.
 15. Never use `AppLoggerSDK` in iOS/KMP setup code; use `AppLoggerIos.shared` for iOS KMP initialization.
+16. Always pass `transport` as a parameter to `initialize()` — do not rely on the no-arg default in production.
+17. Always include `environment()` in the builder to distinguish production from staging data.
+18. Recommend `androidNetworkAvailabilityProvider(context)` when constructing `SupabaseTransport` on Android.
+19. Recommend calling `config.validate()` during development to catch config issues early.
+20. iOS debug mode is read from `Info.plist` key `APPLOGGER_DEBUG` — not from code.
 
 ## Workflow
 

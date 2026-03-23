@@ -2,6 +2,7 @@ package com.applogger.core
 
 import com.applogger.core.internal.*
 import com.applogger.core.model.LogEvent
+import platform.Foundation.NSBundle
 
 /**
  * iOS entry point for the AppLogger SDK, exported to Swift via KMP framework.
@@ -22,6 +23,8 @@ class AppLoggerIos private constructor() : AppLogger {
 
     private var instance: AppLogger = NoOpLogger()
     private var implRef: AppLoggerImpl? = null
+    private var sessionManagerRef: SessionManager? = null
+    private val isInitialized = java.util.concurrent.atomic.AtomicBoolean(false)
 
     companion object {
         val shared = AppLoggerIos()
@@ -31,6 +34,17 @@ class AppLoggerIos private constructor() : AppLogger {
         config: AppLoggerConfig,
         transport: LogTransport? = null
     ) {
+        if (!isInitialized.compareAndSet(false, true)) return
+
+        // B1: Read APPLOGGER_DEBUG from iOS Info.plist (equivalent to Android manifest meta-data).
+        // Set APPLOGGER_DEBUG = true in Info.plist to activate debug mode without changing code.
+        @Suppress("UNCHECKED_CAST")
+        val debugFlag = try {
+            NSBundle.mainBundle.infoDictionary
+                ?.get("APPLOGGER_DEBUG") as? String == "true"
+        } catch (_: Exception) { false }
+        val resolvedConfig = if (debugFlag && !config.isDebugMode) config.copy(isDebugMode = true) else config
+
         val deviceInfoProvider = IosDeviceInfoProvider()
         val deviceInfo = deviceInfoProvider.get()
         val sessionManager = SessionManager()
@@ -41,13 +55,13 @@ class AppLoggerIos private constructor() : AppLogger {
                 TransportResult.Success
             override fun isAvailable(): Boolean = false
         }
-        val formatter = JsonLogFormatter()
+        val formatter = JsonLogFormatter(prettyPrint = resolvedConfig.isDebugMode)
 
         val processor = BatchProcessor(
             buffer = buffer,
             transport = resolvedTransport,
             formatter = formatter,
-            config = config
+            config = resolvedConfig
         )
 
         val impl = AppLoggerImpl(
@@ -55,11 +69,12 @@ class AppLoggerIos private constructor() : AppLogger {
             sessionManager = sessionManager,
             filter = filter,
             processor = processor,
-            config = config
+            config = resolvedConfig
         )
 
         instance = impl
         implRef = impl
+        sessionManagerRef = sessionManager
 
         AppLoggerHealth.processor = processor
         AppLoggerHealth.transport = resolvedTransport
@@ -67,7 +82,7 @@ class AppLoggerIos private constructor() : AppLogger {
         AppLoggerHealth.bufferCapacity = 1000
         AppLoggerHealth.initialized = true
 
-        if (!config.isDebugMode) {
+        if (!resolvedConfig.isDebugMode) {
             IosCrashHandler(impl).install()
         }
     }
@@ -113,4 +128,29 @@ class AppLoggerIos private constructor() : AppLogger {
     fun clearDeviceId() {
         implRef?.clearDeviceId()
     }
+
+    /**
+     * Fuerza el inicio de una nueva sesión inmediatamente.
+     */
+    fun newSession() {
+        sessionManagerRef?.rotate()
+    }
+
+    /**
+     * Resets the SDK to its uninitialized state. FOR TESTING ONLY.
+     */
+    internal fun reset() {
+        isInitialized.set(false)
+        instance = NoOpLogger()
+        implRef = null
+        sessionManagerRef = null
+        AppLoggerHealth.initialized = false
+        AppLoggerHealth.processor = null
+        AppLoggerHealth.transport = null
+        AppLoggerHealth.buffer = null
+    }
+
+    override fun addGlobalExtra(key: String, value: String) = instance.addGlobalExtra(key, value)
+    override fun removeGlobalExtra(key: String) = instance.removeGlobalExtra(key)
+    override fun clearGlobalExtra() = instance.clearGlobalExtra()
 }

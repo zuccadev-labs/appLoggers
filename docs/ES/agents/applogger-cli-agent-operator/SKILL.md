@@ -3,7 +3,7 @@
 ## Metadata
 
 - **Skill ID**: `apploggers-agent-operator`
-- **Version**: `1.0.0`
+- **Version**: `2.0.0`
 - **Category**: Production Operations, Telemetry Discovery, DevOps Automation
 - **Complexity**: Advanced
 - **Prerequisites**: CLI installed and configured, Supabase credentials, basic JSON/TOON parsing knowledge
@@ -14,11 +14,13 @@
 
 This skill enables AI agents and automation systems to **safely, predictably, and deterministically** operate the AppLogger CLI for:
 
-- **Telemetry queries** (logs, metrics, aggregations)
-- **System health checks** (backend availability validation)
+- **Telemetry queries** (logs, metrics, aggregations, pagination)
+- **System health checks** (readiness + deep Supabase connectivity probe)
 - **Contract discovery** (runtime capability detection)
 - **Agent-to-agent communication** (compact TOON responses)
 - **Production incident response** (root cause analysis, audit trails)
+- **Real-time monitoring** (SSE stream for frontends, tail follow mode)
+- **Statistical summaries** (error rate, top tags, by environment)
 
 ### Key Principle
 
@@ -34,10 +36,7 @@ This skill enables AI agents and automation systems to **safely, predictably, an
 Si `apploggers` no existe aun en la maquina del agente, instalar primero:
 
 ```bash
-# Linux
-curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
-
-# macOS (Intel / Apple Silicon)
+# Linux / macOS
 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
@@ -52,12 +51,6 @@ Despues verificar:
 apploggers version --output json
 ```
 
-Reglas:
-
-- Si el instalador cambia `PATH`, abrir una nueva shell o ejecutar por ruta absoluta una vez.
-- Para fijar version: definir `APPLOGGERS_VERSION=apploggers-vX.Y.Z` antes de instalar.
-- En macOS y Linux el instalador exige verificacion SHA-256 y falla si no existe `sha256sum` ni `shasum`.
-
 ### 1. Agent Contract Discovery
 
 Before executing any command, **always** discover capabilities and schema:
@@ -69,16 +62,16 @@ apploggers capabilities --output json
 # What fields exist in telemetry?
 apploggers agent schema --output json
 
-# Is the backend available?
+# Is the backend available? (basic probe)
 apploggers health --output json
+
+# Deep probe: real Supabase connectivity + latency
+apploggers health --deep --output json
 ```
 
 **Why?** The CLI may have new commands, output format changes, or schema updates between versions. Discovery ensures forward compatibility.
 
 ### 1.1 Multi-Project Resolution (Corporate Mode)
-
-When operating multiple telemetry apps (for example `klinema` and `klinematv`),
-agents must resolve the active project deterministically.
 
 Resolution precedence:
 
@@ -87,18 +80,11 @@ Resolution precedence:
 3. Workspace autodetection via `workspace_roots`
 4. `default_project`
 5. Single configured project
-6. Legacy environment variables (`appLogger_supabase*`, `APPLOGGER_SUPABASE_*`, `SUPABASE_*`)
-
-Project config path precedence:
-
-1. `--config <path>`
-2. `APPLOGGER_CONFIG`
-3. Default user config path (`~/.apploggers/cli.json`; fallback legacy: `os.UserConfigDir()/applogger/cli.json`)
 
 Rules for agents:
 
-- Prefer project profiles for production automation.
-- Prefer `api_key_env` in the JSON config instead of inline secrets.
+- All configuration lives in `~/.apploggers/cli.json`.
+- Use `api_key` for direct key storage (simplest for agents).
 - Parse `project` and `config_source` from health/telemetry outputs for auditability.
 
 ### 2. Three Output Modes (Choose Wisely)
@@ -116,36 +102,37 @@ Rules for agents:
 When a command fails, **always check stderr** for error envelope:
 
 ```bash
-# Example failure
 apploggers telemetry query \
   --source logs \
   --aggregate INVALID_MODE \
   --output json \
-  2>&1  # redirect stderr to parse errors
+  2>&1
 
 # stderr output
 {
   "ok": false,
-  "error": "invalid --aggregate value \"INVALID_MODE\" (expected: none, hour, severity, tag, session, name)",
+  "error": "invalid --aggregate value \"INVALID_MODE\" ...",
   "error_kind": "usage_error",
   "exit_code": 2
 }
-
-# Check exit code
-echo $?  # outputs: 2
 ```
 
 **Error Kinds**:
-- `usage_error` (exit code 2): Your invocation is wrong. Fix the flags/args.
-- `runtime_error` (exit code 1): System failure (network, Supabase down). Retry with backoff.
+- `usage_error` (exit code 2): Fix the flags/args. Do NOT retry.
+- `runtime_error` (exit code 1): System failure. The CLI retries 429/503 automatically (3 attempts, backoff 0s→2s→6s). If still failing, check `health --deep`.
+
+**HTTP errors are now differentiated** — the error message tells you exactly what to fix:
+- `authentication failed (HTTP 401)` → check `api_key` in `cli.json`
+- `permission denied (HTTP 403)` → check RLS policies in Supabase
+- `table not found (HTTP 404)` → run AppLoggers migrations
+- `rate limited (HTTP 429)` → retried automatically
+- `Supabase unavailable (HTTP 503)` → retried automatically
 
 ---
 
 ## Workflows
 
-### Workflow 1: Pre-Flight Check
-
-**Guarantee**: Before querying telemetry, verify CLI + backend health.
+### Workflow 1: Pre-Flight Check (with Deep Probe)
 
 ```bash
 #!/bin/bash
@@ -156,360 +143,297 @@ if ! command -v apploggers &> /dev/null; then
   exit 127
 fi
 
-# 2. Verify project resolution inputs are set (project mode) OR legacy env vars exist
-if [ -z "$APPLOGGER_CONFIG" ] && { [ -z "$appLogger_supabaseUrl" ] || [ -z "$appLogger_supabaseKey" ]; }; then
-  echo "FATAL: set APPLOGGER_CONFIG (recommended) or appLogger_supabaseUrl/appLogger_supabaseKey"
-  exit 1
-fi
-
-# 3. Verify CLI version compatibility
+# 2. Verify CLI version compatibility
 VERSION=$(apploggers version --output json | jq -r '.version // empty')
 if [ -z "$VERSION" ]; then
   echo "FATAL: Cannot determine CLI version"
   exit 1
 fi
 
-# 4. Verify backend is healthy (optionally pin project)
-HEALTH=$(apploggers ${APPLOGGER_PROJECT:+--project "$APPLOGGER_PROJECT"} health --output json)
+# 3. Deep health check — verifies real Supabase connectivity
+HEALTH=$(apploggers health --deep --output json)
 if ! jq -e '.ok' <<< "$HEALTH" > /dev/null 2>&1; then
   echo "FATAL: Backend health check failed"
-  echo "$HEALTH" | jq .
+  echo "$HEALTH" | jq '{status, deep}'
   exit 1
 fi
 
+LATENCY=$(jq '.deep.latency_ms // "N/A"' <<< "$HEALTH")
 echo "✓ Pre-flight check passed"
 echo "  - CLI version: $VERSION"
-echo "  - Backend: $(jq '.services.supabase' <<< "$HEALTH")"
-echo "  - Project: $(jq -r '.project // "legacy-env"' <<< "$HEALTH")"
-echo "  - Config source: $(jq -r '.config_source // "environment"' <<< "$HEALTH")"
+echo "  - Project: $(jq -r '.project // "env"' <<< "$HEALTH")"
+echo "  - Supabase latency: ${LATENCY}ms"
 ```
 
-### Workflow 2: Safe Telemetry Query
-
-**Guarantee**: Query with validation, error handling, and structured output.
+### Workflow 2: Production Incident Response
 
 ```bash
 #!/bin/bash
 
-# Input validation
-SOURCE="${1:-logs}"       # logs or metrics
-SEVERITY="${2:-error}"    # error, warn, info, debug
-LIMIT="${3:-100}"
+# Quick stats — error rate in last hour
+FROM=$(date -u -d '-1 hour' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v-1H '+%Y-%m-%dT%H:%M:%SZ')
 
-# Validate input
-if [[ "$SOURCE" != "logs" && "$SOURCE" != "metrics" ]]; then
-  echo "ERROR: Invalid source '$SOURCE' (expected: logs, metrics)"
-  exit 2
-fi
-
-# Build query (with date for relevance)
-FROM=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
-       date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
-
-# Execute query
-QUERY=$(apploggers telemetry query \
-  --source "$SOURCE" \
+STATS=$(apploggers telemetry stats \
+  --source logs \
+  --environment production \
   --from "$FROM" \
-  --severity "$SEVERITY" \
-  --limit "$LIMIT" \
-  --output agent \
-  2>&1)
+  --output json)
 
-# Check exit code
-if [ $? -ne 0 ]; then
-  echo "ERROR: Query failed"
-  echo "$QUERY" | jq . 2>/dev/null || echo "$QUERY"
-  exit 1
-fi
+ERROR_RATE=$(jq '.error_rate_pct' <<< "$STATS")
+TOTAL=$(jq '.total_events' <<< "$STATS")
 
-# Process result (agent output = TOON format)
-echo "Query succeeded"
-echo "$QUERY"
+echo "Last hour: $TOTAL events, error rate: ${ERROR_RATE}%"
 
-# Parse structured data (if TOON parsing available)
-# Note: TOON is line-oriented key: value format
-count=$(echo "$QUERY" | grep -E '^count:' | awk '{print $2}')
-echo "Found $count records"
-```
-
-### Workflow 3: Incident Response Automation
-
-**Guarantee**: Automatic incident detection and escalation.
-
-```bash
-#!/bin/bash
-
-# Rule-based incident detection
-detect_incident() {
-  local hours_back="${1:-1}"
-  
-  # Query errors in last N hours
-  local from=$(date -u -d "-${hours_back} hours" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
-               date -u -v-${hours_back}H '+%Y-%m-%dT%H:%M:%SZ')
-  
-  local resp=$(apploggers telemetry query \
+# If error rate > 20%, get details with stack traces
+if (( $(echo "$ERROR_RATE > 20" | bc -l) )); then
+  echo "HIGH ERROR RATE — fetching details..."
+  apploggers telemetry query \
     --source logs \
-    --severity error \
-    --aggregate hour \
-    --from "$from" \
-    --output json \
-    2>&1)
-  
-  # Parse error count
-  local count=$(jq '.count // 0' <<< "$resp")
-  
-  # Threshold: >500 errors per hour = incident
-  if [ "$count" -gt 500 ]; then
-    echo "INCIDENT DETECTED: $count errors in last $hours_back hour(s)"
-    
-    # Escalation: dump summary
-    jq '.summary' <<< "$resp"
-    
-    # Escalation: notify (example: Slack webhook)
-    curl -X POST "$SLACK_WEBHOOK" \
-      -H 'Content-Type: application/json' \
-      -d "{
-        \"text\": \"🚨 AppLogger Incident: $count errors detected\",
-        \"blocks\": [{\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"$(jq '.summary' <<< "$resp" | jq -Rs .)\"}}}
-      }"
-    
-    return 0  # incident detected
-  else
-    echo "✓ No incident: $count errors in last $hours_back hour(s)"
-    return 1  # no incident
-  fi
-}
-
-# Run detection
-detect_incident 1
+    --min-severity error \
+    --environment production \
+    --from "$FROM" \
+    --throwable \
+    --limit 20 \
+    --output json | jq '.rows[] | {level, tag, message, throwable_type, stack_trace[0]}'
+fi
 ```
 
-### Workflow 4: Session Reconstruction (Root Cause Analysis)
-
-**Guarantee**: Full audit trail for a user session.
+### Workflow 3: Session Reconstruction (Root Cause Analysis)
 
 ```bash
 #!/bin/bash
-
-# Input: User session ID
 SESSION_ID="${1}"
+if [ -z "$SESSION_ID" ]; then echo "Usage: $0 <session-uuid>"; exit 2; fi
 
-if [ -z "$SESSION_ID" ]; then
-  echo "Usage: $0 <session-uuid>"
-  exit 2
-fi
-
-echo "Reconstructing session: $SESSION_ID"
-
-# Get all logs for session ordered by time
+# All logs for session, ascending order (chronological)
 LOGS=$(apploggers telemetry query \
   --source logs \
   --session-id "$SESSION_ID" \
+  --order asc \
   --limit 1000 \
+  --throwable \
   --output json)
 
-if ! jq -e '.ok' <<< "$LOGS" > /dev/null; then
-  echo "ERROR: Failed to fetch session logs"
-  echo "$LOGS" | jq '.error'
-  exit 1
-fi
-
-# Get all metrics for session
+# All metrics for session
 METRICS=$(apploggers telemetry query \
   --source metrics \
   --session-id "$SESSION_ID" \
+  --order asc \
   --limit 1000 \
   --output json)
 
-# Combine into unified timeline
-TIMELINE=$(jq -s 'add | .rows | sort_by(.created_at)' \
-  <(jq '.rows[] | {type: "log", created_at, level, message}' <<< "$LOGS") \
-  <(jq '.rows[] | {type: "metric", created_at, name, value}' <<< "$METRICS"))
+echo "Session $SESSION_ID — $(jq '.count' <<< "$LOGS") logs, $(jq '.count' <<< "$METRICS") metrics"
+jq -r '.rows[] | "\(.created_at) [\(.level)] \(.tag): \(.message)"' <<< "$LOGS"
+```
 
-# Output: Chronological audit trail
-echo "Timeline:"
-jq -r '.[] | "\(.created_at) [\(.type | ascii_upcase)] \(.level // .name): \(.message // .value)"' <<< "$TIMELINE"
+### Workflow 4: Multi-Environment Comparison
 
-# Save for evidence
-TIMESTAMP=$(date -u '+%Y%m%d-%H%M%S')
-jq . > "session-${SESSION_ID}-${TIMESTAMP}.json" <<< "$(jq -s '{session_id, logs: .[0], metrics: .[1]}' <(jq '.rows' <<< "$LOGS") <(jq '.rows' <<< "$METRICS"))"
+```bash
+#!/bin/bash
+FROM=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
 
-echo "✓ Audit trail saved to: session-${SESSION_ID}-${TIMESTAMP}.json"
+for ENV in production staging development; do
+  STATS=$(apploggers telemetry stats \
+    --source logs \
+    --environment "$ENV" \
+    --from "$FROM" \
+    --output json 2>/dev/null)
+  if [ $? -eq 0 ]; then
+    TOTAL=$(jq '.total_events' <<< "$STATS")
+    RATE=$(jq '.error_rate_pct' <<< "$STATS")
+    echo "$ENV: $TOTAL events, ${RATE}% error rate"
+  fi
+done
+```
+
+### Workflow 5: Pagination for Large Datasets
+
+```bash
+#!/bin/bash
+PAGE=0
+PAGE_SIZE=1000
+TOTAL_EXPORTED=0
+
+while true; do
+  RESULT=$(apploggers telemetry query \
+    --source logs \
+    --min-severity error \
+    --environment production \
+    --from 2026-03-23T00:00:00Z \
+    --limit $PAGE_SIZE \
+    --offset $((PAGE * PAGE_SIZE)) \
+    --order asc \
+    --output json)
+
+  COUNT=$(jq '.count' <<< "$RESULT")
+  echo "$RESULT" >> /tmp/all-errors.jsonl
+  TOTAL_EXPORTED=$((TOTAL_EXPORTED + COUNT))
+  echo "Page $PAGE: $COUNT rows (total: $TOTAL_EXPORTED)"
+
+  [ "$COUNT" -lt "$PAGE_SIZE" ] && break
+  PAGE=$((PAGE + 1))
+done
+echo "Export complete: $TOTAL_EXPORTED rows"
 ```
 
 ---
 
 ## Command Reference
 
-### `apploggers capabilities`
+### `apploggers health --deep`
 
-**When to use**: At startup and periodically (hourly cache) to verify CLI features.
-
-```bash
-# Discover output modes
-capabilities=$(apploggers capabilities --output json)
-
-# Check if agent mode is supported
-if jq -e '.output_modes[] | select(. == "agent")' <<< "$capabilities" > /dev/null; then
-  echo "Agent mode supported ✓"
-fi
-
-# Check if telemetry is available
-if jq -e '.capabilities[] | select(. == "telemetry-agent-response")' <<< "$capabilities" > /dev/null; then
-  echo "Compact agent-response subcommand available ✓"
-fi
-```
-
-### `apploggers health`
-
-**When to use**: Every query (cached for 30 seconds) to detect transient failures.
+**When to use**: Pre-flight check, incident response, monitoring cron.
 
 ```bash
-# Full check
-apploggers health --output json
+apploggers health --deep --output json
 
 # Example output:
-# { "ok": true, "services": { "supabase": "available", "database": "online" } }
-
-# Minimal check (just success/fail)
-if apploggers health --output json | jq -e '.ok' > /dev/null; then
-  echo "Backend healthy"
-else
-  echo "Backend degraded or unavailable"
-fi
+# {
+#   "ok": true,
+#   "status": "ready",
+#   "version": "0.2.0",
+#   "project": "my-app",
+#   "deep": {
+#     "supabase_reachable": true,
+#     "latency_ms": 42,
+#     "logs_table_ok": true,
+#     "metrics_table_ok": true
+#   }
+# }
 ```
+
+### `apploggers telemetry query` — Full Flag Reference
+
+```bash
+apploggers telemetry query \
+  --source logs|metrics \
+  --from RFC3339 \
+  --to RFC3339 \
+  --aggregate none|hour|day|week|severity|tag|session|name|environment \
+  --severity debug|info|warn|error|critical|metric \
+  --min-severity debug|info|warn|error|critical \   # range: level >= min
+  --environment production|staging|development \
+  --tag TAG \
+  --session-id UUID \
+  --device-id ID \
+  --user-id UUID \
+  --contains TEXT \
+  --package PACKAGE_NAME \
+  --error-code CODE \
+  --anomaly-type TYPE \
+  --extra-key KEY --extra-value VALUE \             # JSONB ad-hoc filter
+  --sdk-version VERSION \
+  --throwable \                                     # include stack traces
+  --name METRIC_NAME \
+  --limit 1..1000 \
+  --offset 0.. \                                    # pagination
+  --order desc|asc \
+  --output text|json|agent
+```
+
+> `--severity` and `--min-severity` are mutually exclusive.  
+> `--extra-key` and `--extra-value` must be used together.
 
 ### `apploggers telemetry agent-response`
 
-**Recommended for agents** — Compact TOON output for machine parsing.
+**Recommended for agents** — Compact TOON output with `rows_preview` and `hints`.
 
 ```bash
-# Preferred: Compact agent response with summary
 apploggers telemetry agent-response \
   --source logs \
+  --min-severity error \
+  --environment production \
   --aggregate severity \
   --preview-limit 3 \
   --output agent
-
-# Output example (TOON):
-# kind: telemetry_agent_response
-# ok: true
-# source: logs
-# count: 2145
-# summary:
-#   by: severity
-#   buckets:
-#     - {key: error, count: 1200}
-#     - {key: warn, count: 945}
-# rows_preview:
-#   - {id: "...", level: error, message: "..."}
-#   - {id: "...", level: warn, message: "..."}
-#   - {id: "...", level: warn, message: "..."}
-# hints:
-#   - use_from_to_for_date_range
-#   - prefer_session_id_for_isolation
 ```
 
-### `apploggers telemetry query`
+### `apploggers telemetry stats`
 
-**When to use**: Full results needed, strict JSON required, analytics pipeline.
+**When to use**: Quick context before a detailed query. Error rate, top tags, distribution by environment.
 
 ```bash
-# Standard query
-apploggers telemetry query \
+apploggers telemetry stats \
   --source logs \
-  --from 2026-01-01T00:00:00Z \
-  --to 2026-01-01T23:59:59Z \
-  --aggregate severity \
-  --limit 25 \
+  --environment production \
+  --from 2026-03-23T00:00:00Z \
   --output json
+```
 
-# Filter warning anomalies stored in extra.anomaly_type
-apploggers telemetry query \
+### `apploggers telemetry stream`
+
+**When to use**: Frontend SSE integration. Pipe to an HTTP proxy that exposes it as `text/event-stream`.
+
+```bash
+apploggers telemetry stream \
   --source logs \
-  --severity warn \
-  --anomaly-type slow_response \
-  --limit 25 \
-  --output json
+  --min-severity error \
+  --environment production \
+  --interval 5
+```
 
-# Piping for further processing
-apploggers telemetry query \
-  --source metrics \
-  --name response_time_ms \
-  --aggregate name \
-  --output json \
-  | jq '.summary.buckets | sort_by(-count) | .[0:5]'
+### `apploggers telemetry tail`
+
+**When to use**: Real-time debugging from terminal. Human-readable follow mode.
+
+```bash
+apploggers telemetry tail \
+  --source logs \
+  --min-severity error \
+  --environment production \
+  --interval 3
 ```
 
 ---
 
 ## TOON Format Parsing (Agent Output)
 
-TOON is a line-oriented format similar to YAML but more minimal. Here's how to parse agent responses in common languages:
+TOON (`toon-go v0.0.0-20251202084852`) is a line-oriented format with length markers. The CLI uses `toon.WithLengthMarkers(true)`.
 
-### Bash (Pure)
+### Bash
 
 ```bash
-# Extract a top-level key
-count=$(grep -E '^count:' | awk '{print $2}')
-kind=$(grep -E '^kind:' | awk '{print $2}')
-
-# The CLI guarantees single-line, parseable format
+# Extract top-level key
+count=$(apploggers telemetry agent-response --source logs --output agent | grep -E '^count:' | awk '{print $2}')
 ```
 
 ### Python
 
 ```python
-import subprocess
-import json
+import subprocess, json
 
-# Execute query
-output = subprocess.check_output([
+# Use --output json for strict JSON parsing
+result = subprocess.check_output([
     'apploggers', 'telemetry', 'agent-response',
-    '--source', 'logs',
-    '--aggregate', 'severity',
-    '--output', 'agent'
+    '--source', 'logs', '--aggregate', 'severity',
+    '--output', 'json'
 ], text=True)
-
-# Simple TOON-to-dict parser
-result = {}
-for line in output.strip().split('\n'):
-    if ':' in line:
-        key, val = line.split(':', 1)
-        res[key.strip()] = val.strip()
-
-# Access
-print(result['count'])
-print(result['kind'])
+data = json.loads(result)
+print(data['count'], data['summary'])
 ```
 
 ### Go
 
 ```go
-import (
- "encoding/json"
- "os/exec"
-)
-
-// Struct matching telemetry_agent_response
 type AgentResponse struct {
- Kind   string `json:"kind"`
- OK     bool   `json:"ok"`
- Source string `json:"source"`
- Count  int    `json:"count"`
+    Kind    string `json:"kind"`
+    OK      bool   `json:"ok"`
+    Source  string `json:"source"`
+    Count   int    `json:"count"`
+    Summary *struct {
+        By      string `json:"by"`
+        Buckets []struct {
+            Key   string `json:"key"`
+            Count int    `json:"count"`
+        } `json:"buckets"`
+    } `json:"summary,omitempty"`
 }
 
-// Execute
 cmd := exec.Command("apploggers", "telemetry", "agent-response",
- "--source", "logs",
- "--aggregate", "severity",
- "--output", "agent")
-
-output, _ := cmd.Output()
-
-// Parse (if using intermediary JSON conversion)
+    "--source", "logs", "--aggregate", "severity", "--output", "json")
+out, _ := cmd.Output()
 var resp AgentResponse
-json.Unmarshal(output, &resp)
+json.Unmarshal(out, &resp)
 ```
 
 ---
@@ -520,294 +444,178 @@ json.Unmarshal(output, &resp)
 |---|---|---|---|
 | Invalid flag | 2 | `usage_error` | **Fail fast**. Fix invocation. |
 | Invalid value (enum) | 2 | `usage_error` | **Fail fast**. Validate inputs against schema. |
-| Invalid timestamp format | 2 | `usage_error` | **Fail fast**. Use RFC3339, use date utility. |
-| Network timeout | 1 | `runtime_error` | **Retry with backoff** (exponential, max 3 attempts). |
-| Supabase 5xx | 1 | `runtime_error` | **Retry with backoff**. Check `health` first. |
-| Missing credentials | 1 | `runtime_error` | **Fail immediately**. Alert ops. |
-
-### Example Retry Logic
-
-```bash
-#!/bin/bash
-
-retry_query() {
-  local cmd=("$@")
-  local max_attempts=3
-  local attempt=1
-  local delay=1
-  
-  while [ $attempt -le $max_attempts ]; do
-    echo "Attempt $attempt/$max_attempts..."
-    
-    "${cmd[@]}" && return 0
-    
-    exit_code=$?
-    
-    # Usage error: don't retry
-    if [ $exit_code -eq 2 ]; then
-      return 2
-    fi
-    
-    # Runtime error: retry with backoff
-    if [ $exit_code -eq 1 ] && [ $attempt -lt $max_attempts ]; then
-      echo "Failed. Waiting ${delay}s before retry..."
-      sleep $delay
-      delay=$((delay * 2))  # exponential backoff
-      attempt=$((attempt + 1))
-    else
-      return $exit_code
-    fi
-  done
-}
-
-retry_query apploggers telemetry query --source logs --limit 10 --output json
-```
+| `--severity` + `--min-severity` together | 2 | `usage_error` | Use one or the other. |
+| `--extra-key` without `--extra-value` | 2 | `usage_error` | Both flags required together. |
+| Network timeout | 1 | `runtime_error` | CLI retries 429/503 automatically. Check `health --deep`. |
+| HTTP 401 | 1 | `runtime_error` | Fix `api_key` in `cli.json`. |
+| HTTP 403 | 1 | `runtime_error` | Fix RLS policies in Supabase. |
+| HTTP 404 | 1 | `runtime_error` | Run AppLoggers migrations. |
+| HTTP 429 | 1 | `runtime_error` | Auto-retried (3 attempts). |
+| HTTP 503 | 1 | `runtime_error` | Auto-retried (3 attempts). |
 
 ---
 
 ## Best Practices
 
-### 1. **Always Validate Input Before Querying**
+### 1. Use `--min-severity` instead of `--severity` for error triage
 
 ```bash
-# ❌ Don't do this
-apploggers telemetry query --source "$source_from_user" --limit "$limit_from_user"
+# ❌ Misses CRITICAL events
+apploggers telemetry query --source logs --severity error
 
-# ✅ Do this
-case "$source_from_user" in
-  logs|metrics) source=$source_from_user ;;
-  *) echo "ERROR: Invalid source"; exit 2 ;;
-esac
-
-case "$limit_from_user" in
-  [0-9]*) [ "$limit_from_user" -ge 1 ] && [ "$limit_from_user" -le 1000 ] && \
-          limit=$limit_from_user || exit 2 ;;
-  *) echo "ERROR: Invalid limit"; exit 2 ;;
-esac
-
-apploggers telemetry query --source "$source" --limit $limit
+# ✅ Captures ERROR + CRITICAL
+apploggers telemetry query --source logs --min-severity error
 ```
 
-### 2. **Cache Discovery Results (CloudFlare Workers Pattern)**
+### 2. Always filter by `--environment` in production
 
 ```bash
-# discovery.json created once, reused for 24h
-DISCOVERY_CACHE="${HOME}/.applogger-discovery"
-CACHE_AGE=$((24 * 3600))
+# ❌ Mixes production and staging data
+apploggers telemetry query --source logs --severity error
 
-if [ -f "$DISCOVERY_CACHE" ]; then
-  MTIME=$(stat -c %Y "$DISCOVERY_CACHE" 2>/dev/null || stat -f %m "$DISCOVERY_CACHE")
-  AGE=$(($(date +%s) - MTIME))
-  
-  if [ $AGE -lt $CACHE_AGE ]; then
-    echo "Using cached discovery (age: ${AGE}s)"
-    cat "$DISCOVERY_CACHE"
-    exit 0
-  fi
-fi
-
-# Refresh
-apploggers capabilities --output json > "$DISCOVERY_CACHE"
-cat "$DISCOVERY_CACHE"
+# ✅ Production only
+apploggers telemetry query --source logs --min-severity error --environment production
 ```
 
-### 3. **Log All Queries for Audit**
+### 3. Use `stats` before `query` for context
 
 ```bash
-# Every agent invocation should log:
-log_file="/var/log/applogger-agent.log"
+# Get the big picture first
+apploggers telemetry stats --source logs --environment production --output json
 
-{
-  echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Query: $@"
-  apploggers "$@" 2>&1
-  echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Exit: $?"
-} >> "$log_file"
+# Then drill down
+apploggers telemetry query --source logs --min-severity error --environment production --throwable --limit 20
 ```
 
-### 4. **Use Session-ID for Isolation**
+### 4. Use `--throwable` only when needed
 
 ```bash
-# ❌ Risky: Query all logs
-apploggers telemetry query --source logs --limit 5000
+# ❌ Always fetching stack traces wastes bandwidth
+apploggers telemetry query --source logs --throwable --limit 1000
 
-# ✅ Safe: Isolate by session
-apploggers telemetry query \
-  --source logs \
-  --session-id "$user_session_id" \
-  --limit 1000
+# ✅ Only when debugging a specific error
+apploggers telemetry query --source logs --severity error --throwable --limit 10
 ```
 
-### 5. **Prefer agent-response for Compact Output**
+### 5. Paginate large exports
 
 ```bash
-# ❌ Verbose: Full query response
-apploggers telemetry query --source logs --aggregate severity --output json
+# ✅ Use --offset for datasets > 1000 rows
+apploggers telemetry query --source logs --limit 1000 --offset 0
+apploggers telemetry query --source logs --limit 1000 --offset 1000
+```
 
-# ✅ Compact: Agent-optimized
-apploggers telemetry agent-response \
-  --source logs \
-  --aggregate severity \
-  --preview-limit 2 \
-  --output agent
+### 6. Use `health --deep` in monitoring, not just `health`
+
+```bash
+# ❌ Only checks CLI readiness, not Supabase
+apploggers health --output json
+
+# ✅ Verifies real connectivity and measures latency
+apploggers health --deep --output json
 ```
 
 ---
 
 ## Integration Examples
 
-### Example 1: Kubernetes Health Check
-
-```yaml
-# Pod liveness check
-apiVersion: v1
-kind: Pod
-metadata:
-  name: my-app
-spec:
-  containers:
-  - name: app
-    livenessProbe:
-      exec:
-        command:
-        - sh
-        - -c
-        - apploggers health --output json | jq -e '.ok'
-      initialDelaySeconds: 30
-      periodSeconds: 10
-```
-
-### Example 2: GitHub Actions Workflow
+### GitHub Actions — Daily Audit
 
 ```yaml
 name: Daily Telemetry Audit
-
 on:
   schedule:
-    - cron: '0 9 * * *'  # 9 AM UTC
-
+    - cron: '0 9 * * *'
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - name: Install CLI
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
+        run: curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
-      - name: Query errors (last 24h)
-        env:
-          appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL }}
-          appLogger_supabaseKey: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
+      - name: Configure cli.json
         run: |
-          /tmp/apploggers telemetry query \
-            --source logs \
-            --severity error \
-            --output json \
-            > audit-$(date +%Y%m%d).json
+          mkdir -p ~/.apploggers
+          cat > ~/.apploggers/cli.json << EOF
+          {
+            "default_project": "my-app",
+            "projects": [{"name": "my-app", "supabase": {
+              "url": "${{ secrets.APPLOGGER_SUPABASE_URL }}",
+              "api_key": "${{ secrets.APPLOGGER_SUPABASE_KEY }}"
+            }}]
+          }
+          EOF
+
+      - name: Deep health check
+        run: apploggers health --deep --output json | jq -e '.ok'
+
+      - name: Production stats
+        run: |
+          apploggers telemetry stats \
+            --source logs --environment production \
+            --from "$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ')" \
+            --output json > stats.json
+          jq '{total: .total_events, error_rate: .error_rate_pct}' stats.json
 
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
           name: telemetry-audit
-          path: audit-*.json
+          path: stats.json
 ```
 
-### Example 3: Terraform + CLI Monitoring
+### Frontend SSE Proxy (Node.js)
 
-```hcl
-resource "null_resource" "applogger_health_check" {
-  provisioners "local-exec" {
-    command = "apploggers health --output json | jq '.ok'"
-  }
-  
-  triggers = {
-    always_run = timestamp()
-  }
-}
+```javascript
+const { spawn } = require('child_process');
+const http = require('http');
+
+http.createServer((req, res) => {
+  if (req.url !== '/stream') return res.end();
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  });
+
+  const cli = spawn('apploggers', [
+    'telemetry', 'stream',
+    '--source', 'logs',
+    '--min-severity', 'error',
+    '--environment', 'production',
+    '--interval', '5',
+  ]);
+
+  cli.stdout.pipe(res);
+  req.on('close', () => cli.kill());
+}).listen(3001);
 ```
 
----
-
-## Troubleshooting
-
-### "apploggers: command not found"
-
-```bash
-# Check installation
-which apploggers
-
-# Check PATH
-echo $PATH
-
-# Reinstall
-curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
+```javascript
+// Browser client
+const es = new EventSource('http://localhost:3001/stream');
+es.addEventListener('telemetry', (e) => {
+  const data = JSON.parse(e.data);
+  console.log(`${data.count} new events`);
+});
+es.addEventListener('heartbeat', () => console.log('stream alive'));
+es.addEventListener('error', (e) => {
+  const data = JSON.parse(e.data);
+  console.error('stream error:', data.error);
+});
 ```
-
-### "backend health check failed"
-
-```bash
-# Verify credentials
-echo "URL: $appLogger_supabaseUrl"
-echo "Key: ${appLogger_supabaseKey:0:10}..."
-
-# Test connectivity
-curl -s "$appLogger_supabaseUrl/rest/v1/?apikey=$appLogger_supabaseKey" | jq .
-
-# Check Supabase dashboard
-# https://supabase.com/dashboard → Status
-```
-
-### "TOON parse error"
-
-TOON format is simple line-oriented format. Keys come before colons, values after:
-
-```
-kind: telemetry_agent_response
-ok: true
-count: 1247
-```
-
-If your parser shows errors, verify:
-1. Output is actually TOON (not JSON with `--output json`)
-2. Lines aren't wrapped/truncated
-3. Use `apploggers telemetry agent-response --output agent 2>&1 | od -c` to debug bytes
-
----
-
-## FAQ
-
-**Q: Can I parse `--output agent` with JSON?**  
-A: No, TOON is a different format. Use `--output json` for JSON parsing, or extract TOON one line at a time.
-
-**Q: Is agent mode production-safe?**  
-A: Yes. All agent responses are deterministic, validated, and tested against contract tests.
-
-**Q: What happens if Supabase has 100s of millions of records?**  
-A: Queries have `--limit` (default 25, max 1000). Use `--from` and `--to` to narrow date ranges.
-
-**Q: Can I query sensitive PII?**  
-A: Yes, but be responsible. The CLI has no filtering. Ensure your agent doesn't log sensitive data. Use RLS policies in Supabase.
-
-**Q: Does the CLI cache results?**  
-A: No. Each `apploggers` call hits Supabase. Cache in your agent if needed.
 
 ---
 
 ## Version Compatibility
 
-| CLI Version | Go | Status |
-|---|---|---|
-| Latest stable | 1.24+ | Current |
+| CLI Version | Contract Version | Go | Status |
+|---|---|---|---|
+| 0.2.0 | 2.0.0 | 1.24+ | Current |
+| 0.1.x | 1.0.0 | 1.24+ | Deprecated |
 
-Always use the latest stable release. Check [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases) for the current version.
-
----
-
-## Next Steps
-
-1. **Install CLI**: Follow [../cli/INSTALLATION.md](../cli/INSTALLATION.md)
-2. **Read CLI Guide**: [../cli/README.md](../cli/README.md)
-3. **Try examples**: Run workflows above in your environment
-4. **Integrate**: Use in your CI/CD, monitors, bots
+Always use the latest stable release. Check [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases).
 
 ---
 

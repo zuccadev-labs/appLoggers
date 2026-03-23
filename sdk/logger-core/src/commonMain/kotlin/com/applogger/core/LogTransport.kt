@@ -44,11 +44,16 @@ sealed class TransportResult {
      *
      * @property reason Human-readable failure description.
      * @property retryable If true, the batch will be re-queued for a later attempt.
+     * @property retryAfterMs Optional minimum delay in milliseconds before retrying.
+     *           Set by the transport when the server returns a `Retry-After` header (e.g. HTTP 429).
+     *           The [com.applogger.core.internal.BatchProcessor] will respect this value
+     *           instead of its default exponential backoff when present.
      * @property cause Optional underlying exception.
      */
     data class Failure(
         val reason: String,
         val retryable: Boolean,
+        val retryAfterMs: Long? = null,
         val cause: Throwable? = null
     ) : TransportResult()
 }

@@ -232,9 +232,9 @@ GOOS=windows GOARCH=amd64 go build -o apploggers-windows-amd64.exe ./cmd/applogg
 
 ## Configuración Inicial
 
-### Archivo de proyectos (recomendado)
+El CLI crea `~/.apploggers/cli.json` automáticamente en el primer run. Este archivo es la única fuente de configuración — no hay variables de entorno que gestionar.
 
-Al instalar, el CLI crea automáticamente `~/.apploggers/cli.json`. Edítalo con los datos de tu proyecto Supabase:
+Editar el archivo con los datos del proyecto Supabase (URL y `service_role key` desde Supabase Dashboard → Project Settings → API):
 
 ```json
 {
@@ -246,58 +246,41 @@ Al instalar, el CLI crea automáticamente `~/.apploggers/cli.json`. Edítalo con
       "workspace_roots": [],
       "supabase": {
         "url": "https://your-project.supabase.co",
-        "api_key_env": "APPLOGGER_SUPABASE_KEY",
-        "schema": "public",
-        "logs_table": "app_logs",
-        "metrics_table": "app_metrics",
-        "timeout_seconds": 15
+        "api_key": "eyJhbGci..."
       }
     }
   ]
 }
 ```
 
-Luego define la variable de entorno referenciada en `api_key_env`:
+Rutas del archivo:
+
+```
+Windows : C:\Users\<usuario>\.apploggers\cli.json
+Linux   : /home/<usuario>/.apploggers/cli.json
+macOS   : /Users/<usuario>/.apploggers/cli.json
+```
+
+> No versionar este archivo — contiene el `service_role key`. El SDK móvil usa `anon key`; el CLI usa `service_role key`. Nunca exponer `service_role` en clientes móviles o frontend.
+
+Si se prefiere no almacenar el key en el archivo, usar `api_key_env` con el nombre de la variable UPPERCASE. La URL siempre va en el json — no existe variable de entorno para la URL en este path:
+
+```json
+"supabase": {
+  "url": "https://your-project.supabase.co",
+  "api_key_env": "APPLOGGER_SUPABASE_KEY"
+}
+```
+
+Solo el key se exporta como variable de entorno:
 
 ```bash
 # Linux / macOS
-export APPLOGGER_SUPABASE_KEY="your-service-role-key"
+export APPLOGGER_SUPABASE_KEY="eyJhbGci..."
 
 # Windows PowerShell
-$env:APPLOGGER_SUPABASE_KEY = "your-service-role-key"
+$env:APPLOGGER_SUPABASE_KEY = "eyJhbGci..."
 ```
-
-### Variables de entorno directas (alternativa)
-
-Si no usas archivo de proyectos, configura las variables primarias:
-
-```bash
-# Linux / macOS
-export appLogger_supabaseUrl="https://your-project.supabase.co"
-export appLogger_supabaseKey="your-service-role-key"
-```
-
-```powershell
-# Windows PowerShell
-$env:appLogger_supabaseUrl = "https://your-project.supabase.co"
-$env:appLogger_supabaseKey = "your-service-role-key"
-```
-
-```cmd
-REM Windows CMD
-set appLogger_supabaseUrl=https://your-project.supabase.co
-set appLogger_supabaseKey=your-service-role-key
-```
-
-Para persistir en Bash/Zsh:
-
-```bash
-echo 'export appLogger_supabaseUrl="https://your-project.supabase.co"' >> ~/.bashrc
-echo 'export appLogger_supabaseKey="your-service-role-key"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-> Usa siempre la `service_role` key del CLI. El SDK móvil debe usar la anon key. Nunca expongas `service_role` en clientes móviles o frontend.
 
 Ver [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md) para configuración corporativa completa.
 
@@ -359,16 +342,14 @@ chmod +x /usr/local/bin/apploggers
 
 ### "missing Supabase URL" o "missing Supabase API key"
 
-Las variables de entorno no están configuradas o el archivo `~/.apploggers/cli.json` no tiene datos válidos.
+El archivo `~/.apploggers/cli.json` no tiene `url` o `api_key` configurados.
 
 ```bash
-# Verificar variables
-echo $appLogger_supabaseUrl
-echo $appLogger_supabaseKey
-
 # Verificar archivo de configuración
 cat ~/.apploggers/cli.json
 ```
+
+Asegurarse de que `supabase.url` y `supabase.api_key` (o `supabase.api_key_env`) tienen valores no vacíos.
 
 ### "authorization failed: invalid API key"
 
@@ -376,7 +357,7 @@ La key de Supabase es inválida o expiró.
 
 1. Ve a [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API
 2. Copia la `service_role` key
-3. Actualiza la variable: `export appLogger_supabaseKey="..."`
+3. Actualiza `api_key` en `~/.apploggers/cli.json`
 
 ### "GOARCH and OS env vars not allowed" (al compilar)
 

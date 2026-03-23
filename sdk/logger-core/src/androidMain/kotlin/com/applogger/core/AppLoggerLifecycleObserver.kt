@@ -2,25 +2,40 @@ package com.applogger.core
 
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.applogger.core.internal.BatchProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Flush automático cuando la app entra en background.
+ * Flush automático + notificación de background cuando la app entra en background (onStop).
  */
 internal class AppLoggerLifecycleObserver(
-    private val onFlush: () -> Unit
+    private val onBackground: () -> Unit
 ) : DefaultLifecycleObserver {
 
     override fun onStop(owner: LifecycleOwner) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                onFlush()
+                onBackground()
             } catch (_: Exception) {
                 // Silenciar errores en background flush
             }
+        }
+    }
+}
+
+/**
+ * Notificación de foreground para rotación de sesión por timeout (onStart).
+ */
+internal class AppLoggerForegroundObserver(
+    private val onForeground: () -> Unit
+) : DefaultLifecycleObserver {
+
+    override fun onStart(owner: LifecycleOwner) {
+        try {
+            onForeground()
+        } catch (_: Exception) {
+            // Silenciar errores en foreground callback
         }
     }
 }
