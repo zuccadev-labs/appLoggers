@@ -20,7 +20,7 @@ type healthPayload struct {
 
 type healthDeepResult struct {
 	SupabaseReachable bool   `json:"supabase_reachable"`
-	LatencyMs         int64  `json:"latency_ms,omitempty"`
+	LatencyMs         int64  `json:"latency_ms"`
 	LogsTableOK       bool   `json:"logs_table_ok"`
 	MetricsTableOK    bool   `json:"metrics_table_ok"`
 	Error             string `json:"error,omitempty"`

@@ -342,7 +342,7 @@ func newTelemetryStatsCommand() *cobra.Command {
 	// We look up the flag after registration to avoid a panic if the flag name changes.
 	if limitFlag := cmd.Flags().Lookup("limit"); limitFlag != nil {
 		limitFlag.DefValue = "500"
-		limitFlag.Value.Set("500") // nolint:errcheck — Set on IntVar always succeeds for valid int
+		limitFlag.Value.Set("500") //nolint:errcheck // Set on IntVar always succeeds for valid int
 	}
 
 	return cmd
