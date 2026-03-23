@@ -35,6 +35,8 @@ jobs:
         run: ./gradlew detekt
 
       - name: Run Unit Tests
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :sample:testDebugUnitTest
 
       - name: Upload Test Reports
@@ -48,6 +50,8 @@ jobs:
           retention-days: 30
 
       - name: Build
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew assemble
 
       - name: Set up Go
