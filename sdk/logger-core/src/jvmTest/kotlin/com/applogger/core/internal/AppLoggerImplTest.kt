@@ -3,6 +3,11 @@ package com.applogger.core.internal
 import com.applogger.core.*
 import com.applogger.core.model.DeviceInfo
 import com.applogger.core.model.LogLevel
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.boolean
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
@@ -98,7 +103,7 @@ class AppLoggerImplTest {
         assertEquals(LogLevel.INFO, event.level)
         assertEquals("PLAYER", event.tag)
         assertEquals("Playback started", event.message)
-        assertEquals("movie_123", event.extra?.get("content_id"))
+        assertEquals("movie_123", event.extra?.get("content_id")?.jsonPrimitive?.content)
     }
 
     @Test
@@ -135,7 +140,7 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         val event = fakeTransport.sentEvents[0]
-        assertEquals("HIGH_LATENCY", event.extra?.get("anomaly_type"))
+        assertEquals("HIGH_LATENCY", event.extra?.get("anomaly_type")?.jsonPrimitive?.content)
     }
 
     @Test
@@ -146,8 +151,9 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         val event = fakeTransport.sentEvents[0]
-        assertEquals("3", event.extra?.get("retry_count"))
-        assertEquals("false", event.extra?.get("is_cached"))
+        // Native types preserved — Int stays Int, Boolean stays Boolean
+        assertEquals(3, event.extra?.get("retry_count")?.jsonPrimitive?.int)
+        assertEquals(false, event.extra?.get("is_cached")?.jsonPrimitive?.boolean)
     }
 
     @Test
@@ -158,8 +164,8 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         val event = fakeTransport.sentEvents[0]
-        assertEquals("TIMEOUT", event.extra?.get("anomaly_type"))
-        assertEquals("/api/v1", event.extra?.get("endpoint"))
+        assertEquals("TIMEOUT", event.extra?.get("anomaly_type")?.jsonPrimitive?.content)
+        assertEquals("/api/v1", event.extra?.get("endpoint")?.jsonPrimitive?.content)
     }
 
     @Test
@@ -332,7 +338,7 @@ class AppLoggerImplTest {
         val event = fakeTransport.sentEvents[0]
         assertNotNull(event.throwableInfo)
         assertEquals("Exception", event.throwableInfo?.type)
-        assertEquals("HIGH_LATENCY", event.extra?.get("anomaly_type"))
+        assertEquals("HIGH_LATENCY", event.extra?.get("anomaly_type")?.jsonPrimitive?.content)
     }
 
     @Test
@@ -346,7 +352,8 @@ class AppLoggerImplTest {
     }
 
     @Test
-    fun `extra values with numeric and boolean types are stored as strings in LogEvent`() = runBlocking {        logger = createLogger(buildConfig(debugMode = false))
+    fun `extra values with numeric and boolean types are stored as native JsonElement`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
         logger.info("TAG", "typed extra", extra = mapOf(
             "retry_count" to 3,
             "latency_ms" to 123.45,
@@ -357,11 +364,11 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         val event = fakeTransport.sentEvents[0]
-        // LogEvent stores everything as String — type preservation happens at transport layer
-        assertEquals("3", event.extra?.get("retry_count"))
-        assertEquals("123.45", event.extra?.get("latency_ms"))
-        assertEquals("true", event.extra?.get("is_cached"))
-        assertEquals("home", event.extra?.get("label"))
+        // Native types preserved directly in JsonElement — no string conversion
+        assertEquals(3, event.extra?.get("retry_count")?.jsonPrimitive?.int)
+        assertEquals(123.45, event.extra?.get("latency_ms")?.jsonPrimitive?.double)
+        assertEquals(true, event.extra?.get("is_cached")?.jsonPrimitive?.boolean)
+        assertEquals("home", event.extra?.get("label")?.jsonPrimitive?.content)
     }
 
     // ── Global extra ──────────────────────────────────────────────────────────
@@ -376,8 +383,8 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         val event = fakeTransport.sentEvents[0]
-        assertEquals("checkout_v2", event.extra?.get("ab_test"))
-        assertEquals("group_b", event.extra?.get("experiment"))
+        assertEquals("checkout_v2", event.extra?.get("ab_test")?.jsonPrimitive?.content)
+        assertEquals("group_b", event.extra?.get("experiment")?.jsonPrimitive?.content)
     }
 
     @Test
@@ -388,7 +395,7 @@ class AppLoggerImplTest {
         delay(200)
         processor.sendBatch()
 
-        assertEquals("local", fakeTransport.sentEvents[0].extra?.get("source"))
+        assertEquals("local", fakeTransport.sentEvents[0].extra?.get("source")?.jsonPrimitive?.content)
     }
 
     @Test

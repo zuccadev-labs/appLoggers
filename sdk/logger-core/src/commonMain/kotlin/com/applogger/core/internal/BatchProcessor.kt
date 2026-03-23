@@ -11,6 +11,11 @@ import kotlin.random.Random
 /**
  * Core pipeline: buffers events and delivers them in batches with
  * exponential backoff + jitter on transport failure.
+ *
+ * Cuando [offlineStorage] está configurado (offlinePersistenceMode != NONE):
+ * - Al inicio, drena SQLite y reencola los eventos persistidos.
+ * - Cuando se agotan los reintentos, persiste en SQLite en lugar de solo DLQ.
+ *   Con CRITICAL_ONLY solo persiste ERROR y CRITICAL; con ALL persiste todo.
  */
 internal class BatchProcessor(
     private val buffer: LogBuffer,
@@ -18,6 +23,7 @@ internal class BatchProcessor(
     @Suppress("UnusedPrivateProperty")
     private val formatter: LogFormatter,
     private val config: AppLoggerConfig,
+    private val offlineStorage: OfflineStorage = NoOpOfflineStorage,
     private val maxRetries: Int = 5,
     private val baseDelayMs: Long = 1_000L,
     private val maxDelayMs: Long = 30_000L
@@ -34,6 +40,7 @@ internal class BatchProcessor(
     internal fun getConsecutiveFailures(): Int = consecutiveFailures
 
     init {
+        scope.launch { drainOfflineStorage() }
         scope.launch { startConsuming() }
         scope.launch { startPeriodicFlush() }
     }
@@ -43,6 +50,20 @@ internal class BatchProcessor(
         if (!accepted && config.verboseTransportLogging) {
             platformLog("AppLogger", "Event dropped: channel at capacity")
         }
+    }
+
+    /**
+     * Al arrancar, recupera eventos persistidos offline y los reencola.
+     * Espera a que el transport esté disponible antes de intentar enviar.
+     */
+    private suspend fun drainOfflineStorage() {
+        if (config.offlinePersistenceMode == OfflinePersistenceMode.NONE) return
+        val stored = offlineStorage.drain(limit = 500)
+        if (stored.isEmpty()) return
+        if (config.verboseTransportLogging) {
+            platformLog("AppLogger", "Recovered ${stored.size} events from offline storage")
+        }
+        stored.forEach { buffer.push(it) }
     }
 
     private suspend fun startConsuming() {
@@ -68,7 +89,8 @@ internal class BatchProcessor(
         if (batch.isEmpty()) return
 
         if (!transport.isAvailable()) {
-            batch.forEach { buffer.push(it) }
+            // Sin conectividad: persiste offline si está configurado, sino devuelve al buffer
+            persistOrRequeue(batch)
             return
         }
 
@@ -78,6 +100,23 @@ internal class BatchProcessor(
         when (result) {
             is TransportResult.Success -> consecutiveFailures = 0
             is TransportResult.Failure -> handleFailure(batch, result)
+        }
+    }
+
+    private fun persistOrRequeue(batch: List<LogEvent>) {
+        when (config.offlinePersistenceMode) {
+            OfflinePersistenceMode.NONE -> batch.forEach { buffer.push(it) }
+            OfflinePersistenceMode.CRITICAL_ONLY -> {
+                val critical = batch.filter {
+                    it.level == LogLevel.ERROR || it.level == LogLevel.CRITICAL
+                }
+                val rest = batch.filter {
+                    it.level != LogLevel.ERROR && it.level != LogLevel.CRITICAL
+                }
+                if (critical.isNotEmpty()) offlineStorage.persist(critical)
+                rest.forEach { buffer.push(it) }
+            }
+            OfflinePersistenceMode.ALL -> offlineStorage.persist(batch)
         }
     }
 
@@ -95,9 +134,14 @@ internal class BatchProcessor(
             }
             delay(delayMs)
         } else {
-            deadLetterQueue.enqueue(batch, result.reason)
+            // Reintentos agotados: persiste offline si está configurado, sino DLQ en memoria
+            if (config.offlinePersistenceMode != OfflinePersistenceMode.NONE) {
+                persistOrRequeue(batch)
+            } else {
+                deadLetterQueue.enqueue(batch, result.reason)
+            }
             if (config.verboseTransportLogging) {
-                platformLog("AppLogger", "Max retries exhausted, ${batch.size} events moved to DLQ")
+                platformLog("AppLogger", "Max retries exhausted, ${batch.size} events persisted/DLQ")
             }
             consecutiveFailures = 0
         }

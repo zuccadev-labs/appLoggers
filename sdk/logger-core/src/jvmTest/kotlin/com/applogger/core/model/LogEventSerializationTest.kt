@@ -2,6 +2,7 @@ package com.applogger.core.model
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -75,7 +76,10 @@ class LogEventSerializationTest {
             message = "Started",
             deviceInfo = testDeviceInfo,
             sessionId = "session-ghi",
-            extra = mapOf("content_id" to "movie_123", "quality" to "4K")
+            extra = mapOf(
+                "content_id" to JsonPrimitive("movie_123"),
+                "quality" to JsonPrimitive("4K")
+            )
         )
 
         val encoded = json.encodeToString(event)

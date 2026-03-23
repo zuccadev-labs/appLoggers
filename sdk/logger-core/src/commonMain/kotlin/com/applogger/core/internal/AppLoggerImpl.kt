@@ -3,6 +3,8 @@ package com.applogger.core.internal
 import com.applogger.core.*
 import com.applogger.core.model.*
 import kotlin.concurrent.Volatile
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 // Orden de severidad para comparar contra minLevel
 private val LEVEL_ORDINAL = mapOf(
@@ -22,6 +24,17 @@ private val MIN_LEVEL_ORDINAL = mapOf(
     LogMinLevel.CRITICAL to 4
 )
 
+/** Convierte un valor Any a JsonElement preservando el tipo nativo. */
+internal fun anyToJsonElement(value: Any): JsonElement = when (value) {
+    is Boolean -> JsonPrimitive(value)
+    is Int     -> JsonPrimitive(value)
+    is Long    -> JsonPrimitive(value)
+    is Float   -> JsonPrimitive(value)
+    is Double  -> JsonPrimitive(value)
+    is String  -> JsonPrimitive(value)
+    else       -> JsonPrimitive(value.toString())
+}
+
 /**
  * Implementación core del pipeline de eventos.
  */
@@ -40,9 +53,10 @@ internal class AppLoggerImpl(
     private var userId: String? = null
 
     // Global extra: copy-on-write map — safe for multiplatform commonMain.
+    // Stored as Map<String, JsonElement> — same type as LogEvent.extra.
     // Reads are lock-free (volatile snapshot). Writes replace the reference atomically.
     @Volatile
-    private var globalExtra: Map<String, String> = emptyMap()
+    private var globalExtra: Map<String, JsonElement> = emptyMap()
 
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
         process(LogLevel.DEBUG, tag, message, throwable, extra = extra)
@@ -59,8 +73,7 @@ internal class AppLoggerImpl(
         anomalyType: String?,
         extra: Map<String, Any>?
     ) {
-        // Merge anomalyType into extra as Map<String, Any> so native types are preserved
-        // through the same path as all other levels — no premature toString() here.
+        // Merge anomalyType into extra preserving native types — no premature toString().
         val mergedExtra: Map<String, Any>? = when {
             anomalyType != null && extra != null -> extra + mapOf<String, Any>("anomaly_type" to anomalyType)
             anomalyType != null -> mapOf("anomaly_type" to anomalyType)
@@ -141,10 +154,10 @@ internal class AppLoggerImpl(
 
     /**
      * Attaches a key-value pair to every subsequent event until removed.
-     * Copy-on-write: reads are always lock-free.
+     * Stored as JsonPrimitive(String) — copy-on-write, lock-free reads.
      */
     override fun addGlobalExtra(key: String, value: String) {
-        globalExtra = globalExtra + (key to value)
+        globalExtra = globalExtra + (key to JsonPrimitive(value))
     }
 
     override fun removeGlobalExtra(key: String) {
@@ -156,21 +169,15 @@ internal class AppLoggerImpl(
     }
 
     /**
-     * Stringifies per-call extra and merges with globalExtra.
-     * globalExtra has lower priority — per-call values win on key collision.
+     * Converts per-call Map<String, Any> to Map<String, JsonElement> and merges
+     * with globalExtra. Per-call values win on key collision.
+     * Returns null if both sources are empty.
      */
     private fun mergeExtra(
         extra: Map<String, Any>?,
-        global: Map<String, String>
-    ): Map<String, String>? {
-        val perCall = extra?.mapValues { (_, v) ->
-            when (v) {
-                is String  -> v
-                is Number  -> v.toString()
-                is Boolean -> v.toString()
-                else       -> v.toString()
-            }
-        }
+        global: Map<String, JsonElement>
+    ): Map<String, JsonElement>? {
+        val perCall = extra?.mapValues { (_, v) -> anyToJsonElement(v) }
         return when {
             global.isEmpty() && perCall == null -> null
             global.isEmpty() -> perCall
@@ -204,7 +211,7 @@ internal class AppLoggerImpl(
                 platformLog("AppLogger/$tag", "[${level.name}] $message")
             }
 
-            // Stringify per-call extra, preserving numeric/boolean representation.
+            // Convierte Map<String,Any> a Map<String,JsonElement> preservando tipos nativos.
             // Merge: globalExtra (lower priority) + perCall (higher priority).
             val resolvedExtra = mergeExtra(extra, globalExtra)
             val event = LogEvent(

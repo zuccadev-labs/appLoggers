@@ -14,8 +14,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 /**
@@ -185,9 +185,6 @@ private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
 )
 
 private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
-    // Use typed metric fields directly — no string parsing.
-    // metricTags already contains platform, app_version, device_model
-    // auto-enriched by AppLoggerImpl.metric().
     return SupabaseMetricEntry(
         name = metricName ?: tag,
         value = metricValue ?: 0.0,
@@ -200,22 +197,14 @@ private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
 }
 
 /**
- * Converts a [Map<String, String>] to a [JsonObject] preserving native JSON types.
- *
- * Values that look like integers, doubles, or booleans are serialized as JSON primitives
- * rather than quoted strings. This enables richer JSONB queries in Supabase:
+ * Converts a [Map<String, JsonElement>] to a [JsonObject].
+ * Values are already native JSON primitives — no heuristic parsing needed.
+ * Enables richer JSONB queries in Supabase:
  * ```sql
  * SELECT * FROM app_logs WHERE (extra->>'retry_count')::int > 2;
+ * SELECT * FROM app_logs WHERE (extra->>'is_cached')::boolean = true;
  * ```
  */
-private fun Map<String, String>.toJsonObject(): JsonObject = buildJsonObject {
-    forEach { (key, value) ->
-        val primitive = when {
-            value == "true" || value == "false" -> JsonPrimitive(value.toBoolean())
-            value.toLongOrNull() != null        -> JsonPrimitive(value.toLong())
-            value.toDoubleOrNull() != null      -> JsonPrimitive(value.toDouble())
-            else                                -> JsonPrimitive(value)
-        }
-        put(key, primitive)
-    }
+private fun Map<String, JsonElement>.toJsonObject(): JsonObject = buildJsonObject {
+    forEach { (key, element) -> put(key, element) }
 }

@@ -4,6 +4,7 @@ import com.applogger.core.*
 import com.applogger.core.internal.*
 import com.applogger.core.model.DeviceInfo
 import com.applogger.core.model.LogLevel
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*

@@ -103,11 +103,17 @@ object AppLoggerSDK : AppLogger {
         val resolvedTransport = transport ?: NoOpTransport()
         val formatter = JsonLogFormatter()
 
+        val offlineStorage: OfflineStorage = when (resolvedConfig.offlinePersistenceMode) {
+            OfflinePersistenceMode.NONE -> NoOpOfflineStorage
+            else -> SqliteOfflineStorage(appContext)
+        }
+
         val processor = BatchProcessor(
             buffer = buffer,
             transport = resolvedTransport,
             formatter = formatter,
-            config = resolvedConfig
+            config = resolvedConfig,
+            offlineStorage = offlineStorage
         )
 
         val impl = AppLoggerImpl(
