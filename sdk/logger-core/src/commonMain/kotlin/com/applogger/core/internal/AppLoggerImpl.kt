@@ -24,6 +24,26 @@ private val MIN_LEVEL_ORDINAL = mapOf(
     LogMinLevel.CRITICAL to 4
 )
 
+/**
+ * Pillar 1 — Auto-inject anomaly_type when a Throwable is present and the caller
+ * did not supply one explicitly. Ensures the Supabase column is never empty on real errors.
+ * Top-level to avoid counting against AppLoggerImpl's TooManyFunctions limit.
+ */
+private fun injectAnomalyType(
+    level: LogLevel,
+    throwable: Throwable?,
+    extra: Map<String, Any>?
+): Map<String, Any>? {
+    if (throwable == null || extra?.containsKey("anomaly_type") == true) return extra
+    val autoType = when (level) {
+        LogLevel.CRITICAL -> "critical"
+        LogLevel.ERROR    -> "error"
+        LogLevel.WARN     -> "warn"
+        else              -> return extra
+    }
+    return (extra ?: emptyMap()) + mapOf("anomaly_type" to autoType)
+}
+
 /** Convierte un valor Any a JsonElement preservando el tipo nativo. */
 internal fun anyToJsonElement(value: Any): JsonElement = when (value) {
     is Boolean -> JsonPrimitive(value)
@@ -164,25 +184,20 @@ internal class AppLoggerImpl(
         userId = null
     }
 
-    fun setDeviceId(id: String) {
-        val normalized = id.trim()
-        if (normalized.isNotEmpty()) {
-            deviceId = normalized
-        }
+    /**
+     * Sets the device ID. Pass `null` to revert to the SDK-generated default.
+     * AppLoggerSDK exposes this as separate setDeviceId(String) and clearDeviceId().
+     */
+    fun setDeviceId(id: String?) {
+        deviceId = if (id.isNullOrBlank()) defaultDeviceId(deviceInfo) else id.trim()
     }
 
-    fun clearDeviceId() {
-        deviceId = defaultDeviceId(deviceInfo)
-    }
-
-    /** Sets the distributed trace ID attached to all subsequent events. */
-    fun setTraceId(id: String) {
-        traceId = id.trim().ifBlank { null }
-    }
-
-    /** Clears the distributed trace ID. */
-    fun clearTraceId() {
-        traceId = null
+    /**
+     * Sets or clears the distributed trace ID attached to all subsequent events.
+     * Pass `null` to clear. Blank strings are treated as null.
+     */
+    fun setTraceId(id: String?) {
+        traceId = id?.trim()?.ifBlank { null }
     }
 
     /**
@@ -238,95 +253,25 @@ internal class AppLoggerImpl(
         extra: Map<String, Any>? = null
     ) {
         try {
-            // DEBUG suprimido en producción
             if (level == LogLevel.DEBUG && !config.isDebugMode) return
-
-            // minLevel: descarta eventos por debajo del umbral configurado.
-            // METRIC siempre pasa (ordinal 5 > cualquier minLevel).
             if (level != LogLevel.METRIC) {
-                val eventOrdinal = LEVEL_ORDINAL[level] ?: 0
-                val minOrdinal = MIN_LEVEL_ORDINAL[config.minLevel] ?: 0
+                val eventOrdinal = LEVEL_ORDINAL.getOrDefault(level, 0)
+                val minOrdinal   = MIN_LEVEL_ORDINAL.getOrDefault(config.minLevel, 0)
                 if (eventOrdinal < minOrdinal) return
             }
-
-            // Logcat/consoleOutput solo cuando isDebugMode está activo.
-            // APPLOGGER_DEBUG=true activa isDebugMode en AppLoggerSDK.initialize().
             if (config.isDebugMode && config.consoleOutput) {
                 platformLog("AppLogger/$tag", "[${level.name}] $message")
             }
-
-            // Pillar 1 — Auto-flattening del Throwable:
-            // Si hay excepción y no se pasó anomaly_type explícito, lo inferimos del nivel.
-            // Esto garantiza que la columna anomaly_type en Supabase nunca quede vacía
-            // cuando hay un error real, sin forzar al desarrollador a recordarlo.
-            val effectiveExtra: Map<String, Any>? = if (
-                throwable != null && extra?.containsKey("anomaly_type") != true
-            ) {
-                val autoAnomalyType = when (level) {
-                    LogLevel.CRITICAL -> "critical"
-                    LogLevel.ERROR    -> "error"
-                    LogLevel.WARN     -> "warn"
-                    else              -> null
-                }
-                if (autoAnomalyType != null) {
-                    (extra ?: emptyMap()) + mapOf("anomaly_type" to autoAnomalyType)
-                } else extra
-            } else extra
-
-            // Convierte Map<String,Any> a Map<String,JsonElement> preservando tipos nativos.
-            // Merge: globalExtra (lower priority) + perCall (higher priority).
-            val resolvedExtra = mergeExtra(effectiveExtra, globalExtra)
-            var event = LogEvent(
-                id = generateUUID(),
-                timestamp = currentTimeMillis(),
-                level = level,
-                tag = tag.take(100),
-                message = message.take(10_000),
-                throwableInfo = throwable?.toThrowableInfo(config.maxStackTraceLines),
-                deviceInfo = deviceInfo,
-                deviceId = deviceId,
-                sessionId = sessionManager.sessionId,
-                userId = userId,
-                environment = config.environment,
-                extra = resolvedExtra,
-                traceId = traceId
-            )
-
+            val effectiveExtra = injectAnomalyType(level, throwable, extra)
+            val resolvedExtra  = mergeExtra(effectiveExtra, globalExtra)
+            var event = buildLogEvent(level, tag, message, throwable, resolvedExtra)
             if (!filter.passes(event)) return
-
-            // High-severity enrichment: breadcrumbs + system snapshot only for ERROR/CRITICAL.
-            // These operations are guarded to keep debug/info paths zero-cost.
             if (level == LogLevel.ERROR || level == LogLevel.CRITICAL) {
-                var enriched: Map<String, JsonElement> = event.extra ?: emptyMap()
-                val sizeBefore = enriched.size
-
-                // Auto-attach user interaction breadcrumbs — "what did the user do before the crash?"
-                val crumbs = breadcrumbs
-                if (crumbs != null && !crumbs.isEmpty()) {
-                    enriched = enriched + mapOf("breadcrumbs" to crumbs.snapshot())
-                }
-
-                // Auto-capture platform diagnostics — thermal, memory, network at error time.
-                if (systemSnapshotProvider != null) {
-                    val snapshot = runCatching { systemSnapshotProvider.invoke() }.getOrElse { emptyMap() }
-                    if (snapshot.isNotEmpty()) {
-                        val snapJson: Map<String, JsonElement> = snapshot.mapValues { (_, v) -> JsonPrimitive(v) }
-                        enriched = enriched + snapJson
-                    }
-                }
-
-                // Only copy the event if enrichment actually added keys (avoids allocation).
-                if (enriched.size != sizeBefore) {
-                    event = event.copy(extra = enriched.ifEmpty { null })
-                }
+                event = enrichHighSeverityEvent(event)
             }
-
-            // Deduplication: collapses identical error bursts into one event with occurrence_count=N.
-            // When debouncer is disabled (null) events pass through unchanged.
-            // When enabled, returns null to suppress duplicates within the active window.
             if (debouncer != null) {
-                val deduped = debouncer.process(event) ?: return
-                processor.enqueue(deduped)
+                val deduped = debouncer.process(event)
+                if (deduped != null) processor.enqueue(deduped)
             } else {
                 processor.enqueue(event)
             }
@@ -334,4 +279,50 @@ internal class AppLoggerImpl(
             // El SDK NUNCA lanza excepciones al caller
         }
     }
+
+    private fun buildLogEvent(
+        level: LogLevel,
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+        resolvedExtra: Map<String, JsonElement>?
+    ) = LogEvent(
+        id = generateUUID(),
+        timestamp = currentTimeMillis(),
+        level = level,
+        tag = tag.take(100),
+        message = message.take(10_000),
+        throwableInfo = throwable?.toThrowableInfo(config.maxStackTraceLines),
+        deviceInfo = deviceInfo,
+        deviceId = deviceId,
+        sessionId = sessionManager.sessionId,
+        userId = userId,
+        environment = config.environment,
+        extra = resolvedExtra,
+        traceId = traceId
+    )
+
+    /**
+     * Enriches ERROR/CRITICAL events with breadcrumbs and platform diagnostics.
+     * Guarded to keep INFO/DEBUG paths zero-cost.
+     */
+    private fun enrichHighSeverityEvent(event: LogEvent): LogEvent {
+        var enriched = event.extra ?: emptyMap<String, JsonElement>()
+        val sizeBefore = enriched.size
+
+        val crumbs = breadcrumbs
+        if (crumbs != null && !crumbs.isEmpty()) {
+            enriched = enriched + mapOf("breadcrumbs" to crumbs.snapshot())
+        }
+        // Capture as local val so Kotlin can smart-cast the nullable property inside the lambda.
+        val snapshotFn = systemSnapshotProvider
+        if (snapshotFn != null) {
+            val snap = runCatching { snapshotFn.invoke() }.getOrElse { emptyMap() }
+            if (snap.isNotEmpty()) {
+                enriched = enriched + snap.mapValues { (_, v) -> JsonPrimitive(v) as JsonElement }
+            }
+        }
+        return if (enriched.size != sizeBefore) event.copy(extra = enriched.ifEmpty { null }) else event
+    }
+
 }

@@ -170,7 +170,7 @@ object AppLoggerSDK : AppLogger {
     }
 
     fun clearDeviceId() {
-        implRef?.clearDeviceId()
+        implRef?.setDeviceId(null)
     }
 
     /**
@@ -189,7 +189,7 @@ object AppLoggerSDK : AppLogger {
 
     /** Clears the distributed trace ID. Call after the traced operation completes. */
     fun clearTraceId() {
-        implRef?.clearTraceId()
+        implRef?.setTraceId(null)
     }
 
     /**
@@ -345,83 +345,67 @@ object AppLoggerSDK : AppLogger {
     }
 
     /**
-     * Builds the system snapshot provider for Android.
-     *
-     * Captures real-time platform diagnostics at the moment an ERROR/CRITICAL event is logged:
-     * - `memory_usage_pct`: Percentage of total RAM in use (all API levels).
-     * - `thermal_status`: Current thermal status string (API 29+: NONE/LIGHT/MODERATE/SEVERE/CRITICAL/EMERGENCY/SHUTDOWN).
-     * - `network_type`: Active connection type (wifi / ethernet / cellular / none / unknown).
-     *
-     * Critical for TV debugging: thermal throttling causes filter failures and codec crashes —
-     * knowing the thermal state at error time is the first clue in a forensic investigation.
-     *
-     * The lambda is called from the SDK's internal background thread; all APIs used here
-     * are documented as safe for off-main-thread access.
+     * Builds the platform diagnostic snapshot provider.
+     * Called on ERROR/CRITICAL events; results merged into the event's extra map.
+     * Captures: memory_usage_pct, thermal_status (API 29+), network_type.
+     * Each capture is independently guarded — one failure does not block the others.
      */
     private fun buildSystemSnapshotProvider(context: Context): () -> Map<String, String> {
         val appContext = context.applicationContext
         return {
-            @Suppress("TooGenericExceptionCaught")
             buildMap {
-                // 1. Memory usage
-                try {
-                    val am = appContext.getSystemService(Context.ACTIVITY_SERVICE)
-                        as? android.app.ActivityManager
-                    if (am != null) {
-                        val mem = android.app.ActivityManager.MemoryInfo()
-                        am.getMemoryInfo(mem)
-                        if (mem.totalMem > 0L) {
-                            val usedPct = ((mem.totalMem - mem.availMem) * 100L / mem.totalMem).toInt()
-                            put("memory_usage_pct", usedPct.toString())
-                        }
-                    }
-                } catch (_: Exception) { /* non-fatal */ }
-
-                // 2. Thermal status (API 29+)
-                try {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                        val pm = appContext.getSystemService(Context.POWER_SERVICE)
-                            as? android.os.PowerManager
-                        if (pm != null) {
-                            val status = when (pm.currentThermalStatus) {
-                                android.os.PowerManager.THERMAL_STATUS_NONE         -> "none"
-                                android.os.PowerManager.THERMAL_STATUS_LIGHT        -> "light"
-                                android.os.PowerManager.THERMAL_STATUS_MODERATE     -> "moderate"
-                                android.os.PowerManager.THERMAL_STATUS_SEVERE       -> "severe"
-                                android.os.PowerManager.THERMAL_STATUS_CRITICAL     -> "critical"
-                                android.os.PowerManager.THERMAL_STATUS_EMERGENCY    -> "emergency"
-                                android.os.PowerManager.THERMAL_STATUS_SHUTDOWN     -> "shutdown"
-                                else -> "unknown"
-                            }
-                            put("thermal_status", status)
-                        }
-                    }
-                } catch (_: Exception) { /* non-fatal */ }
-
-                // 3. Network type
-                try {
-                    val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
-                        as? android.net.ConnectivityManager
-                    if (cm != null) {
-                        val networkType = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-                            when {
-                                caps == null -> "none"
-                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)     -> "wifi"
-                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
-                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-                                else -> "unknown"
-                            }
-                        } else {
-                            @Suppress("DEPRECATION")
-                            cm.activeNetworkInfo?.typeName?.lowercase() ?: "none"
-                        }
-                        put("network_type", networkType)
-                    }
-                } catch (_: Exception) { /* non-fatal */ }
+                captureMemoryUsage(appContext)?.let { put("memory_usage_pct", it) }
+                captureThermalStatus(appContext)?.let { put("thermal_status", it) }
+                captureNetworkType(appContext)?.let { put("network_type", it) }
             }
         }
     }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun captureMemoryUsage(context: android.content.Context): String? = try {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+        val mem = android.app.ActivityManager.MemoryInfo()
+        am?.getMemoryInfo(mem)
+        if (mem.totalMem > 0L) ((mem.totalMem - mem.availMem) * 100L / mem.totalMem).toString()
+        else null
+    } catch (_: Exception) { null }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun captureThermalStatus(context: android.content.Context): String? = try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            pm?.let { resolveThermalLabel(it.currentThermalStatus) }
+        } else null
+    } catch (_: Exception) { null }
+
+    private fun resolveThermalLabel(status: Int): String = when (status) {
+        android.os.PowerManager.THERMAL_STATUS_NONE      -> "none"
+        android.os.PowerManager.THERMAL_STATUS_LIGHT     -> "light"
+        android.os.PowerManager.THERMAL_STATUS_MODERATE  -> "moderate"
+        android.os.PowerManager.THERMAL_STATUS_SEVERE    -> "severe"
+        android.os.PowerManager.THERMAL_STATUS_CRITICAL  -> "critical"
+        android.os.PowerManager.THERMAL_STATUS_EMERGENCY -> "emergency"
+        android.os.PowerManager.THERMAL_STATUS_SHUTDOWN  -> "shutdown"
+        else -> "unknown"
+    }
+
+    @Suppress("TooGenericExceptionCaught", "DEPRECATION")
+    private fun captureNetworkType(context: android.content.Context): String? = try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? android.net.ConnectivityManager ?: return null
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+            when {
+                caps == null -> "none"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)     -> "wifi"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                else -> "unknown"
+            }
+        } else {
+            cm.activeNetworkInfo?.typeName?.lowercase() ?: "none"
+        }
+    } catch (_: Exception) { null }
 
     private fun buildOfflineStorage(context: Context, config: AppLoggerConfig): OfflineStorage =
         when (config.offlinePersistenceMode) {
