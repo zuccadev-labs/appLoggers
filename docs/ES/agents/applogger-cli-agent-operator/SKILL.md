@@ -87,18 +87,17 @@ Resolution precedence:
 3. Workspace autodetection via `workspace_roots`
 4. `default_project`
 5. Single configured project
-6. Legacy environment variables (`appLogger_supabase*`, `APPLOGGER_SUPABASE_*`, `SUPABASE_*`)
 
 Project config path precedence:
 
 1. `--config <path>`
 2. `APPLOGGER_CONFIG`
-3. Default user config path (`~/.apploggers/cli.json`; fallback legacy: `os.UserConfigDir()/applogger/cli.json`)
+3. Default user config path (`~/.apploggers/cli.json`)
 
 Rules for agents:
 
-- Prefer project profiles for production automation.
-- Prefer `api_key_env` in the JSON config instead of inline secrets.
+- All configuration lives in `~/.apploggers/cli.json` — the agent reads/writes this file directly.
+- Use `api_key` for direct key storage (simplest for agents). Use `api_key_env` only if the key must not be stored in the file.
 - Parse `project` and `config_source` from health/telemetry outputs for auditability.
 
 ### 2. Three Output Modes (Choose Wisely)
@@ -156,9 +155,9 @@ if ! command -v apploggers &> /dev/null; then
   exit 127
 fi
 
-# 2. Verify project resolution inputs are set (project mode) OR legacy env vars exist
-if [ -z "$APPLOGGER_CONFIG" ] && { [ -z "$appLogger_supabaseUrl" ] || [ -z "$appLogger_supabaseKey" ]; }; then
-  echo "FATAL: set APPLOGGER_CONFIG (recommended) or appLogger_supabaseUrl/appLogger_supabaseKey"
+# 2. Verify cli.json exists and has credentials configured
+if [ ! -f "${HOME}/.apploggers/cli.json" ]; then
+  echo "FATAL: ~/.apploggers/cli.json not found — run 'apploggers version' once to create the template, then configure url and api_key"
   exit 1
 fi
 
@@ -693,10 +692,25 @@ jobs:
         run: |
           curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 
+      - name: Configure cli.json
+        run: |
+          mkdir -p ~/.apploggers
+          cat > ~/.apploggers/cli.json << EOF
+          {
+            "default_project": "my-app",
+            "projects": [
+              {
+                "name": "my-app",
+                "supabase": {
+                  "url": "${{ secrets.APPLOGGER_SUPABASE_URL }}",
+                  "api_key": "${{ secrets.APPLOGGER_SUPABASE_KEY }}"
+                }
+              }
+            ]
+          }
+          EOF
+
       - name: Query errors (last 24h)
-        env:
-          appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL }}
-          appLogger_supabaseKey: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
         run: |
           /tmp/apploggers telemetry query \
             --source logs \
@@ -745,12 +759,12 @@ curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/i
 ### "backend health check failed"
 
 ```bash
-# Verify credentials
-echo "URL: $appLogger_supabaseUrl"
-echo "Key: ${appLogger_supabaseKey:0:10}..."
+# Verify cli.json is configured
+cat ~/.apploggers/cli.json | jq '.projects[0].supabase | {url, has_key: (.api_key != "" and .api_key != null)}'
 
-# Test connectivity
-curl -s "$appLogger_supabaseUrl/rest/v1/?apikey=$appLogger_supabaseKey" | jq .
+# Test connectivity directly
+URL=$(cat ~/.apploggers/cli.json | jq -r '.projects[0].supabase.url')
+curl -s "$URL/rest/v1/" | jq .
 
 # Check Supabase dashboard
 # https://supabase.com/dashboard → Status

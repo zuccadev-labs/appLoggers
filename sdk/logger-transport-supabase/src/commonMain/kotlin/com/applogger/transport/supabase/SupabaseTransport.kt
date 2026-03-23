@@ -14,6 +14,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * [LogTransport] implementation that delivers events to Supabase (PostgreSQL)
@@ -140,7 +143,7 @@ internal data class SupabaseLogEntry(
     @SerialName("session_id") val sessionId: String,
     @SerialName("device_id") val deviceId: String,
     @SerialName("user_id") val userId: String? = null,
-    val extra: Map<String, String>? = null
+    val extra: JsonObject? = null
 )
 
 @Serializable
@@ -178,23 +181,41 @@ private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
     sessionId = sessionId,
     deviceId = deviceId,
     userId = userId,
-    extra = extra
+    extra = extra?.toJsonObject()
 )
 
 private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
-    val metricName = extra?.get("metric_name") ?: tag
-    val metricValue = extra?.get("metric_value")?.toDoubleOrNull() ?: 0.0
-    val metricUnit = extra?.get("metric_unit") ?: "count"
-    val metricTags = extra?.filterKeys { it !in setOf("metric_name", "metric_value", "metric_unit") }
-        ?: emptyMap()
-
+    // Use typed metric fields directly — no string parsing.
+    // metricTags already contains platform, app_version, device_model
+    // auto-enriched by AppLoggerImpl.metric().
     return SupabaseMetricEntry(
-        name = metricName,
-        value = metricValue,
-        unit = metricUnit,
-        tags = metricTags + mapOf("platform" to deviceInfo.platform),
+        name = metricName ?: tag,
+        value = metricValue ?: 0.0,
+        unit = metricUnit ?: "count",
+        tags = metricTags ?: emptyMap(),
         deviceId = deviceId,
         sessionId = sessionId,
         sdkVersion = sdkVersion
     )
+}
+
+/**
+ * Converts a [Map<String, String>] to a [JsonObject] preserving native JSON types.
+ *
+ * Values that look like integers, doubles, or booleans are serialized as JSON primitives
+ * rather than quoted strings. This enables richer JSONB queries in Supabase:
+ * ```sql
+ * SELECT * FROM app_logs WHERE (extra->>'retry_count')::int > 2;
+ * ```
+ */
+private fun Map<String, String>.toJsonObject(): JsonObject = buildJsonObject {
+    forEach { (key, value) ->
+        val primitive = when {
+            value == "true" || value == "false" -> JsonPrimitive(value.toBoolean())
+            value.toLongOrNull() != null        -> JsonPrimitive(value.toLong())
+            value.toDoubleOrNull() != null      -> JsonPrimitive(value.toDouble())
+            else                                -> JsonPrimitive(value)
+        }
+        put(key, primitive)
+    }
 }

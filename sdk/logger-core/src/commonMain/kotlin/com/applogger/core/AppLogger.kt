@@ -26,7 +26,9 @@ interface AppLogger {
      * @param tag   Short identifier for the source (e.g. class or screen name).
      * @param message Human-readable description.
      * @param throwable Optional exception whose stack trace will be captured.
-     * @param extra Optional key-value metadata attached to the event.
+     * @param extra Optional key-value metadata. Values of type [Int], [Long], [Double], and
+     *              [Boolean] are preserved as native JSON primitives in Supabase JSONB, enabling
+     *              richer queries (e.g. `extra->>'retry_count' > 2`). Other types are stringified.
      */
     fun debug(tag: String, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null)
 
@@ -36,7 +38,8 @@ interface AppLogger {
      * @param tag   Short identifier for the source.
      * @param message Human-readable description.
      * @param throwable Optional exception whose stack trace will be captured.
-     * @param extra Optional key-value metadata.
+     * @param extra Optional key-value metadata. Values of type [Int], [Long], [Double], and
+     *              [Boolean] are preserved as native JSON primitives in Supabase JSONB.
      */
     fun info(tag: String, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null)
 
@@ -47,7 +50,8 @@ interface AppLogger {
      * @param message Human-readable description.
      * @param throwable Optional exception whose stack trace will be captured.
      * @param anomalyType Optional classification of the anomaly (e.g. "slow_response").
-     * @param extra Optional key-value metadata.
+     * @param extra Optional key-value metadata. Values of type [Int], [Long], [Double], and
+     *              [Boolean] are preserved as native JSON primitives in Supabase JSONB.
      */
     fun warn(
         tag: String,
@@ -63,7 +67,8 @@ interface AppLogger {
      * @param tag   Short identifier for the source.
      * @param message Human-readable description.
      * @param throwable Optional exception whose stack trace will be captured.
-     * @param extra Optional key-value metadata.
+     * @param extra Optional key-value metadata. Values of type [Int], [Long], [Double], and
+     *              [Boolean] are preserved as native JSON primitives in Supabase JSONB.
      */
     fun error(tag: String, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null)
 
@@ -73,7 +78,8 @@ interface AppLogger {
      * @param tag   Short identifier for the source.
      * @param message Human-readable description.
      * @param throwable Optional exception whose stack trace will be captured.
-     * @param extra Optional key-value metadata.
+     * @param extra Optional key-value metadata. Values of type [Int], [Long], [Double], and
+     *              [Boolean] are preserved as native JSON primitives in Supabase JSONB.
      */
     fun critical(tag: String, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null)
 

@@ -145,10 +145,12 @@ class AppLoggerImplTest {
 
         val event = fakeTransport.sentEvents[0]
         assertEquals(LogLevel.METRIC, event.level)
-        assertEquals("screen_load_time", event.extra?.get("metric_name"))
-        assertEquals("1234.0", event.extra?.get("metric_value"))
-        assertEquals("ms", event.extra?.get("metric_unit"))
-        assertEquals("Home", event.extra?.get("screen"))
+        assertEquals("screen_load_time", event.metricName)
+        assertEquals(1234.0, event.metricValue)
+        assertEquals("ms", event.metricUnit)
+        assertEquals("Home", event.metricTags?.get("screen"))
+        // extra should be null — metric data lives in typed fields
+        assertNull(event.extra)
     }
 
     @Test
@@ -315,6 +317,26 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         assertNull(fakeTransport.sentEvents[0].throwableInfo)
+    }
+
+    @Test
+    fun `extra values with numeric and boolean types are stored as strings in LogEvent`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.info("TAG", "typed extra", extra = mapOf(
+            "retry_count" to 3,
+            "latency_ms" to 123.45,
+            "is_cached" to true,
+            "label" to "home"
+        ))
+        delay(200)
+        processor.sendBatch()
+
+        val event = fakeTransport.sentEvents[0]
+        // LogEvent stores everything as String — type preservation happens at transport layer
+        assertEquals("3", event.extra?.get("retry_count"))
+        assertEquals("123.45", event.extra?.get("latency_ms"))
+        assertEquals("true", event.extra?.get("is_cached"))
+        assertEquals("home", event.extra?.get("label"))
     }
 
     /**

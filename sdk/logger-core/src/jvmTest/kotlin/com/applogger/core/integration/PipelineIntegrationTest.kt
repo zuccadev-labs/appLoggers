@@ -139,7 +139,11 @@ class PipelineIntegrationTest {
         assertEquals(LogLevel.WARN, transport.sentEvents[1].level)
         assertEquals(LogLevel.ERROR, transport.sentEvents[2].level)
         assertEquals(LogLevel.CRITICAL, transport.sentEvents[3].level)
-        assertEquals(LogLevel.METRIC, transport.sentEvents[4].level)
+        val metric = transport.sentEvents[4]
+        assertEquals(LogLevel.METRIC, metric.level)
+        assertEquals("load_time", metric.metricName)
+        assertEquals(100.0, metric.metricValue)
+        assertEquals("ms", metric.metricUnit)
     }
 
     @Test

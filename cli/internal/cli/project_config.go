@@ -83,15 +83,20 @@ func loadSupabaseConfigFromProjectConfig() (supabaseConfig, error) {
 		return supabaseConfig{}, fmt.Errorf("failed to resolve AppLogger project from %s: %w", configPath, err)
 	}
 
-	apiKey := strings.TrimSpace(selected.Supabase.APIKey)
-	if envName := strings.TrimSpace(selected.Supabase.APIKeyEnv); envName != "" {
-		apiKey = strings.TrimSpace(os.Getenv(envName))
-		if apiKey == "" {
-			return supabaseConfig{}, fmt.Errorf("project %q requires secret env %s for Supabase API key", selected.Name, envName)
-		}
-	}
+	apiKey := resolveProjectAPIKey(selected, configPath)
 	if apiKey == "" {
-		return supabaseConfig{}, fmt.Errorf("project %q is missing a Supabase API key; set supabase.api_key_env or supabase.api_key in %s", selected.Name, configPath)
+		envName := strings.TrimSpace(selected.Supabase.APIKeyEnv)
+		if envName != "" {
+			return supabaseConfig{}, fmt.Errorf(
+				"project %q: api_key_env is set to %q but the environment variable is empty or not exported; "+
+					"export %s=<service_role_key> or set supabase.api_key directly in %s",
+				selected.Name, envName, envName, configPath,
+			)
+		}
+		return supabaseConfig{}, fmt.Errorf(
+			"project %q is missing a Supabase API key; set supabase.api_key or supabase.api_key_env in %s",
+			selected.Name, configPath,
+		)
 	}
 
 	timeoutSeconds := selected.Supabase.TimeoutSeconds
@@ -167,8 +172,9 @@ func ensureConfigDir(path string) error {
 }
 
 const exampleConfigJSON = `{
-  "_comment": "AppLoggers CLI configuration file. Edit this file to configure your projects.",
+  "_comment": "AppLoggers CLI — archivo de configuración de proyectos.",
   "_docs": "https://github.com/zuccadev-labs/appLoggers/tree/main/docs/ES/cli",
+  "_key_resolution": "api_key_env tiene prioridad si la variable está exportada; si no, se usa api_key. Ambos pueden coexistir.",
   "default_project": "my-app",
   "projects": [
     {
@@ -177,11 +183,9 @@ const exampleConfigJSON = `{
       "workspace_roots": [],
       "supabase": {
         "url": "https://your-project.supabase.co",
-        "api_key_env": "APPLOGGER_SUPABASE_KEY",
-        "schema": "public",
-        "logs_table": "app_logs",
-        "metrics_table": "app_metrics",
-        "timeout_seconds": 15
+        "_api_key_note": "Opción A: pon el valor directo del service_role key en api_key (no versionar). Opción B: pon el NOMBRE de la variable de entorno en api_key_env y exporta esa variable.",
+        "api_key": "",
+        "api_key_env": "APPLOGGER_SUPABASE_KEY"
       }
     }
   ]
@@ -193,6 +197,20 @@ func writeExampleConfigIfAbsent(configPath string) {
 		return
 	}
 	_ = os.WriteFile(configPath, []byte(exampleConfigJSON), 0644)
+}
+
+func resolveProjectAPIKey(profile cliProjectProfile, configPath string) string {
+	// Priority:
+	// 1. api_key_env — if set and the env var is non-empty, use it.
+	// 2. api_key    — direct value in the json (fallback when env var is absent/empty).
+	// Both empty → caller reports the error with actionable guidance.
+	if envName := strings.TrimSpace(profile.Supabase.APIKeyEnv); envName != "" {
+		if value := strings.TrimSpace(os.Getenv(envName)); value != "" {
+			return value
+		}
+		// env var is empty or not exported — fall through to api_key
+	}
+	return strings.TrimSpace(profile.Supabase.APIKey)
 }
 
 func legacyProjectConfigPath() string {

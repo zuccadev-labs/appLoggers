@@ -50,7 +50,7 @@ func queryTelemetry(ctx context.Context, cfg supabaseConfig, req telemetryQueryR
 	selectColumns := "id,created_at,level,tag,message,session_id,device_id,user_id,sdk_version,extra"
 	if req.Source == "metrics" {
 		table = cfg.MetricsTable
-		selectColumns = "id,created_at,name,value,unit,session_id,device_id,sdk_version"
+		selectColumns = "id,created_at,name,value,unit,tags,device_id,session_id,sdk_version"
 	}
 
 	base.Path = path.Join(base.Path, "rest", "v1", table)

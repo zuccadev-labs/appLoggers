@@ -708,6 +708,49 @@ func writeProjectConfig(t *testing.T, path string, payload any) {
 	}
 }
 
+func TestTelemetryQueryProjectProfileAPIKeyFallbackToDirectKey(t *testing.T) {
+	// When api_key_env is set but the env var is absent/empty,
+	// the CLI must fall back to api_key (direct value) instead of failing.
+	binary := buildCLI(t)
+	configPath := filepath.Join(t.TempDir(), "applogger-cli.json")
+	mockSupabase := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[ {"id":"1","created_at":"2026-03-01T00:00:00Z","level":"INFO","tag":"test","message":"ok"} ]`))
+	}))
+	defer mockSupabase.Close()
+
+	writeProjectConfig(t, configPath, map[string]any{
+		"projects": []map[string]any{
+			{
+				"name": "fallback-test",
+				"supabase": map[string]any{
+					"url":         mockSupabase.URL,
+					"api_key_env": "APPLOGGER_NONEXISTENT_VAR_XYZ",
+					"api_key":     "direct-fallback-key",
+				},
+			},
+		},
+	})
+
+	// Do NOT export APPLOGGER_NONEXISTENT_VAR_XYZ — it must fall back to api_key.
+	env := []string{"APPLOGGER_CONFIG=" + configPath}
+	for _, e := range os.Environ() {
+		if !strings.HasPrefix(e, "APPLOGGER_NONEXISTENT_VAR_XYZ=") {
+			env = append(env, e)
+		}
+	}
+
+	cmd := exec.Command(binary, "telemetry", "query", "--source", "logs", "--limit", "5", "--output", "json")
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected fallback to api_key to succeed, got error: %v, output=%s", err, string(out))
+	}
+	if !strings.Contains(string(out), "\"ok\": true") {
+		t.Fatalf("expected ok:true in response, output=%s", string(out))
+	}
+}
+
 func TestTelemetryQueryNameFilterInvalidForLogs(t *testing.T) {
 	binary := buildCLI(t)
 	cmd := exec.Command(binary, "telemetry", "query", "--source", "logs", "--name", "response_time_ms", "--output", "json")

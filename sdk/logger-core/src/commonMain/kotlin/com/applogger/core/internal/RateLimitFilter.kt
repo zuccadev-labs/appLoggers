@@ -7,30 +7,34 @@ import kotlin.concurrent.Volatile
 
 /**
  * Limitador de rate por tag con bypass automático para ERROR y CRITICAL.
+ *
+ * La clave de conteo incluye el sessionId para aislar correctamente
+ * múltiples proyectos o sesiones concurrentes en el mismo proceso.
  */
 internal class RateLimitFilter(
     private val maxEventsPerMinutePerTag: Int = 60
 ) : LogFilter {
 
+    // Key: "sessionId:tag" — isolates rate limit per session/project
     private val counters = mutableMapOf<String, Int>()
 
     @Volatile
     private var lastResetTime: Long = 0L
 
     override fun passes(event: LogEvent): Boolean {
-        // ERROR y CRITICAL siempre pasan (no usar >= porque METRIC tiene ordinal mayor)
+        // ERROR y CRITICAL siempre pasan
         if (event.level == LogLevel.ERROR || event.level == LogLevel.CRITICAL) return true
 
         val now = com.applogger.core.currentTimeMillis()
-        // Reset counters every minute
         if (now - lastResetTime > 60_000L) {
             counters.clear()
             lastResetTime = now
         }
 
-        val count = counters.getOrPut(event.tag) { 0 }
+        val key = "${event.sessionId}:${event.tag}"
+        val count = counters.getOrPut(key) { 0 }
         return if (count < maxEventsPerMinutePerTag) {
-            counters[event.tag] = count + 1
+            counters[key] = count + 1
             true
         } else {
             false

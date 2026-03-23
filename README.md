@@ -225,16 +225,16 @@ Un template está incluido en el repositorio:
 cp local.properties.example local.properties
 ```
 
-> **Variables del SDK vs variables del CLI — diferencias clave**
+> **Variables del SDK vs configuración del CLI — diferencias clave**
 >
-> Este proyecto tiene dos superficies con variables de configuración distintas. Es importante no mezclarlas:
+> Este proyecto tiene dos superficies de configuración distintas. Es importante no mezclarlas:
 >
-> | Superficie | Archivo / Scope | Variables | Formato | Uso |
+> | Superficie | Configuración | Variables | Formato | Uso |
 > |---|---|---|---|---|
 > | **SDK** (Android/iOS/JVM) | `local.properties` → `BuildConfig` | `APPLOGGER_URL`, `APPLOGGER_ANON_KEY`, `APPLOGGER_DEBUG` | UPPERCASE | Instrumentación en la app cliente. Usa **anon key** para INSERT. |
-> | **CLI** (operaciones) | Variables de entorno del shell / CI | `appLogger_supabaseUrl`, `appLogger_supabaseKey` (primarias) · `APPLOGGER_SUPABASE_URL`, `APPLOGGER_SUPABASE_KEY` (aliases) | camelCase primarias / UPPERCASE aliases | Consultas de telemetría y diagnóstico. Usa **service_role key** para SELECT. |
+> | **CLI** (operaciones) | `~/.apploggers/cli.json` (creado automáticamente) | `supabase.url`, `supabase.api_key` en el json | JSON | Consultas de telemetría y diagnóstico. Usa **service_role key** para SELECT. |
 >
-> El CLI acepta ambas formas (camelCase y UPPERCASE) — son equivalentes. Nunca uses la `service_role` key en el SDK ni la `anon` key en el CLI.
+> El CLI se configura editando `~/.apploggers/cli.json` — no requiere exportar variables de entorno. Nunca uses la `service_role` key en el SDK ni la `anon` key en el CLI.
 
 Luego abrí `local.properties` y completá los valores:
 

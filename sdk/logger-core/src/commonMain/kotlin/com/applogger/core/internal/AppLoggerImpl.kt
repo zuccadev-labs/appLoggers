@@ -52,13 +52,42 @@ internal class AppLoggerImpl(
     }
 
     override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) {
-        val extra = buildMap {
-            put("metric_name", name)
-            put("metric_value", value.toString())
-            put("metric_unit", unit)
-            tags?.forEach { (k, v) -> put(k, v) }
+        try {
+            if (config.isDebugMode && config.consoleOutput) {
+                platformLog("AppLogger/METRIC", "[METRIC] $name=$value $unit")
+            }
+
+            // Auto-enrich tags with device context the SDK already has.
+            // Developers don't need to pass platform/app_version/device_model manually.
+            val enrichedTags = buildMap {
+                tags?.forEach { (k, v) -> put(k, v) }
+                put("platform", deviceInfo.platform)
+                put("app_version", deviceInfo.appVersion)
+                put("device_model", deviceInfo.model)
+            }
+
+            val event = LogEvent(
+                id = generateUUID(),
+                timestamp = currentTimeMillis(),
+                level = LogLevel.METRIC,
+                tag = "METRIC",
+                message = "$name=$value $unit",
+                deviceInfo = deviceInfo,
+                deviceId = deviceId,
+                sessionId = sessionManager.sessionId,
+                userId = userId,
+                sdkVersion = AppLoggerVersion.NAME,
+                metricName = name,
+                metricValue = value,
+                metricUnit = unit,
+                metricTags = enrichedTags
+            )
+
+            if (!filter.passes(event)) return
+            processor.enqueue(event)
+        } catch (_: Exception) {
+            // El SDK NUNCA lanza excepciones al caller
         }
-        process(LogLevel.METRIC, "METRIC", "$name=$value $unit", extraStr = extra)
     }
 
     override fun flush() = processor.flush()
@@ -100,7 +129,20 @@ internal class AppLoggerImpl(
                 platformLog("AppLogger/$tag", "[${level.name}] $message")
             }
 
-            val resolvedExtra = extraStr ?: extra?.mapValues { it.value.toString() }
+            // Preserve native types (Int, Double, Boolean) — only stringify unknown types.
+            // This allows richer JSONB queries in Supabase (e.g. extra->>'retry_count' > 2).
+            val resolvedExtra: Map<String, String>? = when {
+                extraStr != null -> extraStr
+                extra != null -> extra.mapValues { (_, v) ->
+                    when (v) {
+                        is String  -> v
+                        is Number  -> v.toString()
+                        is Boolean -> v.toString()
+                        else       -> v.toString()
+                    }
+                }
+                else -> null
+            }
 
             val event = LogEvent(
                 id = generateUUID(),
