@@ -69,6 +69,9 @@ class InMemoryLogger : AppLogger {
     }
 
     override fun flush() = Unit
+    override fun addGlobalExtra(key: String, value: String) = Unit
+    override fun removeGlobalExtra(key: String) = Unit
+    override fun clearGlobalExtra() = Unit
 
     fun assertLogged(level: LogLevel, tag: String? = null) {
         val found = _logs.any { it.level == level && (tag == null || it.tag == tag) }

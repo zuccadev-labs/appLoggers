@@ -98,4 +98,24 @@ interface AppLogger {
      * Call this before the app goes to background or terminates.
      */
     fun flush()
+
+    // ── Global extra context ──────────────────────────────────────────────────
+
+    /**
+     * Attaches a key-value pair to every subsequent event until removed.
+     *
+     * Useful for experiment groups, feature flags, AB test variants:
+     * ```kotlin
+     * logger.addGlobalExtra("ab_test", "checkout_v2")
+     * logger.addGlobalExtra("experiment", "group_b")
+     * ```
+     * Per-call `extra` values always override global ones on key collision.
+     */
+    fun addGlobalExtra(key: String, value: String)
+
+    /** Removes a single key from the global extra context. */
+    fun removeGlobalExtra(key: String)
+
+    /** Clears all global extra context. */
+    fun clearGlobalExtra()
 }

@@ -40,6 +40,9 @@ class AppLoggerExtensionsTest {
         override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) =
             metrics.add(MetricCapture(name, value, unit, tags)).let {}
         override fun flush() = Unit
+        override fun addGlobalExtra(key: String, value: String) = Unit
+        override fun removeGlobalExtra(key: String) = Unit
+        override fun clearGlobalExtra() = Unit
     }
 
     private lateinit var spy: SpyLogger

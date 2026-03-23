@@ -30,6 +30,9 @@ internal class BatchProcessor(
     private var consecutiveFailures = 0
     internal val deadLetterQueue = DeadLetterQueue()
 
+    /** Exposes current consecutive failure count for health monitoring. */
+    internal fun getConsecutiveFailures(): Int = consecutiveFailures
+
     init {
         scope.launch { startConsuming() }
         scope.launch { startPeriodicFlush() }

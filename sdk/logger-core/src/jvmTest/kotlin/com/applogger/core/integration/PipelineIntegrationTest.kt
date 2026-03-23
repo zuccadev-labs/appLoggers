@@ -188,6 +188,24 @@ class PipelineIntegrationTest {
         assertTrue(transport.sentEvents.isNotEmpty())
     }
 
+    @Test
+    fun `complete flow - consecutiveFailures increments on transport failure`() = runBlocking {
+        val logger = createPipeline()
+        logger.info("TAG", "event")
+        delay(200)
+
+        transport.shouldFail = true
+        transport.retryable = true
+        processor.sendBatch()
+
+        assertTrue(processor.getConsecutiveFailures() > 0)
+
+        // Recovers on success
+        transport.shouldFail = false
+        processor.sendBatch()
+        assertEquals(0, processor.getConsecutiveFailures())
+    }
+
     private class RecordingTransport : LogTransport {
         val sentEvents = java.util.Collections.synchronizedList(mutableListOf<com.applogger.core.model.LogEvent>())
         var shouldFail = false

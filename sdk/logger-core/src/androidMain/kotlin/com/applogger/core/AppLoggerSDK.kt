@@ -1,6 +1,7 @@
 package com.applogger.core
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.applogger.core.internal.*
 import kotlin.concurrent.Volatile
@@ -147,6 +148,35 @@ object AppLoggerSDK : AppLogger {
 
     fun clearDeviceId() {
         implRef?.clearDeviceId()
+    }
+
+    override fun addGlobalExtra(key: String, value: String) {
+        implRef?.addGlobalExtra(key, value)
+    }
+
+    override fun removeGlobalExtra(key: String) {
+        implRef?.removeGlobalExtra(key)
+    }
+
+    override fun clearGlobalExtra() {
+        implRef?.clearGlobalExtra()
+    }
+
+    /**
+     * Resets the SDK to its uninitialized state.
+     *
+     * **FOR TESTING ONLY.** Allows re-initialization between test cases.
+     * Never call this in production code.
+     */
+    @VisibleForTesting
+    fun reset() {
+        isInitialized.set(false)
+        instance = NoOpLogger()
+        implRef = null
+        AppLoggerHealth.initialized = false
+        AppLoggerHealth.processor = null
+        AppLoggerHealth.transport = null
+        AppLoggerHealth.buffer = null
     }
 
     private fun computeBufferCapacity(

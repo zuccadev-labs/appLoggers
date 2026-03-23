@@ -21,6 +21,11 @@ internal class AppLoggerImpl(
     @Volatile
     private var userId: String? = null
 
+    // Global extra: copy-on-write map — safe for multiplatform commonMain.
+    // Reads are lock-free (volatile snapshot). Writes replace the reference atomically.
+    @Volatile
+    private var globalExtra: Map<String, String> = emptyMap()
+
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
         process(LogLevel.DEBUG, tag, message, throwable, extra = extra)
     }
@@ -36,11 +41,14 @@ internal class AppLoggerImpl(
         anomalyType: String?,
         extra: Map<String, Any>?
     ) {
-        val mergedExtra = buildMap {
-            extra?.forEach { (k, v) -> put(k, v.toString()) }
-            anomalyType?.let { put("anomaly_type", it) }
-        }.ifEmpty { null }
-        process(LogLevel.WARN, tag, message, throwable, extraStr = mergedExtra)
+        // Merge anomalyType into extra as Map<String, Any> so native types are preserved
+        // through the same path as all other levels — no premature toString() here.
+        val mergedExtra: Map<String, Any>? = when {
+            anomalyType != null && extra != null -> extra + mapOf<String, Any>("anomaly_type" to anomalyType)
+            anomalyType != null -> mapOf("anomaly_type" to anomalyType)
+            else -> extra
+        }?.ifEmpty { null }
+        process(LogLevel.WARN, tag, message, throwable, extra = mergedExtra)
     }
 
     override fun error(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
@@ -57,8 +65,6 @@ internal class AppLoggerImpl(
                 platformLog("AppLogger/METRIC", "[METRIC] $name=$value $unit")
             }
 
-            // Auto-enrich tags with device context the SDK already has.
-            // Developers don't need to pass platform/app_version/device_model manually.
             val enrichedTags = buildMap {
                 tags?.forEach { (k, v) -> put(k, v) }
                 put("platform", deviceInfo.platform)
@@ -112,38 +118,65 @@ internal class AppLoggerImpl(
         deviceId = defaultDeviceId(deviceInfo)
     }
 
+    // ── Global extra ──────────────────────────────────────────────────────────
+
+    /**
+     * Attaches a key-value pair to every subsequent event until removed.
+     * Copy-on-write: reads are always lock-free.
+     */
+    override fun addGlobalExtra(key: String, value: String) {
+        globalExtra = globalExtra + (key to value)
+    }
+
+    override fun removeGlobalExtra(key: String) {
+        globalExtra = globalExtra - key
+    }
+
+    override fun clearGlobalExtra() {
+        globalExtra = emptyMap()
+    }
+
+    /**
+     * Stringifies per-call extra and merges with globalExtra.
+     * globalExtra has lower priority — per-call values win on key collision.
+     */
+    private fun mergeExtra(
+        extra: Map<String, Any>?,
+        global: Map<String, String>
+    ): Map<String, String>? {
+        val perCall = extra?.mapValues { (_, v) ->
+            when (v) {
+                is String  -> v
+                is Number  -> v.toString()
+                is Boolean -> v.toString()
+                else       -> v.toString()
+            }
+        }
+        return when {
+            global.isEmpty() && perCall == null -> null
+            global.isEmpty() -> perCall
+            perCall == null  -> global
+            else             -> global + perCall  // perCall wins on collision
+        }
+    }
+
     private fun process(
         level: LogLevel,
         tag: String,
         message: String,
         throwable: Throwable? = null,
-        extra: Map<String, Any>? = null,
-        extraStr: Map<String, String>? = null
+        extra: Map<String, Any>? = null
     ) {
         try {
-            // Guard: debug events descartados en producción
             if (level == LogLevel.DEBUG && !config.isDebugMode) return
 
-            // Consola en modo debug
             if (config.isDebugMode && config.consoleOutput) {
                 platformLog("AppLogger/$tag", "[${level.name}] $message")
             }
 
-            // Preserve native types (Int, Double, Boolean) — only stringify unknown types.
-            // This allows richer JSONB queries in Supabase (e.g. extra->>'retry_count' > 2).
-            val resolvedExtra: Map<String, String>? = when {
-                extraStr != null -> extraStr
-                extra != null -> extra.mapValues { (_, v) ->
-                    when (v) {
-                        is String  -> v
-                        is Number  -> v.toString()
-                        is Boolean -> v.toString()
-                        else       -> v.toString()
-                    }
-                }
-                else -> null
-            }
-
+            // Stringify per-call extra, preserving numeric/boolean representation.
+            // Merge: globalExtra (lower priority) + perCall (higher priority).
+            val resolvedExtra = mergeExtra(extra, globalExtra)
             val event = LogEvent(
                 id = generateUUID(),
                 timestamp = currentTimeMillis(),
@@ -158,10 +191,7 @@ internal class AppLoggerImpl(
                 extra = resolvedExtra
             )
 
-            // Aplicar filtros
             if (!filter.passes(event)) return
-
-            // Entregar al procesador (non-blocking)
             processor.enqueue(event)
         } catch (_: Exception) {
             // El SDK NUNCA lanza excepciones al caller

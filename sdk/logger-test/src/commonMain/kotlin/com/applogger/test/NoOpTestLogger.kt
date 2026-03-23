@@ -22,4 +22,7 @@ class NoOpTestLogger : AppLogger {
     override fun critical(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) = Unit
     override fun metric(name: String, value: Double, unit: String, tags: Map<String, String>?) = Unit
     override fun flush() = Unit
+    override fun addGlobalExtra(key: String, value: String) = Unit
+    override fun removeGlobalExtra(key: String) = Unit
+    override fun clearGlobalExtra() = Unit
 }

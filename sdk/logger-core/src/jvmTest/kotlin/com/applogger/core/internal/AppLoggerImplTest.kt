@@ -137,6 +137,30 @@ class AppLoggerImplTest {
     }
 
     @Test
+    fun `warn preserves native types in extra like other levels`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.warn("NETWORK", "Slow response", extra = mapOf("retry_count" to 3, "is_cached" to false))
+        delay(200)
+        processor.sendBatch()
+
+        val event = fakeTransport.sentEvents[0]
+        assertEquals("3", event.extra?.get("retry_count"))
+        assertEquals("false", event.extra?.get("is_cached"))
+    }
+
+    @Test
+    fun `warn merges anomalyType and extra without losing either`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.warn("NET", "Timeout", anomalyType = "TIMEOUT", extra = mapOf("endpoint" to "/api/v1"))
+        delay(200)
+        processor.sendBatch()
+
+        val event = fakeTransport.sentEvents[0]
+        assertEquals("TIMEOUT", event.extra?.get("anomaly_type"))
+        assertEquals("/api/v1", event.extra?.get("endpoint"))
+    }
+
+    @Test
     fun `metric events include metric metadata`() = runBlocking {
         logger = createLogger(buildConfig(debugMode = false))
         logger.metric("screen_load_time", 1234.0, "ms", tags = mapOf("screen" to "Home"))
@@ -320,8 +344,7 @@ class AppLoggerImplTest {
     }
 
     @Test
-    fun `extra values with numeric and boolean types are stored as strings in LogEvent`() = runBlocking {
-        logger = createLogger(buildConfig(debugMode = false))
+    fun `extra values with numeric and boolean types are stored as strings in LogEvent`() = runBlocking {        logger = createLogger(buildConfig(debugMode = false))
         logger.info("TAG", "typed extra", extra = mapOf(
             "retry_count" to 3,
             "latency_ms" to 123.45,
@@ -339,11 +362,62 @@ class AppLoggerImplTest {
         assertEquals("home", event.extra?.get("label"))
     }
 
+    // ── Global extra ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `globalExtra is attached to every event`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.addGlobalExtra("ab_test", "checkout_v2")
+        logger.addGlobalExtra("experiment", "group_b")
+        logger.info("TAG", "event with global context")
+        delay(200)
+        processor.sendBatch()
+
+        val event = fakeTransport.sentEvents[0]
+        assertEquals("checkout_v2", event.extra?.get("ab_test"))
+        assertEquals("group_b", event.extra?.get("experiment"))
+    }
+
+    @Test
+    fun `per-call extra overrides globalExtra on key collision`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.addGlobalExtra("source", "global")
+        logger.info("TAG", "override test", extra = mapOf("source" to "local"))
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals("local", fakeTransport.sentEvents[0].extra?.get("source"))
+    }
+
+    @Test
+    fun `removeGlobalExtra stops attaching that key`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.addGlobalExtra("flag", "on")
+        logger.removeGlobalExtra("flag")
+        logger.info("TAG", "after remove")
+        delay(200)
+        processor.sendBatch()
+
+        assertNull(fakeTransport.sentEvents[0].extra?.get("flag"))
+    }
+
+    @Test
+    fun `clearGlobalExtra removes all global context`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.addGlobalExtra("k1", "v1")
+        logger.addGlobalExtra("k2", "v2")
+        logger.clearGlobalExtra()
+        logger.info("TAG", "after clear")
+        delay(200)
+        processor.sendBatch()
+
+        assertNull(fakeTransport.sentEvents[0].extra)
+    }
+
     /**
      * Simple recording transport for tests.
      */
-    private class RecordingTransport : LogTransport {
-        val sentEvents = java.util.Collections.synchronizedList(mutableListOf<com.applogger.core.model.LogEvent>())
+    private class RecordingTransport : LogTransport {        val sentEvents = java.util.Collections.synchronizedList(mutableListOf<com.applogger.core.model.LogEvent>())
 
         override suspend fun send(events: List<com.applogger.core.model.LogEvent>): TransportResult {
             sentEvents.addAll(events)

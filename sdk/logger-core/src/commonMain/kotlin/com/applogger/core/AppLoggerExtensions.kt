@@ -129,7 +129,7 @@ fun Any.logM(
     val sourceTag = logTag() // capture before entering buildMap lambda
     val enriched = buildMap {
         tags?.forEach { (k, v) -> put(k, v) }
-        putIfAbsent("source", sourceTag)
+        if (!containsKey("source")) put("source", sourceTag)
     }
     logger.metric(name, value, unit, enriched)
 }
@@ -273,7 +273,7 @@ inline fun <T> Any.timed(
     val result = block()
     val enriched = buildMap<String, String> {
         tags?.forEach { (k, v) -> put(k, v) }
-        putIfAbsent("source", sourceTag)
+        if (!containsKey("source")) put("source", sourceTag)
     }
     logger.metric(name, (currentTimeMillis() - start).toDouble(), unit, enriched)
     return result
