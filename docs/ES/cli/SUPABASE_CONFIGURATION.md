@@ -151,18 +151,18 @@ Recomendacion: usar un usuario tecnico dedicado para ejecuciones automatizadas.
 Crear usuario sin login interactivo:
 
 ```bash
-sudo useradd --system --home /opt/applogger-cli --shell /usr/sbin/nologin applogger-cli
-sudo mkdir -p /opt/applogger-cli
-sudo chown -R applogger-cli:applogger-cli /opt/applogger-cli
+sudo useradd --system --home /opt/apploggers --shell /usr/sbin/nologin apploggers
+sudo mkdir -p /opt/apploggers
+sudo chown -R apploggers:apploggers /opt/apploggers
 ```
 
 Guardar secretos en archivo root-only y exportarlos en un servicio systemd:
 
 ```bash
-sudo install -m 600 -o root -g root /dev/null /etc/applogger-cli.env
+sudo install -m 600 -o root -g root /dev/null /etc/apploggers.env
 ```
 
-Contenido sugerido de `/etc/applogger-cli.env`:
+Contenido sugerido de `/etc/apploggers.env`:
 
 ```env
 appLogger_supabaseUrl=https://YOUR_PROJECT.supabase.co
@@ -218,10 +218,10 @@ Para `act` en local, definir el mismo par en `.act.secrets`. Si el workflow refe
 Comandos de verificacion minima:
 
 ```bash
-applogger-cli health --output json
-applogger-cli telemetry query --source logs --limit 5 --output json
-applogger-cli telemetry query --source metrics --name response_time_ms --limit 5 --output json
-applogger-cli telemetry agent-response --source logs --aggregate severity --preview-limit 3 --output agent
+apploggers health --output json
+apploggers telemetry query --source logs --limit 5 --output json
+apploggers telemetry query --source metrics --name response_time_ms --limit 5 --output json
+apploggers telemetry agent-response --source logs --aggregate severity --preview-limit 3 --output agent
 ```
 
 Se considera OK cuando:

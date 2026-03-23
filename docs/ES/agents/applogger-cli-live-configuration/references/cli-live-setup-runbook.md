@@ -5,7 +5,7 @@
 ```powershell
 $env:appLogger_supabaseUrl = "https://YOUR_PROJECT.supabase.co"
 $env:appLogger_supabaseKey = "YOUR_SERVICE_ROLE_KEY"
-applogger-cli health --output json
+apploggers health --output json
 ```
 
 ## Linux/macOS (bash)
@@ -13,15 +13,15 @@ applogger-cli health --output json
 ```bash
 export appLogger_supabaseUrl="https://YOUR_PROJECT.supabase.co"
 export appLogger_supabaseKey="YOUR_SERVICE_ROLE_KEY"
-applogger-cli health --output json
+apploggers health --output json
 ```
 
 ## Operational validation
 
-1. `applogger-cli capabilities --output json`
-2. `applogger-cli health --output json`
-3. `applogger-cli telemetry query --source logs --limit 5 --output json`
-4. `applogger-cli telemetry query --source metrics --name response_time_ms --limit 5 --output json`
+1. `apploggers capabilities --output json`
+2. `apploggers health --output json`
+3. `apploggers telemetry query --source logs --limit 5 --output json`
+4. `apploggers telemetry query --source metrics --name response_time_ms --limit 5 --output json`
 
 ## Production notes
 

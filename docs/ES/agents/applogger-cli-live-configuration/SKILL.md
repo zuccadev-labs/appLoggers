@@ -40,10 +40,10 @@ Examples:
 2. Export required environment variables for current shell.
 3. Configure persistent env in OS/CI secret store.
 4. Run readiness commands:
-   - `applogger-cli health --output json`
-   - `applogger-cli telemetry query --source logs --limit 5 --output json`
+   - `apploggers health --output json`
+   - `apploggers telemetry query --source logs --limit 5 --output json`
 5. Validate metrics query with name filter:
-   - `applogger-cli telemetry query --source metrics --name <metric> --limit 5 --output json`
+   - `apploggers telemetry query --source metrics --name <metric> --limit 5 --output json`
 
 ## Gaps outside automation
 

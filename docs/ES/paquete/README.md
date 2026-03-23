@@ -34,7 +34,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.zuccadev-labs.appLoggers:logger-core:0.1.1-alpha.7")
+    // Reemplazar <latest-version> con la última release: https://github.com/zuccadev-labs/appLoggers/releases
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:<latest-version>")
 }
 ```
 

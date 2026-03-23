@@ -19,10 +19,11 @@ Add dependencies in the app module:
 
 ```kotlin
 dependencies {
-    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.7")
-    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.7")
+    // Reemplazar <latest-version> con la última release: https://github.com/zuccadev-labs/appLoggers/releases
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:<latest-version>")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:<latest-version>")
 
-    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:v0.1.1-alpha.7")
+    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:<latest-version>")
 }
 ```
 

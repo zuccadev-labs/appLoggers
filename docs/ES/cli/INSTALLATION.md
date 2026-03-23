@@ -1,8 +1,8 @@
-# AppLogger CLI — Guía de Instalación
+# AppLoggers CLI — Guía de Instalación
 
-**Última actualización**: 2026-03-21  
-**Versión mínima**: Go 1.24+ (si compilas desde fuente)  
+**Última actualización**: 2026-03-22
 **Plataformas soportadas**: Windows, macOS, Linux (x86_64, ARM64)
+**Requisito mínimo para compilar desde fuente**: Go 1.24+
 
 ---
 
@@ -20,13 +20,10 @@
 
 ## Instalación Rápida
 
-### Opción 1: Instalador estándar de una línea (Recomendado)
+### Opción 1: Instalador de una línea (Recomendado)
 
 ```bash
-# Linux
-curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
-
-# macOS (Intel y Apple Silicon)
+# Linux / macOS
 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
@@ -35,65 +32,58 @@ curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/i
 irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 ```
 
-Este flujo:
+El instalador:
 
-- resuelve la última release `apploggers-v*`
-- detecta plataforma y arquitectura
-- descarga el binario correcto
-- valida checksum SHA-256 de forma obligatoria
-- deja el binario listo para usar
-- aplica política de red con reintentos y timeouts para descargas
+- Resuelve la última release `apploggers-v*` automáticamente
+- Detecta plataforma y arquitectura
+- Descarga el binario correcto
+- Valida checksum SHA-256 de forma obligatoria
+- Crea `~/.apploggers/cli.json` con un template de ejemplo si no existe
+- Agrega el binario al `PATH`
 
-Notas de hardening del instalador:
+Notas de seguridad:
 
 - Linux/macOS: requiere `sha256sum` o `shasum`; si no existe verificador, la instalación falla.
 - Windows: usa TLS 1.2 y reintentos de descarga con timeout configurable.
 
-Parámetros de red (opcionales):
+### Parámetros opcionales del instalador
 
-- Bash installer:
-  - `APPLOGGERS_CURL_RETRY_MAX` (default `5`)
-  - `APPLOGGERS_CURL_RETRY_DELAY` (default `2`)
-  - `APPLOGGERS_CURL_CONNECT_TIMEOUT` (default `10`)
-  - `APPLOGGERS_CURL_MAX_TIME` (default `120`)
-  - `APPLOGGERS_CURL_RETRY_MAX_TIME` (default `300`)
-- PowerShell installer:
-  - `-DownloadRetries` (default `5`)
-  - `-RetryDelaySeconds` (default `2`)
-  - `-DownloadTimeoutSeconds` (default `120`)
+**Bash (Linux/macOS):**
 
-Para fijar una versión específica:
+| Variable | Default | Propósito |
+|---|---|---|
+| `APPLOGGERS_VERSION` | última release | Tag específico a instalar (ej: `apploggers-vX.Y.Z`) |
+| `APPLOGGERS_INSTALL_DIR` | `/usr/local/bin` o `~/.local/bin` | Directorio de instalación |
+| `APPLOGGERS_CONFIG_DIR` | `~/.apploggers` | Directorio de configuración |
+| `APPLOGGERS_CURL_RETRY_MAX` | `5` | Reintentos de descarga |
+| `APPLOGGERS_CURL_CONNECT_TIMEOUT` | `10` | Timeout de conexión (segundos) |
+| `APPLOGGERS_CURL_MAX_TIME` | `120` | Timeout total de descarga (segundos) |
 
 ```bash
-APPLOGGERS_VERSION=apploggers-v0.1.1 curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
+# Instalar una versión específica
+APPLOGGERS_VERSION=apploggers-vX.Y.Z \
+  curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
+**PowerShell (Windows):**
+
+| Parámetro | Default | Propósito |
+|---|---|---|
+| `-Version` / `$env:APPLOGGERS_VERSION` | última release | Tag específico a instalar |
+| `-InstallDir` / `$env:APPLOGGERS_INSTALL_DIR` | `%LOCALAPPDATA%\Programs\AppLoggers` | Directorio de instalación |
+| `-ConfigDir` / `$env:APPLOGGERS_CONFIG_DIR` | `%USERPROFILE%\.apploggers` | Directorio de configuración |
+| `-DownloadRetries` | `5` | Reintentos de descarga |
+| `-DownloadTimeoutSeconds` | `120` | Timeout de descarga (segundos) |
+
 ```powershell
-$env:APPLOGGERS_VERSION = 'apploggers-v0.1.1'
+# Instalar una versión específica
+$env:APPLOGGERS_VERSION = 'apploggers-vX.Y.Z'
 irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 ```
 
-## Upgrade en Sitio
+---
 
-Con una version reciente del CLI puedes actualizar directamente desde el binario:
-
-```bash
-apploggers upgrade
-```
-
-Version especifica:
-
-```bash
-apploggers upgrade --version apploggers-v0.1.1
-```
-
-Forzar reinstalacion aunque ya coincida la version:
-
-```bash
-apploggers upgrade --force
-```
-
-### Opción 2: Descargar Binario (Manual)
+### Opción 2: Descargar Binario Manualmente
 
 ```bash
 # Linux / macOS
@@ -101,12 +91,13 @@ VERSION="apploggers-vX.Y.Z"
 curl -L "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/apploggers-linux-amd64" -o apploggers
 chmod +x apploggers
 sudo mv apploggers /usr/local/bin/
+```
 
-# Windows (PowerShell)
+```powershell
+# Windows PowerShell
 $version = "apploggers-vX.Y.Z"
 $url = "https://github.com/zuccadev-labs/appLoggers/releases/download/$version/apploggers-windows-amd64.exe"
-$output = "$env:ProgramFiles\apploggers.exe"
-Invoke-WebRequest -Uri $url -OutFile $output
+Invoke-WebRequest -Uri $url -OutFile "$env:ProgramFiles\apploggers.exe"
 ```
 
 ### Opción 3: Compilar desde Fuente
@@ -114,188 +105,89 @@ Invoke-WebRequest -Uri $url -OutFile $output
 ```bash
 git clone https://github.com/zuccadev-labs/appLoggers.git
 cd appLoggers/cli
-go build -o apploggers ./cmd/apploggers
+go build -o apploggers ./cmd/applogger-cli
 sudo mv apploggers /usr/local/bin/
 ```
 
-### Opción 4: Homebrew / Scoop / Winget (manifiestos de publicación)
+### Opción 4: Gestores de paquetes
 
-Desde `apploggers-v*`, el workflow de release genera y publica estos manifiestos como assets:
+El workflow de release genera y publica manifiestos listos para usar:
 
-- `manifests/homebrew/apploggers.rb`
-- `manifests/scoop/apploggers.json`
-- `manifests/winget/DevZucca.AppLoggerCLI*.yaml`
+- Homebrew: `apploggers.rb`
+- Scoop: `apploggers.json`
+- Winget: `DevZucca.AppLoggers.*.yaml`
 
-Esto deja la publicación lista para:
-
-- Tap Homebrew propio
-- Bucket Scoop propio
-- PR al repositorio `microsoft/winget-pkgs`
+Consulta los assets de la última release en [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases).
 
 ---
 
 ## Instalación por Plataforma
 
-### 📦 Windows
-
-#### A. Descargar Binario Precompilado
+### Windows
 
 1. Ve a [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases)
 2. Descarga `apploggers-windows-amd64.exe`
-3. Coloca el archivo en una carpeta dentro de `PATH` (ej: `C:\Program Files\apploggers\`)
-4. Abre **PowerShell** o **CMD** y verifica:
+3. Colócalo en una carpeta dentro de `PATH` (ej: `C:\Program Files\AppLoggers\`)
+4. Verifica:
 
 ```powershell
 apploggers version --output json
 ```
 
-#### B. Agregar a PATH (PowerShell)
+Para agregar al PATH de forma permanente:
 
 ```powershell
-# Opción 1: Directamente al descargar
-$downloadPath = "$env:USERPROFILE\Downloads\apploggers-windows-amd64.exe"
-$installPath = "$env:ProgramFiles\apploggers.exe"
-Copy-Item $downloadPath $installPath
-
-# Opción 2: Agregar carpeta a PATH (permanente)
 [Environment]::SetEnvironmentVariable(
     "Path",
-    [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Users\TuUsuario\AppLocalData\Local\apploggers",
+    [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Program Files\AppLoggers",
     "User"
 )
 # Reinicia PowerShell después
 ```
 
-#### C. Compilar desde Fuente
-
-```powershell
-# 1. Instalar Go (si no lo tienes)
-# Descargar desde https://golang.org/dl
-
-# 2. Clonar y compilar
-git clone https://github.com/zuccadev-labs/appLoggers.git
-cd appLoggers\cli
-go build -o apploggers.exe .\cmd\apploggers
-
-# 3. Mover a PATH
-Move-Item apploggers.exe "$env:ProgramFiles\apploggers.exe"
-```
-
----
-
-### 🍎 macOS
-
-#### A. Descargar Binario Precompilado
+### macOS
 
 ```bash
-# Detectar arquitectura
-ARCH=$(uname -m)  # "arm64" (Apple Silicon) o "x86_64" (Intel)
+# Detectar arquitectura automáticamente
+ARCH=$(uname -m | sed 's/x86_64/amd64/')
 VERSION="apploggers-vX.Y.Z"
 
-# Descargar
 curl -L \
   "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/apploggers-darwin-${ARCH}" \
   -o apploggers
 
 chmod +x apploggers
 sudo mv apploggers /usr/local/bin/
-
-# Verificar
 apploggers version --output json
 ```
 
-#### B. Compilar desde Fuente
+### Linux
 
 ```bash
-# 1. Asegúrate de tener Go 1.24+
-go version
-
-# 2. Clonar y compilar
-git clone https://github.com/zuccadev-labs/appLoggers.git
-cd appLoggers/cli
-go build -o apploggers ./cmd/apploggers
-
-# 3. Instalar globalmente
-sudo mv apploggers /usr/local/bin/
-chmod +x /usr/local/bin/apploggers
-```
-
-#### C. Homebrew (con tap propio)
-
-```bash
-# 1) copiar el formula generado desde los assets de release
-# 2) publicarlo en tu tap (ej: devzucca/homebrew-applogger)
-brew install devzucca/apploggers/apploggers
-```
-
-#### D. Winget (publicación comunitaria)
-
-```powershell
-# usar los manifiestos winget generados en el release
-# y abrir PR a microsoft/winget-pkgs
-winget install DevZucca.AppLoggerCLI
-```
-
----
-
-### 🐧 Linux
-
-#### A. Descargar Binario Precompilado
-
-```bash
-# Detectar arquitectura
-ARCH=$(dpkg --print-architecture)  # "amd64", "arm64", etc.
+ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 VERSION="apploggers-vX.Y.Z"
 
-# Descargar
 curl -L \
   "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/apploggers-linux-${ARCH}" \
   -o apploggers
 
 chmod +x apploggers
 sudo mv apploggers /usr/local/bin/
-
-# Verificar
 apploggers version --output json
 ```
 
-#### B. Compilar desde Fuente
-
-```bash
-# 1. Instalar Go (si no lo tienes)
-sudo apt-get update
-sudo apt-get install -y golang        # O descargar desde golang.org/dl
-
-# 2. Clonar y compilar
-git clone https://github.com/zuccadev-labs/appLoggers.git
-cd appLoggers/cli
-go build -o apploggers ./cmd/apploggers
-
-# 3. Instalar globalmente
-sudo mv apploggers /usr/local/bin/
-sudo chmod +x /usr/local/bin/apploggers
-```
-
-#### C. Docker (Para CI/CD o ambientes aislados)
+### Docker
 
 ```dockerfile
-# Dockerfile
-FROM golang:1.25-alpine AS builder
-WORKDIR /app
-COPY . .
+FROM golang:1.24-alpine AS builder
 WORKDIR /app/cli
-RUN go build -o apploggers ./cmd/apploggers
+COPY cli/ .
+RUN go build -o apploggers ./cmd/applogger-cli
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 COPY --from=builder /app/cli/apploggers /usr/local/bin/
 ENTRYPOINT ["apploggers"]
-```
-
-```bash
-# Usar imagen Docker
-docker build -t apploggers:latest .
-docker run apploggers:latest --version
 ```
 
 ---
@@ -304,154 +196,123 @@ docker run apploggers:latest --version
 
 ### Requisitos
 
-| Herramienta | Versión mínima | Verificar con |
-|---|---|---|
-| Go | 1.24 | `go version` |
-| Git | 2.30+ | `git --version` |
-| GNU Make | 4.3+ (opcional) | `make --version` |
+| Herramienta | Versión mínima |
+|---|---|
+| Go | 1.24 |
+| Git | 2.30+ |
 
 ### Pasos
 
 ```bash
-# 1. Clonar el repositorio
 git clone https://github.com/zuccadev-labs/appLoggers.git
-cd appLoggers
-
-# 2. Descargar dependencias
-cd cli
+cd appLoggers/cli
 go mod download
-
-# 3. Compilar
-go build -o apploggers ./cmd/apploggers
-
-# 4. (Opcional) Compilar para múltiples plataformas
-make build-all
-
-# 5. Instalar (Linux / macOS)
+go build -o apploggers ./cmd/applogger-cli
 sudo mv apploggers /usr/local/bin/
-chmod +x /usr/local/bin/apploggers
-
-# 6. Verificar
 apploggers version --output json
 ```
 
-### Compilar para Otras Plataformas
+### Cross-compilation
 
 ```bash
 # Linux ARM64
-GOOS=linux GOARCH=arm64 go build -o apploggers-linux-arm64 ./cmd/apploggers
+GOOS=linux GOARCH=arm64 go build -o apploggers-linux-arm64 ./cmd/applogger-cli
 
 # macOS Intel
-GOOS=darwin GOARCH=amd64 go build -o apploggers-darwin-amd64 ./cmd/apploggers
+GOOS=darwin GOARCH=amd64 go build -o apploggers-darwin-amd64 ./cmd/applogger-cli
 
 # macOS Apple Silicon
-GOOS=darwin GOARCH=arm64 go build -o apploggers-darwin-arm64 ./cmd/apploggers
+GOOS=darwin GOARCH=arm64 go build -o apploggers-darwin-arm64 ./cmd/applogger-cli
 
 # Windows
-GOOS=windows GOARCH=amd64 go build -o apploggers-windows-amd64.exe ./cmd/apploggers
+GOOS=windows GOARCH=amd64 go build -o apploggers-windows-amd64.exe ./cmd/applogger-cli
 ```
 
 ---
 
 ## Configuración Inicial
 
-### 1. Configurar Supabase (Backend de Telemetría)
+### Archivo de proyectos (recomendado)
 
-El CLI necesita acceso a tu proyecto Supabase para consultar logs y métricas.
+Al instalar, el CLI crea automáticamente `~/.apploggers/cli.json`. Edítalo con los datos de tu proyecto Supabase:
 
-#### PowerShell (Windows)
+```json
+{
+  "default_project": "my-app",
+  "projects": [
+    {
+      "name": "my-app",
+      "display_name": "My Application",
+      "workspace_roots": [],
+      "supabase": {
+        "url": "https://your-project.supabase.co",
+        "api_key_env": "APPLOGGER_SUPABASE_KEY",
+        "schema": "public",
+        "logs_table": "app_logs",
+        "metrics_table": "app_metrics",
+        "timeout_seconds": 15
+      }
+    }
+  ]
+}
+```
+
+Luego define la variable de entorno referenciada en `api_key_env`:
+
+```bash
+# Linux / macOS
+export APPLOGGER_SUPABASE_KEY="your-service-role-key"
+
+# Windows PowerShell
+$env:APPLOGGER_SUPABASE_KEY = "your-service-role-key"
+```
+
+### Variables de entorno directas (alternativa)
+
+Si no usas archivo de proyectos, configura las variables primarias:
+
+```bash
+# Linux / macOS
+export appLogger_supabaseUrl="https://your-project.supabase.co"
+export appLogger_supabaseKey="your-service-role-key"
+```
 
 ```powershell
-# Obtener credenciales de Supabase
-# 1. Ve a https://supabase.com/dashboard
-# 2. Selecciona tu proyecto
-# 3. Settings → API → copia los valores
-
-$env:appLogger_supabaseUrl = "https://TU_PROJECT_REF.supabase.co"
-$env:appLogger_supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-
-# Verifica que funcionó
-apploggers health --output json
+# Windows PowerShell
+$env:appLogger_supabaseUrl = "https://your-project.supabase.co"
+$env:appLogger_supabaseKey = "your-service-role-key"
 ```
-
-#### CMD (Windows)
 
 ```cmd
-set appLogger_supabaseUrl=https://TU_PROJECT_REF.supabase.co
-set appLogger_supabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-REM Verifica
-apploggers health --output json
+REM Windows CMD
+set appLogger_supabaseUrl=https://your-project.supabase.co
+set appLogger_supabaseKey=your-service-role-key
 ```
 
-#### Bash / Zsh (macOS, Linux)
+Para persistir en Bash/Zsh:
 
 ```bash
-export appLogger_supabaseUrl="https://TU_PROJECT_REF.supabase.co"
-export appLogger_supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-
-# Verifica
-apploggers health --output json
-```
-
-#### Persistir Variables (Opcional)
-
-**Bash/Zsh:**
-```bash
-# Agregar a ~/.bashrc o ~/.zshrc
-echo 'export appLogger_supabaseUrl="https://TU_PROJECT_REF.supabase.co"' >> ~/.bashrc
-echo 'export appLogger_supabaseKey="..."' >> ~/.bashrc
+echo 'export appLogger_supabaseUrl="https://your-project.supabase.co"' >> ~/.bashrc
+echo 'export appLogger_supabaseKey="your-service-role-key"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**PowerShell:**
-```powershell
-# Agregar a tu perfil PowerShell
-$profile  # te muestra la ruta
-Add-Content -Path $profile -Value @"
-`$env:appLogger_supabaseUrl = "https://TU_PROJECT_REF.supabase.co"
-`$env:appLogger_supabaseKey = "..."
-"@
-```
+> Usa siempre la `service_role` key del CLI. El SDK móvil debe usar la anon key. Nunca expongas `service_role` en clientes móviles o frontend.
 
-### 2. Configuración Avanzada (Opcional)
-
-| Variable | Default | Propósito |
-|---|---|---|
-| `appLogger_supabaseUrl` | — | URL de tu proyecto Supabase |
-| `appLogger_supabaseKey` | — | Llave `service_role` para consultas del CLI |
-| `appLogger_supabaseSchema` | `public` | Esquema en PostgreSQL |
-| `appLogger_supabaseLogTable` | `app_logs` | Tabla de logs |
-| `appLogger_supabaseMetricTable` | `app_metrics` | Tabla de métricas |
-| `appLogger_supabaseTimeoutSeconds` | `15` | Timeout HTTP (1-120) |
-
-> Seguridad: usa `service_role` solo en backend/entornos de operaciones.
-> El SDK movil debe usar anon key y nunca exponer `service_role`.
+Ver [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md) para configuración corporativa completa.
 
 ---
 
 ## Verificación
 
-### 1. Verificar Instalación
-
 ```bash
+# Verificar instalación
 apploggers version --output json
-# Output: {"name":"apploggers","version":"apploggers-vX.Y.Z",...}
 
-apploggers --syncbin-metadata
-# Output: JSON con metadatos Syncbin
-```
-
-### 2. Verificar Conectividad con Supabase
-
-```bash
+# Verificar conectividad con Supabase
 apploggers health --output json
-# Debe retornar: {"ok": true, "services": {"supabase": "available", ...}}
-```
 
-### 3. Primer Query
-
-```bash
+# Primer query
 apploggers telemetry query \
   --source logs \
   --aggregate severity \
@@ -461,79 +322,74 @@ apploggers telemetry query \
 
 ---
 
+## Upgrade en Sitio
+
+```bash
+# Actualizar a la última versión
+apploggers upgrade
+
+# Versión específica
+apploggers upgrade --version apploggers-vX.Y.Z
+
+# Forzar reinstalación
+apploggers upgrade --force
+```
+
+---
+
 ## Solución de Problemas
 
 ### "apploggers: command not found"
 
-**Causa**: El binario no está en PATH.
+El binario no está en PATH.
 
-**Solución**:
 ```bash
 # Verificar si existe
-ls -la /usr/local/bin/apploggers
+which apploggers || ls -la /usr/local/bin/apploggers
 
-# Si no existe, descargarlo nuevamente
-VERSION="apploggers-vX.Y.Z"
-curl -L "https://github.com/zuccadev-labs/appLoggers/releases/download/${VERSION}/apploggers-linux-amd64" \
-  -o /usr/local/bin/apploggers
-chmod +x /usr/local/bin/apploggers
+# Reinstalar
+curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash
 ```
 
 ### "permission denied"
 
-**Causa**: El archivo no tiene permisos de ejecución.
-
 ```bash
 chmod +x /usr/local/bin/apploggers
 ```
 
-### "health check failed: appLogger_supabaseUrl not set"
+### "missing Supabase URL" o "missing Supabase API key"
 
-**Causa**: Las variables de entorno no están configuradas.
+Las variables de entorno no están configuradas o el archivo `~/.apploggers/cli.json` no tiene datos válidos.
 
 ```bash
-# Verifica si están cargadas
+# Verificar variables
 echo $appLogger_supabaseUrl
 echo $appLogger_supabaseKey
 
-# Si están vacías, configúralas
-export appLogger_supabaseUrl="..."
-export appLogger_supabaseKey="..."
-```
-
-### "GOARCH and OS env vars not allowed"
-
-**Causa**: Conflicto de variables de entorno durante compilación.
-
-```bash
-# Limpiar antes de compilar
-unset GOOS GOARCH
-go build -o apploggers ./cmd/apploggers
+# Verificar archivo de configuración
+cat ~/.apploggers/cli.json
 ```
 
 ### "authorization failed: invalid API key"
 
-**Causa**: La llave de Supabase es inválida o expiró.
+La key de Supabase es inválida o expiró.
 
-**Solución**:
-1. Ve a [Supabase Dashboard](https://supabase.com/dashboard)
-2. Settings → API
-3. Copia la llave `service_role` nuevamente
-4. Reconfigura: `export appLogger_supabaseKey="..."`
+1. Ve a [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API
+2. Copia la `service_role` key
+3. Actualiza la variable: `export appLogger_supabaseKey="..."`
+
+### "GOARCH and OS env vars not allowed" (al compilar)
+
+```bash
+unset GOOS GOARCH
+go build -o apploggers ./cmd/applogger-cli
+```
 
 ---
 
 ## Siguiente Paso
 
-Una vez instalado, consulta [./README.md](./README.md) para:
-- Comandos disponibles
-- Ejemplos de consultas
-- Modo agent para automatización
-- Integración con agentes IA
+- Referencia de comandos y consultas: [README.md](./README.md)
+- Configuración Supabase corporativa: [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md)
 
-Para configuración de Supabase a nivel operativo (migraciones, RLS,
-service_role y usuario del CLI), consulta:
-- [SUPABASE_CONFIGURATION.md](./SUPABASE_CONFIGURATION.md)
-
-Para preguntas o issues:  
 → [GitHub Issues](https://github.com/zuccadev-labs/appLoggers/issues)
