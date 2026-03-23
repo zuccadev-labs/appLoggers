@@ -103,10 +103,7 @@ object AppLoggerSDK : AppLogger {
         val resolvedTransport = transport ?: NoOpTransport()
         val formatter = JsonLogFormatter()
 
-        val offlineStorage: OfflineStorage = when (resolvedConfig.offlinePersistenceMode) {
-            OfflinePersistenceMode.NONE -> NoOpOfflineStorage
-            else -> SqliteOfflineStorage(appContext)
-        }
+        val offlineStorage: OfflineStorage = buildOfflineStorage(appContext, resolvedConfig)
 
         val processor = BatchProcessor(
             buffer = buffer,
@@ -264,6 +261,12 @@ object AppLoggerSDK : AppLogger {
             false
         }
     }
+
+    private fun buildOfflineStorage(context: Context, config: AppLoggerConfig): OfflineStorage =
+        when (config.offlinePersistenceMode) {
+            OfflinePersistenceMode.NONE -> NoOpOfflineStorage
+            else -> SqliteOfflineStorage(context)
+        }
 
     private fun computeBufferCapacity(
         appContext: Context,
