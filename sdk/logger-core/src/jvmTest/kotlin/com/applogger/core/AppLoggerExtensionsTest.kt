@@ -238,4 +238,109 @@ class AppLoggerExtensionsTest {
         spy.logI(tag, "using companion tag")
         assertEquals("SpyLogger", spy.calls[0].tag)
     }
+
+    // ── withTag() ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `withTag string fixes tag for all calls`() {
+        val log = spy.withTag("PaymentRepository")
+        log.i("Charging card")
+        log.e("Charge failed", RuntimeException("declined"))
+        assertEquals(2, spy.calls.size)
+        assertTrue(spy.calls.all { it.tag == "PaymentRepository" })
+    }
+
+    @Test
+    fun `withTag receiver infers tag from class name`() {
+        val log = spy.withTag(this)
+        log.d("debug msg")
+        assertEquals("AppLoggerExtensionsTest", spy.calls[0].tag)
+    }
+
+    @Test
+    fun `TaggedLogger metric delegates correctly`() {
+        val log = spy.withTag("Repo")
+        log.metric("query_time", 50.0, "ms", mapOf("table" to "users"))
+        assertEquals(1, spy.metrics.size)
+        assertEquals("query_time", spy.metrics[0].name)
+        assertEquals("users", spy.metrics[0].tags?.get("table"))
+    }
+
+    @Test
+    fun `TaggedLogger warn passes anomalyType`() {
+        val log = spy.withTag("Network")
+        log.w("Slow response", anomalyType = "HIGH_LATENCY")
+        assertEquals(LogLevel.WARN, spy.calls[0].level)
+        assertEquals("Network", spy.calls[0].tag)
+    }
+
+    // ── timed() ───────────────────────────────────────────────────────────────
+
+    @Test
+    fun `timed records metric with elapsed time`() {
+        val result = spy.timed("db_query", "ms") { 42 }
+        assertEquals(42, result)
+        assertEquals(1, spy.metrics.size)
+        assertEquals("db_query", spy.metrics[0].name)
+        assertEquals("ms", spy.metrics[0].unit)
+        assertTrue(spy.metrics[0].value >= 0.0)
+    }
+
+    @Test
+    fun `timed passes tags to metric`() {
+        spy.timed("api_call", tags = mapOf("endpoint" to "/users")) { Unit }
+        assertEquals("/users", spy.metrics[0].tags?.get("endpoint"))
+    }
+
+    @Test
+    fun `Any timed infers source tag`() {
+        this.timed(spy, "render_time") { Unit }
+        assertEquals("AppLoggerExtensionsTest", spy.metrics[0].tags?.get("source"))
+    }
+
+    @Test
+    fun `Any timed does not override explicit source tag`() {
+        this.timed(spy, "render_time", tags = mapOf("source" to "Custom")) { Unit }
+        assertEquals("Custom", spy.metrics[0].tags?.get("source"))
+    }
+
+    // ── logCatching() ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `logCatching returns result on success`() {
+        val result = spy.logCatching("TAG", "fetch user") { "user_data" }
+        assertEquals("user_data", result)
+        assertTrue(spy.calls.isEmpty())
+    }
+
+    @Test
+    fun `logCatching returns null and logs error on exception`() {
+        val result = spy.logCatching("TAG", "fetch user") {
+            throw RuntimeException("timeout")
+        }
+        assertNull(result)
+        assertEquals(1, spy.calls.size)
+        assertEquals(LogLevel.ERROR, spy.calls[0].level)
+        assertEquals("TAG", spy.calls[0].tag)
+        assertTrue(spy.calls[0].message.contains("fetch user"))
+        assertNotNull(spy.calls[0].throwable)
+    }
+
+    @Test
+    fun `Any logCatching infers tag from class name`() {
+        val result = this.logCatching(spy, "submit order") {
+            throw IllegalStateException("out of stock")
+        }
+        assertNull(result)
+        assertEquals("AppLoggerExtensionsTest", spy.calls[0].tag)
+        assertEquals(LogLevel.ERROR, spy.calls[0].level)
+    }
+
+    @Test
+    fun `logCatching passes extra to error event`() {
+        spy.logCatching("TAG", "process", extra = mapOf("order_id" to "123")) {
+            throw RuntimeException("failed")
+        }
+        assertEquals("123", spy.calls[0].extra?.get("order_id"))
+    }
 }
