@@ -87,7 +87,7 @@ class SupabaseE2ETest {
         level: LogLevel = LogLevel.INFO,
         tag: String = "E2E_TEST",
         message: String = "Test event",
-        extra: Map<String, String>? = null
+        extra: Map<String, JsonElement>? = null
     ) = LogEvent(
         id = "e2e-${System.currentTimeMillis()}-${(Math.random() * 10000).toInt()}",
         timestamp = System.currentTimeMillis(),
@@ -155,10 +155,10 @@ class SupabaseE2ETest {
             tag = "METRIC",
             message = "screen_load_time=1234.0 ms",
             extra = mapOf(
-                "metric_name" to "screen_load_time",
-                "metric_value" to "1234.0",
-                "metric_unit" to "ms",
-                "screen" to "HomeScreen"
+                "metric_name" to JsonPrimitive("screen_load_time"),
+                "metric_value" to JsonPrimitive("1234.0"),
+                "metric_unit" to JsonPrimitive("ms"),
+                "screen" to JsonPrimitive("HomeScreen")
             )
         )
         val result = transport.send(listOf(event))
@@ -172,7 +172,10 @@ class SupabaseE2ETest {
             level = LogLevel.INFO,
             tag = "E2E_EXTRA",
             message = "Event with extra fields",
-            extra = mapOf("content_id" to "movie_123", "screen" to "PlayerScreen")
+            extra = mapOf(
+                "content_id" to JsonPrimitive("movie_123"),
+                "screen" to JsonPrimitive("PlayerScreen")
+            )
         )
         val result = transport.send(listOf(event))
         assertTrue(result is TransportResult.Success)
