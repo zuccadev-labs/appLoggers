@@ -1,7 +1,5 @@
 # AppLogger — Guía de Publicación del Paquete
 
-**Versión:** 0.1.1-alpha.7  
-**Fecha:** 2026-03-17  
 **Plataformas objetivo:** JitPack · GitHub Packages · Maven Central
 
 > Estado actual: JitPack es el canal más directo para consumo. GitHub Packages requiere una release etiquetada exitosa para que los artefactos aparezcan en la sección Packages del repositorio. Maven Central sigue siendo un objetivo de publicación, no un canal ya operativo.
@@ -37,7 +35,7 @@ cat gradle/libs.versions.toml
 # gradle.properties
 GROUP=com.github.zuccadev-labs
 POM_ARTIFACT_ID=appLoggers
-VERSION_NAME=0.1.1-alpha.7
+VERSION_NAME=<ver sdk/gradle.properties>
 
 POM_NAME=AppLogger
 POM_DESCRIPTION=Kotlin Multiplatform SDK for structured technical telemetry on Android/TV/iOS/JVM
@@ -194,15 +192,16 @@ JitPack construye el artefacto directamente desde el repositorio de GitHub. No r
 ### 3.1 Crear un release en GitHub
 
 ```bash
-git tag -a v0.1.1-alpha.7 -m "Release 0.1.1-alpha.7"
-git push origin v0.1.1-alpha.7
+# Reemplazar con la versión real de sdk/gradle.properties → VERSION_NAME
+git tag -a v<X.Y.Z> -m "Release <X.Y.Z>"
+git push origin v<X.Y.Z>
 ```
 
 ### 3.2 Activar la build en JitPack
 
 1. Ir a [jitpack.io](https://jitpack.io)
 2. Buscar `zuccadev-labs/appLoggers`
-3. Hacer clic en **Get it** junto al tag `v0.1.1-alpha.4`
+3. Hacer clic en **Get it** junto al tag creado
 4. JitPack construye el artefacto automáticamente
 
 ### 3.3 Consumo desde la app
@@ -216,8 +215,9 @@ dependencyResolutionManagement {
 }
 
 // app/build.gradle.kts
+// Reemplazar <latest-version> con la última release: https://github.com/zuccadev-labs/appLoggers/releases
 dependencies {
-    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.4")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:<latest-version>")
 }
 ```
 
@@ -296,7 +296,7 @@ repositories {
 
 ```bash
 # Estable
-git tag -a v0.1.1-alpha.7 -m "Current alpha release"
+git tag -a v<X.Y.Z> -m "Release <X.Y.Z>"
 
 # Alpha (API puede cambiar)
 git tag -a v0.2.0-alpha.1 -m "New transport trait alpha"

@@ -14,7 +14,7 @@ Monorepo de telemetría técnica — **SDK** · Frontend · CLI.
 
 - [🗂️ Estructura del Repositorio](#estructura-del-repositorio)
 - [✨ Características](#características)
-- [🖥️ AppLogger CLI (Operaciones)](#applogger-cli-operaciones)
+- [🖥️ AppLoggers CLI (Operaciones)](#apploggers-cli-operaciones)
 - [📦 AppLogger SDK (Instrumentación)](#applogger-sdk-instrumentación)
 - [🤖 Programas de Agentes IA](#programas-de-agentes-ia)
 - [⚙️ Configuración del Entorno](#configuración-del-entorno)
@@ -42,7 +42,7 @@ appLoggers/
 │   ├── logger-test/                ← Utilidades de testing
 │   ├── sample/                     ← App Android de ejemplo
 │   └── build.gradle.kts            ← Build raíz del SDK
-├── cli/                            ← ✅ CLI para Operaciones (v0.1.0-alpha.0)
+├── cli/                            ← ✅ CLI para Operaciones (apploggers)
 │   ├── cmd/                        ← Entrypoint
 │   ├── internal/cli/               ← Comandos y lógica
 │   ├── tests/                      ← Pruebas de integración
@@ -86,18 +86,18 @@ Single source of truth por superficie:
 - SDK: `sdk/gradle.properties` -> `VERSION_NAME`
   - Se usa para publicar artefactos y para generar `AppLoggerVersion` automaticamente.
 - CLI: `cli/VERSION`
-  - El workflow de CLI lo usa para construir versiones en ramas y valida que el tag release `applogger-cli-v*` coincida con ese valor.
+  - El workflow de CLI lo usa para construir versiones en ramas y valida que el tag release `apploggers-v*` coincida con ese valor.
 
 Regla de release:
 
 - SDK release tag: `vX.Y.Z...` (pipeline SDK)
-- CLI release tag: `applogger-cli-vX.Y.Z...` (pipeline CLI)
+- CLI release tag: `apploggers-vX.Y.Z...` (pipeline CLI)
 
 ---
 
-## AppLogger CLI (Operaciones)
+## AppLoggers CLI (Operaciones)
 
-**applogger-cli** es la herramienta para consultar telemetría, validar salud, y automatizar operaciones.
+**apploggers** es la herramienta de línea de comandos para consultar telemetría, validar salud, y automatizar operaciones.
 
 ### Instalación Rápida (3 minutos)
 
@@ -109,28 +109,28 @@ curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/i
 irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.ps1 | iex
 
 # Verificar
-applogger-cli version --output json
+apploggers version --output json
 ```
 
 ### Primeros Comandos
 
 ```bash
 # Consultar logs de error (últimas 24h)
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --severity error \
   --limit 50 \
   --output json
 
 # Salida compacta para agentes (TOON format)
-applogger-cli telemetry agent-response \
+apploggers telemetry agent-response \
   --source logs \
   --aggregate severity \
   --preview-limit 3 \
   --output agent
 
 # Validar salud del backend
-applogger-cli health --output json
+apploggers health --output json
 ```
 
 ### Documentación CLI
@@ -175,12 +175,12 @@ Tenemos **skills especializados** para agentes IA. Úsalos cuando necesites auto
 # Instrucción para un agente:
 # "consulta los logs de error de las últimas 24 horas y resúmelo por severidad"
 
-applogger-cli telemetry agent-response \
+apploggers telemetry agent-response \
   --source logs \
   --severity error \
   --aggregate severity \
-  --from 2026-03-18T10:00:00Z \
-  --to 2026-03-19T10:00:00Z \
+  --from <timestamp-inicio-ISO8601> \
+  --to <timestamp-fin-ISO8601> \
   --preview-limit 3 \
   --output agent
 
@@ -224,6 +224,17 @@ Un template está incluido en el repositorio:
 ```bash
 cp local.properties.example local.properties
 ```
+
+> **Variables del SDK vs variables del CLI — diferencias clave**
+>
+> Este proyecto tiene dos superficies con variables de configuración distintas. Es importante no mezclarlas:
+>
+> | Superficie | Archivo / Scope | Variables | Formato | Uso |
+> |---|---|---|---|---|
+> | **SDK** (Android/iOS/JVM) | `local.properties` → `BuildConfig` | `APPLOGGER_URL`, `APPLOGGER_ANON_KEY`, `APPLOGGER_DEBUG` | UPPERCASE | Instrumentación en la app cliente. Usa **anon key** para INSERT. |
+> | **CLI** (operaciones) | Variables de entorno del shell / CI | `appLogger_supabaseUrl`, `appLogger_supabaseKey` (primarias) · `APPLOGGER_SUPABASE_URL`, `APPLOGGER_SUPABASE_KEY` (aliases) | camelCase primarias / UPPERCASE aliases | Consultas de telemetría y diagnóstico. Usa **service_role key** para SELECT. |
+>
+> El CLI acepta ambas formas (camelCase y UPPERCASE) — son equivalentes. Nunca uses la `service_role` key en el SDK ni la `anon` key en el CLI.
 
 Luego abrí `local.properties` y completá los valores:
 
@@ -303,13 +314,14 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 dependencies {
     // Core del logger (obligatorio)
-    implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.7")
+    // Reemplazar <latest-version> con la última release: https://github.com/zuccadev-labs/appLoggers/releases
+    implementation("com.github.zuccadev-labs.appLoggers:logger-core:<latest-version>")
 
     // Transporte Supabase (opcional — si tu backend es Supabase)
-    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:v0.1.1-alpha.7")
+    implementation("com.github.zuccadev-labs.appLoggers:logger-transport-supabase:<latest-version>")
 
     // Utilidades de testing (solo para tests)
-    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:v0.1.1-alpha.7")
+    testImplementation("com.github.zuccadev-labs.appLoggers:logger-test:<latest-version>")
 }
 ```
 
@@ -330,9 +342,10 @@ dependencyResolutionManagement {
 }
 
 // app/build.gradle.kts
+// Reemplazar <latest-version> con la última release: https://github.com/zuccadev-labs/appLoggers/releases
 dependencies {
-    implementation("com.github.zuccadev-labs:logger-core:0.1.1-alpha.7")
-    implementation("com.github.zuccadev-labs:logger-transport-supabase:0.1.1-alpha.7")
+    implementation("com.github.zuccadev-labs:logger-core:<latest-version>")
+    implementation("com.github.zuccadev-labs:logger-transport-supabase:<latest-version>")
 }
 ```
 
@@ -465,10 +478,12 @@ Para que el pipeline funcione al 100%, configurá estos secrets en **GitHub → 
 
 | Secret | Requerido por | Dónde obtenerlo |
 |---|---|---|
-| `appLogger_supabaseUrl` | Job `e2e` | Supabase Dashboard → Settings → API → Project URL |
+| `APPLOGGER_SUPABASE_URL` | Job `e2e` | Supabase Dashboard → Settings → API → Project URL |
 | `APPLOGGER_SUPABASE_ANON_KEY` | Job `e2e` | Supabase Dashboard → Settings → API → `anon` `public` key |
 | `APPLOGGER_SUPABASE_SERVICE_KEY` | Job `e2e` | Supabase Dashboard → Settings → API → `service_role` key |
 | `CODECOV_TOKEN` | Job `test` (opcional) | [codecov.io](https://codecov.io) → Settings → Token |
+
+> Los nombres de secrets en GitHub deben ser **UPPERCASE** por convención. El workflow los inyecta como variables de entorno con el mismo nombre.
 
 > Si los secrets de Supabase no están configurados, los jobs `lint`, `test` y `security` pasan normalmente — solo `e2e` fallará.
 
@@ -556,8 +571,8 @@ Ver documentación completa en [docs/ES/paquete/testing.md](docs/ES/paquete/test
 JitPack construye automáticamente cuando se crea un tag o cuando alguien solicita el artefacto:
 
 ```kotlin
-// Usar en cualquier proyecto
-implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.7")
+// Reemplazar <latest-version> con la última release: https://github.com/zuccadev-labs/appLoggers/releases
+implementation("com.github.zuccadev-labs.appLoggers:logger-core:<latest-version>")
 ```
 
 ### GitHub Packages (CI/CD)
@@ -565,8 +580,9 @@ implementation("com.github.zuccadev-labs.appLoggers:logger-core:v0.1.1-alpha.7")
 El workflow `release.yml` publica automáticamente al crear un tag `v*`:
 
 ```bash
-git tag -a v0.1.1-alpha.7 -m "Release 0.1.1-alpha.7"
-git push origin v0.1.1-alpha.7
+# Ejemplo — reemplazar con la versión real del sdk/gradle.properties
+git tag -a v0.2.0 -m "Release 0.2.0"
+git push origin v0.2.0
 # → GitHub Actions: tests + publish + GitHub Release
 ```
 

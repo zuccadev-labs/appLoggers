@@ -1,6 +1,5 @@
-# AppLogger CLI — Buenas Prácticas Corporativas
+# AppLoggers CLI — Buenas Prácticas Corporativas
 
-**Última actualización**: 2026-03-19  
 **Audiencia**: DevOps, SRE, DevEx Engineers, Architects
 
 ---
@@ -16,7 +15,7 @@
 export appLogger_supabaseUrl="https://project.supabase.co"
 export appLogger_supabaseKey="$(aws secretsmanager get-secret-value --secret-id applogger-key | jq -r .SecretString)"
 
-applogger-cli health --output json
+apploggers health --output json
 ```
 
 ```bash
@@ -45,13 +44,13 @@ env:
 
 ```bash
 # ❌ Hardcodear en scripts
-applogger-cli --url "https://..." --key "eyJhbGc..."
+apploggers --url "https://..." --key "eyJhbGc..."
 
 # ❌ Guardar en archivos de configuración
-echo "key=eyJhbGc..." > /etc/applogger.conf   # ❌ ¡DANGEROUS!
+echo "key=eyJhbGc..." > /etc/apploggers.conf   # ❌ ¡DANGEROUS!
 
 # ❌ Pasar en línea de comandos visible
-ps aux | grep applogger-cli                  # ❌ Secrets expuestos
+ps aux | grep apploggers                  # ❌ Secrets expuestos
 
 # ❌ Loguear credenciales
 echo "Using key: $appLogger_supabaseKey"    # ❌ Logs sensibles
@@ -66,7 +65,7 @@ echo "Using key: $appLogger_supabaseKey"    # ❌ Logs sensibles
 set -euo pipefail
 
 # Check exit code
-if ! applogger-cli health --output json; then
+if ! apploggers health --output json; then
   echo "ERROR: Health check failed (exit code: $?)" >&2
   # Log properly but obscure sensitive data
   echo "ERROR: $(date -u '+%Y-%m-%dT%H:%M:%SZ') - Backend unavailable" >> /var/log/applogger-health.log
@@ -74,7 +73,7 @@ if ! applogger-cli health --output json; then
 fi
 
 # Parse JSON safely
-health_response=$(applogger-cli health --output json 2>&1)
+health_response=$(apploggers health --output json 2>&1)
 if jq -e '.ok' <<< "$health_response" > /dev/null 2>&1; then
   echo "✓ Health check passed"
 else
@@ -88,11 +87,11 @@ fi
 
 ```bash
 # ❌ No verificar exit codes
-applogger-cli telemetry query --source logs
+apploggers telemetry query --source logs
 # Si falla silenciosamente, continúa con datos inconsistentes
 
 # ❌ No log de errores
-applogger-cli health > /dev/null 2>&1  # Error desaparece
+apploggers health > /dev/null 2>&1  # Error desaparece
 
 # ❌ Parsear JSON sin validación
 echo "$response" | jq '.count'  # Si no es JSON válido, falla sin mensajes claros
@@ -130,7 +129,7 @@ validate_source "logs"
 validate_severity "error"
 validate_limit "100"
 
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --severity error \
   --limit 100
@@ -141,12 +140,12 @@ applogger-cli telemetry query \
 ```bash
 # ❌ Confiar ciegamente en entrada de usuario
 SEVERITY="$1"
-applogger-cli telemetry query --severity "$SEVERITY"
+apploggers telemetry query --severity "$SEVERITY"
 # Si el usuario pasa "--severity'; DROP TABLE;", puede causar problemas
 
 # ❌ Límites sin validar
 LIMIT="$1"
-applogger-cli telemetry query --limit "$LIMIT"
+apploggers telemetry query --limit "$LIMIT"
 # 1000000 puede sobrecargar el backend
 ```
 
@@ -170,7 +169,7 @@ get_capabilities() {
   fi
   
   # Refresh cache
-  applogger-cli capabilities --output json | tee "$CACHE_FILE"
+  apploggers capabilities --output json | tee "$CACHE_FILE"
 }
 
 # Use cached capabilities
@@ -198,7 +197,7 @@ check_rate_limit() {
   echo "$current" >> "$QUERY_COUNT_FILE"
 }
 
-check_rate_limit && applogger-cli telemetry query --source logs
+check_rate_limit && apploggers telemetry query --source logs
 ```
 
 #### ❌ NO Hacer
@@ -206,11 +205,11 @@ check_rate_limit && applogger-cli telemetry query --source logs
 ```bash
 # ❌ Llamadas sin caché
 for i in {1..100}; do
-  applogger-cli capabilities  # Hammering server 100x en loop
+  apploggers capabilities  # Hammering server 100x en loop
 done
 
 # ❌ Sin rate limiting
-watch -n 1 'applogger-cli telemetry query'  # Consulta cada 1 segundo
+watch -n 1 'apploggers telemetry query'  # Consulta cada 1 segundo
 ```
 
 ### 5. Logging y Auditoría
@@ -233,7 +232,7 @@ log_query() {
   } >> /var/log/applogger-queries.log
   
   # Execute query
-  if applogger-cli telemetry query --source "$source" --output json; then
+  if apploggers telemetry query --source "$source" --output json; then
     echo "status=success" >> /var/log/applogger-queries.log
   else
     echo "status=failed" >> /var/log/applogger-queries.log
@@ -248,13 +247,13 @@ log_query "logs"
 
 ```bash
 # ❌ Loguear sin estructura
-applogger-cli telemetry query >> /tmp/log.txt  # Formato inconsistente
+apploggers telemetry query >> /tmp/log.txt  # Formato inconsistente
 
 # ❌ Loguear datos sensibles
 echo "Query ran with credentials: $appLogger_supabaseKey" >> log.txt  # ❌ SECRETOS
 
 # ❌ Sin trazabilidad
-applogger-cli health && echo "Health check OK"  # No se sabe quién, cuándo, por qué
+apploggers health && echo "Health check OK"  # No se sabe quién, cuándo, por qué
 ```
 
 ### 6. Monitoreo en Producción
@@ -273,7 +272,7 @@ LOG_FILE="/var/log/applogger-monitor.log"
   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running operational health check"
   
   # 1. Backend availability
-  if ! applogger-cli health --output json | jq -e '.ok' > /dev/null; then
+  if ! apploggers health --output json | jq -e '.ok' > /dev/null; then
     echo "ALERT: Backend unavailable"
     echo "ALERT: Backend unavailable" | mail -s "AppLogger Down" "$ALERT_EMAIL"
     exit 1
@@ -282,7 +281,7 @@ LOG_FILE="/var/log/applogger-monitor.log"
   # 2. Error rate (last 24h)
   from=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
          date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
-  error_count=$(applogger-cli telemetry query \
+  error_count=$(apploggers telemetry query \
     --source logs \
     --severity error \
     --from "$from" \
@@ -308,7 +307,7 @@ LOG_FILE="/var/log/applogger-monitor.log"
 # CLI cae silenciosamente, nadie se da cuenta
 
 # ❌ Alertas sin contexto
-applogger-cli health | grep -q "ok" || echo "ERROR"  # ¿Qué error? ¿Por qué?
+apploggers health | grep -q "ok" || echo "ERROR"  # ¿Qué error? ¿Por qué?
 
 # ❌ Monitoreo manual
 # Ejecutar queries manualmente en lugar de automatizado
@@ -353,23 +352,23 @@ retry_with_backoff() {
 }
 
 # Use it
-retry_with_backoff applogger-cli telemetry query --source logs --limit 10 --output json
+retry_with_backoff apploggers telemetry query --source logs --limit 10 --output json
 ```
 
 #### ❌ NO Hacer
 
 ```bash
 # ❌ Sin retry
-applogger-cli telemetry query
+apploggers telemetry query
 # Si falla una vez, script falla completamente
 
 # ❌ Infinite retry
 while true; do
-  applogger-cli telemetry query && break
+  apploggers telemetry query && break
 done  # Si backend está caído, loops forever
 
 # ❌ Retry inmediato
-applogger-cli telemetry query || applogger-cli telemetry query  # Hammers endpoint
+apploggers telemetry query || apploggers telemetry query  # Hammers endpoint
 ```
 
 ### 8. Integración con Sistemas Modernos
@@ -388,16 +387,18 @@ spec:
       template:
         spec:
           containers:
-          - name: applogger-cli
+          - name: apploggers
             image: golang:1.25-alpine
             command:
             - sh
             - -c
             - |
               apk add --no-cache curl
-              curl -L https://.../applogger-cli -o /usr/local/bin/applogger-cli
-              chmod +x /usr/local/bin/applogger-cli
-              applogger-cli telemetry query \
+              # Descargar la última release desde: https://github.com/zuccadev-labs/appLoggers/releases
+              curl -L https://github.com/zuccadev-labs/appLoggers/releases/latest/download/apploggers-linux-amd64 \
+                -o /usr/local/bin/apploggers
+              chmod +x /usr/local/bin/apploggers
+              apploggers telemetry query \
                 --source logs \
                 --aggregate severity \
                 --output json > /tmp/audit.json
@@ -424,14 +425,14 @@ FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache git
 RUN git clone https://github.com/zuccadev-labs/appLoggers.git /app
 WORKDIR /app/cli
-RUN go build -o /usr/local/bin/applogger-cli ./cmd/applogger-cli
+RUN go build -o /usr/local/bin/apploggers ./cmd/applogger-cli
 
 FROM alpine:latest
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /usr/local/bin/applogger-cli /usr/local/bin/
+COPY --from=builder /usr/local/bin/apploggers /usr/local/bin/
 ENV appLogger_supabaseUrl=""
 ENV appLogger_supabaseKey=""
-ENTRYPOINT ["applogger-cli"]
+ENTRYPOINT ["apploggers"]
 CMD ["--help"]
 ```
 
@@ -453,13 +454,14 @@ jobs:
     steps:
       - name: Download CLI
         run: |
-          curl -L https://github.com/zuccadev-labs/appLoggers/releases/download/applogger-cli-v0.1.0/applogger-cli-linux-amd64 \
-            -o /tmp/applogger-cli
-          chmod +x /tmp/applogger-cli
+          # Ver la última release en: https://github.com/zuccadev-labs/appLoggers/releases
+          curl -L https://github.com/zuccadev-labs/appLoggers/releases/latest/download/apploggers-linux-amd64 \
+            -o /tmp/apploggers
+          chmod +x /tmp/apploggers
       
       - name: Generate report
         run: |
-          /tmp/applogger-cli telemetry query \
+          /tmp/apploggers telemetry query \
             --source logs \
             --aggregate severity \
             --output json > daily-report.json
@@ -492,7 +494,7 @@ jobs:
 
 ## Recursos
 
-- [AppLogger CLI — README](../README.md)
-- [AppLogger CLI — Installation](./INSTALLATION.md)
-- [AppLogger CLI — Usage Guide](./README.md)
+- [AppLoggers CLI — README](../README.md)
+- [AppLoggers CLI — Installation](./INSTALLATION.md)
+- [AppLoggers CLI — Usage Guide](./README.md)
 - [Skill: CLI Agent Operator](../agents/applogger-cli-agent-operator/SKILL.md)

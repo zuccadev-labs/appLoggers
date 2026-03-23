@@ -1,8 +1,5 @@
 # AppLogger — Matriz de Compatibilidad
 
-**Versión SDK:** 0.1.1-alpha.4  
-**Fecha:** 2026-03-17
-
 Documento de referencia rápida para compatibilidad mínima de plataforma y runtime.
 
 ---
