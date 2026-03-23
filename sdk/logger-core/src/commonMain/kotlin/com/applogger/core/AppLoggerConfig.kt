@@ -1,5 +1,8 @@
 package com.applogger.core
 
+private const val LARGE_BATCH_THRESHOLD = 50
+private const val SHORT_FLUSH_THRESHOLD = 10
+
 /**
  * Immutable configuration for the AppLogger SDK.
  *
@@ -154,16 +157,19 @@ data class AppLoggerConfig(
         }
 
         // Batch size vs flush interval coherence
-        if (batchSize >= 50 && flushIntervalSeconds <= 10) {
-            issues += "batchSize=$batchSize with flushIntervalSeconds=$flushIntervalSeconds may cause large bursts — consider increasing flushIntervalSeconds or reducing batchSize"
+        if (batchSize >= LARGE_BATCH_THRESHOLD && flushIntervalSeconds <= SHORT_FLUSH_THRESHOLD) {
+            issues += "batchSize=$batchSize with flushIntervalSeconds=$flushIntervalSeconds " +
+                "may cause large bursts — consider increasing flushIntervalSeconds or reducing batchSize"
         }
         if (batchSize == 1) {
-            issues += "batchSize=1 disables batching — every event triggers a network request; use only for debugging"
+            issues += "batchSize=1 disables batching — every event triggers a network request; " +
+                "use only for debugging"
         }
 
         // Debug mode in production warning
         if (isDebugMode && environment == "production") {
-            issues += "isDebugMode=true with environment='production' — debug mode should not be active in production builds"
+            issues += "isDebugMode=true with environment='production' — " +
+                "debug mode should not be active in production builds"
         }
 
         return issues

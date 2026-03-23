@@ -63,7 +63,8 @@ class ThrowableExtTest {
         val cause = IOException("network error")
         val exception = RuntimeException("wrapped", cause)
         val info = exception.toThrowableInfo(maxLines = 50)
-        assertEquals("RuntimeException", info.type)
+        // toThrowableInfo uses qualifiedName (fully-qualified) by design
+        assertEquals("java.lang.RuntimeException", info.type)
         assertEquals("wrapped", info.message)
     }
 }

@@ -20,6 +20,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val HTTP_SERVICE_UNAVAILABLE = 503
+private const val HTTP_CLIENT_ERROR_MIN = 400
+private const val HTTP_CLIENT_ERROR_MAX = 499
 private const val DEFAULT_RETRY_AFTER_SECONDS = 60L
 
 /**
@@ -169,7 +171,7 @@ class SupabaseTransport(
                 reason = "Supabase unavailable ($table): $body",
                 retryable = true
             )
-            in 400..499 -> TransportResult.Failure(
+            in HTTP_CLIENT_ERROR_MIN..HTTP_CLIENT_ERROR_MAX -> TransportResult.Failure(
                 reason = "Supabase client error $code ($table): $body",
                 retryable = false  // Bad request — retrying won't help
             )

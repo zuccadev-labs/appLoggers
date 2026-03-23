@@ -4,6 +4,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import platform.Foundation.NSSetUncaughtExceptionHandler
 
+private const val MAX_CRASH_STACK_FRAMES = 50
+
 /**
  * Captura de crashes en iOS usando NSSetUncaughtExceptionHandler.
  */
@@ -18,7 +20,7 @@ internal class IosCrashHandler(
                     // callStackSymbols contiene el stack trace nativo de iOS
                     val stackFrames = nsEx.callStackSymbols
                         ?.filterIsInstance<String>()
-                        ?.take(50)
+                        ?.take(MAX_CRASH_STACK_FRAMES)
                         ?: emptyList()
 
                     val crashMessage = buildString {

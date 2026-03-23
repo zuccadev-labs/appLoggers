@@ -16,6 +16,9 @@ import platform.Network.nw_interface_type_cellular
 import platform.Network.nw_interface_type_wired
 import platform.darwin.dispatch_get_main_queue
 
+/** 100ms en nanosegundos — timeout máximo para el monitor de red en init del SDK */
+private const val NETWORK_MONITOR_TIMEOUT_NS = 100_000_000L
+
 /**
  * Proveedor de metadatos del dispositivo iOS.
  * NUNCA incluye PII.
@@ -80,7 +83,7 @@ internal class IosDeviceInfoProvider : DeviceInfoProvider {
                 semaphore,
                 platform.darwin.dispatch_time(
                     platform.darwin.DISPATCH_TIME_NOW,
-                    100_000_000L // 100ms en nanosegundos
+                    NETWORK_MONITOR_TIMEOUT_NS
                 )
             )
             nw_path_monitor_cancel(monitor)

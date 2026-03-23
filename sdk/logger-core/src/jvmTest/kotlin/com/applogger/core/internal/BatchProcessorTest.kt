@@ -6,6 +6,7 @@ import com.applogger.core.model.LogEvent
 import com.applogger.core.model.LogLevel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
