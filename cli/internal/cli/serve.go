@@ -49,11 +49,11 @@ func (h *sseHub) broadcast(msg string) {
 }
 
 type serveStats struct {
-	mu            sync.Mutex
-	eventsServed  int
-	clientCount   int
-	lastPollAt    time.Time
-	lastEventID   string
+	mu           sync.Mutex
+	eventsServed int
+	clientCount  int
+	lastPollAt   time.Time
+	lastEventID  string
 }
 
 func newServeCommand() *cobra.Command {
@@ -233,4 +233,3 @@ func fetchLatestEvents(ctx context.Context, cfg supabaseConfig, environment, min
 	}
 	return doQueryWithRetry(ctx, cfg, req, 1)
 }
-

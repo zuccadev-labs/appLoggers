@@ -15,13 +15,13 @@ import (
 )
 
 type eraseResult struct {
-	OK          bool   `json:"ok"`
-	DryRun      bool   `json:"dry_run"`
-	UserID      string `json:"user_id,omitempty"`
-	DeviceID    string `json:"device_id,omitempty"`
-	Environment string `json:"environment,omitempty"`
-	AffectedRows int   `json:"affected_rows"`
-	Message     string `json:"message"`
+	OK           bool   `json:"ok"`
+	DryRun       bool   `json:"dry_run"`
+	UserID       string `json:"user_id,omitempty"`
+	DeviceID     string `json:"device_id,omitempty"`
+	Environment  string `json:"environment,omitempty"`
+	AffectedRows int    `json:"affected_rows"`
+	Message      string `json:"message"`
 }
 
 func newEraseCommand() *cobra.Command {

@@ -22,23 +22,23 @@ const (
 )
 
 type batchVerifyResult struct {
-	BatchID      string            `json:"batch_id"`
-	ExpectedCount int              `json:"expected_count"`
-	ActualCount  int               `json:"actual_count"`
-	Hash         string            `json:"hash,omitempty"`
-	Status       batchVerifyStatus `json:"status"`
+	BatchID       string            `json:"batch_id"`
+	ExpectedCount int               `json:"expected_count"`
+	ActualCount   int               `json:"actual_count"`
+	Hash          string            `json:"hash,omitempty"`
+	Status        batchVerifyStatus `json:"status"`
 }
 
 type verifyReport struct {
-	OK          bool                `json:"ok"`
-	From        string              `json:"from"`
-	To          string              `json:"to"`
-	Environment string              `json:"environment,omitempty"`
-	TotalBatches int                `json:"total_batches"`
-	OKCount     int                 `json:"ok_count"`
-	Incomplete  int                 `json:"incomplete_count"`
-	NoHash      int                 `json:"no_hash_count"`
-	Results     []batchVerifyResult `json:"results"`
+	OK           bool                `json:"ok"`
+	From         string              `json:"from"`
+	To           string              `json:"to"`
+	Environment  string              `json:"environment,omitempty"`
+	TotalBatches int                 `json:"total_batches"`
+	OKCount      int                 `json:"ok_count"`
+	Incomplete   int                 `json:"incomplete_count"`
+	NoHash       int                 `json:"no_hash_count"`
+	Results      []batchVerifyResult `json:"results"`
 }
 
 func newVerifyCommand() *cobra.Command {

@@ -11,29 +11,19 @@ import (
 
 // ── audit privacy ─────────────────────────────────────────────────────────────
 
-type privacyEventRow struct {
-	ID          string `json:"id"`
-	Level       string `json:"level"`
-	UserID      string `json:"user_id"`
-	DeviceID    string `json:"device_id"`
-	Environment string `json:"environment"`
-	Extra       any    `json:"extra"`
-	CreatedAt   string `json:"created_at"`
-}
-
 type privacyReport struct {
-	OK             bool                  `json:"ok"`
-	Environment    string                `json:"environment,omitempty"`
-	From           string                `json:"from"`
-	To             string                `json:"to"`
-	TotalEvents    int                   `json:"total_events"`
-	WithUserID     int                   `json:"with_user_id"`
-	WithDeviceID   int                   `json:"with_device_id"`
-	PIIRisk        string                `json:"pii_risk"`
-	ConsentBreakdown map[string]int      `json:"consent_breakdown"`
-	UserIDPct      float64               `json:"user_id_pct"`
-	DeviceIDPct    float64               `json:"device_id_pct"`
-	Recommendations []string             `json:"recommendations,omitempty"`
+	OK               bool           `json:"ok"`
+	Environment      string         `json:"environment,omitempty"`
+	From             string         `json:"from"`
+	To               string         `json:"to"`
+	TotalEvents      int            `json:"total_events"`
+	WithUserID       int            `json:"with_user_id"`
+	WithDeviceID     int            `json:"with_device_id"`
+	PIIRisk          string         `json:"pii_risk"`
+	ConsentBreakdown map[string]int `json:"consent_breakdown"`
+	UserIDPct        float64        `json:"user_id_pct"`
+	DeviceIDPct      float64        `json:"device_id_pct"`
+	Recommendations  []string       `json:"recommendations,omitempty"`
 }
 
 func newAuditCommand() *cobra.Command {
