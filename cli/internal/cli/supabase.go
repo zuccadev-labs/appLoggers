@@ -26,6 +26,11 @@ func loadSupabaseConfig() (supabaseConfig, error) {
 		return supabaseConfig{}, err
 	}
 
+	// Try local.properties before falling back to env vars
+	if cfg, err := loadSupabaseConfigFromLocalProperties(); err == nil {
+		return cfg, nil
+	}
+
 	cfg := supabaseConfig{
 		ConfigSource:   "environment",
 		URL:            firstNonEmptyEnv("appLogger_supabaseUrl", "APPLOGGER_SUPABASE_URL", "SUPABASE_URL"),
@@ -85,4 +90,76 @@ func firstNonEmptyEnv(keys ...string) string {
 
 func (c supabaseConfig) timeout() time.Duration {
 	return time.Duration(c.TimeoutSeconds) * time.Second
+}
+
+// loadSupabaseConfigFromLocalProperties reads Supabase credentials from local.properties
+// in the current working directory or its workspace roots.
+func loadSupabaseConfigFromLocalProperties() (supabaseConfig, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return supabaseConfig{}, os.ErrNotExist
+	}
+
+	lpPath := cwd + string(os.PathSeparator) + "local.properties"
+	content, err := os.ReadFile(lpPath)
+	if err != nil {
+		return supabaseConfig{}, os.ErrNotExist
+	}
+
+	props := parsePropertiesFile(string(content))
+
+	supabaseURL := firstNonEmpty(
+		props["appLogger.supabaseUrl"],
+		props["SUPABASE_URL"],
+	)
+	apiKey := firstNonEmpty(
+		props["appLogger.supabaseKey"],
+		props["SUPABASE_KEY"],
+	)
+
+	if supabaseURL == "" || apiKey == "" {
+		return supabaseConfig{}, os.ErrNotExist
+	}
+
+	cfg := supabaseConfig{
+		ConfigSource:   "local_properties",
+		URL:            supabaseURL,
+		APIKey:         apiKey,
+		Schema:         firstNonEmpty(props["appLogger.supabaseSchema"], "public"),
+		LogsTable:      firstNonEmpty(props["appLogger.supabaseLogTable"], "app_logs"),
+		MetricsTable:   firstNonEmpty(props["appLogger.supabaseMetricTable"], "app_metrics"),
+		TimeoutSeconds: 15,
+	}
+	return validateSupabaseConfig(cfg)
+}
+
+// parsePropertiesFile parses a Java .properties-style file (key=value lines, # comments).
+func parsePropertiesFile(content string) map[string]string {
+	result := make(map[string]string)
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
+			continue
+		}
+		idx := strings.IndexByte(line, '=')
+		if idx < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:idx])
+		value := strings.TrimSpace(line[idx+1:])
+		if key != "" {
+			result[key] = value
+		}
+	}
+	return result
+}
+
+// firstNonEmpty returns the first non-empty string from the provided values.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

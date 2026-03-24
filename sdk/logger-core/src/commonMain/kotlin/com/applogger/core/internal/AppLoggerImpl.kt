@@ -44,6 +44,50 @@ private fun injectAnomalyType(
     return (extra ?: emptyMap()) + mapOf("anomaly_type" to autoType)
 }
 
+/**
+ * Enqueues an event through the deduplication debouncer if active, or directly.
+ * Top-level to reduce CyclomaticComplexity of AppLoggerImpl.process().
+ */
+private fun enqueueWithDebounce(event: LogEvent, debouncer: EventDebouncer?, processor: BatchProcessor) {
+    if (debouncer != null) {
+        val deduped = debouncer.process(event)
+        if (deduped != null) processor.enqueue(deduped)
+    } else {
+        processor.enqueue(event)
+    }
+}
+
+/**
+ * Converts per-call Map<String, Any> to Map<String, JsonElement> and merges with globalExtra.
+ * Per-call values win on key collision. Returns null when both sources are empty.
+ * Top-level to avoid counting against AppLoggerImpl's TooManyFunctions limit.
+ */
+private fun mergeExtra(
+    extra: Map<String, Any>?,
+    global: Map<String, JsonElement>
+): Map<String, JsonElement>? {
+    val perCall = extra?.mapValues { (_, v) -> anyToJsonElement(v) }
+    return when {
+        global.isEmpty() && perCall == null -> null
+        global.isEmpty() -> perCall
+        perCall == null  -> global
+        else             -> global + perCall  // perCall wins on collision
+    }
+}
+
+/**
+ * Removes user_prop_* keys from globalExtra when consent is below MARKETING.
+ * Top-level to avoid counting against AppLoggerImpl's TooManyFunctions limit.
+ */
+private fun filterGlobalExtraForConsent(
+    global: Map<String, JsonElement>,
+    consentProvider: (() -> ConsentLevel)?
+): Map<String, JsonElement> {
+    val consent = consentProvider?.invoke() ?: ConsentLevel.MARKETING
+    if (consent == ConsentLevel.MARKETING) return global
+    return global.filterKeys { !it.startsWith("user_prop_") }
+}
+
 /** Convierte un valor Any a JsonElement preservando el tipo nativo. */
 internal fun anyToJsonElement(value: Any): JsonElement = when (value) {
     is Boolean -> JsonPrimitive(value)
@@ -70,7 +114,9 @@ internal class AppLoggerImpl(
     private val filter: LogFilter,
     private val processor: BatchProcessor,
     private val config: AppLoggerConfig,
-    private val systemSnapshotProvider: (() -> Map<String, String>)? = null
+    private val systemSnapshotProvider: (() -> Map<String, String>)? = null,
+    private val consentProvider: (() -> ConsentLevel)? = null,
+    private val deviceIdAnonymizer: ((String) -> String)? = null
 ) : AppLogger {
 
     @Volatile
@@ -96,6 +142,13 @@ internal class AppLoggerImpl(
     // Feature: Breadcrumbs — null when breadcrumbCapacity == 0.
     private val breadcrumbs: BreadcrumbBuffer? =
         if (config.breadcrumbCapacity > 0) BreadcrumbBuffer(config.breadcrumbCapacity) else null
+
+    // Feature: Consent — null when no consentProvider is supplied.
+    private val consentFilter: ConsentFilter? = consentProvider?.let { ConsentFilter(it) }
+
+    // Feature: Session Variant — A/B test or experiment tag.
+    @Volatile
+    private var sessionVariant: String? = null
 
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) {
         process(LogLevel.DEBUG, tag, message, throwable, extra = extra)
@@ -161,6 +214,7 @@ internal class AppLoggerImpl(
                 metricTags = enrichedTags
             )
 
+            if (consentFilter != null && !consentFilter.passes(event)) return
             if (!filter.passes(event)) return
             processor.enqueue(event)
         } catch (_: Exception) {
@@ -227,23 +281,6 @@ internal class AppLoggerImpl(
         globalExtra = emptyMap()
     }
 
-    /**
-     * Converts per-call Map<String, Any> to Map<String, JsonElement> and merges
-     * with globalExtra. Per-call values win on key collision.
-     * Returns null if both sources are empty.
-     */
-    private fun mergeExtra(
-        extra: Map<String, Any>?,
-        global: Map<String, JsonElement>
-    ): Map<String, JsonElement>? {
-        val perCall = extra?.mapValues { (_, v) -> anyToJsonElement(v) }
-        return when {
-            global.isEmpty() && perCall == null -> null
-            global.isEmpty() -> perCall
-            perCall == null  -> global
-            else             -> global + perCall  // perCall wins on collision
-        }
-    }
 
     private fun process(
         level: LogLevel,
@@ -263,21 +300,21 @@ internal class AppLoggerImpl(
                 platformLog("AppLogger/$tag", "[${level.name}] $message")
             }
             val effectiveExtra = injectAnomalyType(level, throwable, extra)
-            val resolvedExtra  = mergeExtra(effectiveExtra, globalExtra)
+            val resolvedExtra  = mergeExtra(effectiveExtra, filterGlobalExtraForConsent(globalExtra, consentProvider))
             var event = buildLogEvent(level, tag, message, throwable, resolvedExtra)
+            if (consentFilter != null && !consentFilter.passes(event)) return
             if (!filter.passes(event)) return
             if (level == LogLevel.ERROR || level == LogLevel.CRITICAL) {
                 event = enrichHighSeverityEvent(event)
             }
-            if (debouncer != null) {
-                val deduped = debouncer.process(event)
-                if (deduped != null) processor.enqueue(deduped)
-            } else {
-                processor.enqueue(event)
-            }
+            enqueueWithDebounce(event, debouncer, processor)
         } catch (_: Exception) {
             // El SDK NUNCA lanza excepciones al caller
         }
+    }
+
+    override fun setSessionVariant(variant: String?) {
+        sessionVariant = variant?.trim()?.ifBlank { null }
     }
 
     private fun buildLogEvent(
@@ -286,21 +323,28 @@ internal class AppLoggerImpl(
         message: String,
         throwable: Throwable?,
         resolvedExtra: Map<String, JsonElement>?
-    ) = LogEvent(
-        id = generateUUID(),
-        timestamp = currentTimeMillis(),
-        level = level,
-        tag = tag.take(100),
-        message = message.take(10_000),
-        throwableInfo = throwable?.toThrowableInfo(config.maxStackTraceLines),
-        deviceInfo = deviceInfo,
-        deviceId = deviceId,
-        sessionId = sessionManager.sessionId,
-        userId = userId,
-        environment = config.environment,
-        extra = resolvedExtra,
-        traceId = traceId
-    )
+    ): LogEvent {
+        val isStrict = consentProvider?.invoke() == ConsentLevel.STRICT && config.dataMinimizationEnabled
+        val effectiveUserId = if (isStrict) null else userId
+        val effectiveDeviceId = if (isStrict && deviceIdAnonymizer != null) deviceIdAnonymizer(deviceId) else deviceId
+        return LogEvent(
+            id = generateUUID(),
+            timestamp = currentTimeMillis(),
+            level = level,
+            tag = tag.take(100),
+            message = message.take(10_000),
+            throwableInfo = throwable?.toThrowableInfo(config.maxStackTraceLines),
+            deviceInfo = deviceInfo,
+            deviceId = effectiveDeviceId,
+            sessionId = sessionManager.sessionId,
+            userId = effectiveUserId,
+            environment = config.environment,
+            extra = resolvedExtra,
+            traceId = traceId,
+            variant = sessionVariant
+        )
+    }
+
 
     /**
      * Enriches ERROR/CRITICAL events with breadcrumbs and platform diagnostics.

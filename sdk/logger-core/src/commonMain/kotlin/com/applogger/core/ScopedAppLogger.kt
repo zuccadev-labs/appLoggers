@@ -15,6 +15,11 @@ package com.applogger.core
  *
  * Per-call values always win, scope attributes override global attributes.
  *
+ * ## Consent override
+ * Pass a [consentLevel] to tag every event from this scope with an explicit consent
+ * requirement, overriding the default inference from log level. Useful for scopes
+ * that handle strictly performance-only data regardless of event level.
+ *
  * ## Usage
  * ```kotlin
  * // Create a scope for a specific playback session:
@@ -44,7 +49,8 @@ package com.applogger.core
  */
 class ScopedAppLogger internal constructor(
     private val delegate: AppLogger,
-    private val scopeExtra: Map<String, Any>
+    private val scopeExtra: Map<String, Any>,
+    internal val consentLevel: ConsentLevel? = null
 ) : AppLogger by delegate {
 
     override fun debug(tag: String, message: String, throwable: Throwable?, extra: Map<String, Any>?) =
@@ -70,18 +76,25 @@ class ScopedAppLogger internal constructor(
     /**
      * Creates a child scope that inherits all attributes from this scope and adds [pairs].
      * Child values override parent values on key collision.
+     * The [consentLevel] is inherited from the parent scope by default.
      *
      * ```kotlin
      * val sessionLog = AppLoggerSDK.newScope("session_id" to sessionId)
      * val playerLog  = sessionLog.childScope("content_id" to contentId)
      * ```
      */
-    fun childScope(vararg pairs: Pair<String, Any>): ScopedAppLogger =
-        ScopedAppLogger(delegate, scopeExtra + pairs.toMap())
+    fun childScope(vararg pairs: Pair<String, Any>, consentLevel: ConsentLevel? = this.consentLevel): ScopedAppLogger =
+        ScopedAppLogger(delegate, scopeExtra + pairs.toMap(), consentLevel)
 
-    // Merge order: scopeExtra (base) + per-call extra (wins on collision)
-    private fun Map<String, Any>?.mergedWithScope(): Map<String, Any> =
-        if (this == null) scopeExtra else scopeExtra + this
+    // Merge order: scopeExtra (base) + consentLevel tag + per-call extra (wins on collision)
+    private fun Map<String, Any>?.mergedWithScope(): Map<String, Any> {
+        val withConsent: Map<String, Any> = if (consentLevel != null) {
+            scopeExtra + mapOf(CONSENT_EXTRA_KEY to consentLevel.name.lowercase())
+        } else {
+            scopeExtra
+        }
+        return if (this == null) withConsent else withConsent + this
+    }
 }
 
 /**
@@ -98,5 +111,5 @@ class ScopedAppLogger internal constructor(
  *
  * @see ScopedAppLogger for full documentation and priority semantics.
  */
-fun AppLogger.newScope(vararg attributes: Pair<String, Any>): ScopedAppLogger =
-    ScopedAppLogger(this, attributes.toMap())
+fun AppLogger.newScope(vararg attributes: Pair<String, Any>, consentLevel: ConsentLevel? = null): ScopedAppLogger =
+    ScopedAppLogger(this, attributes.toMap(), consentLevel)

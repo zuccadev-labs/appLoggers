@@ -85,6 +85,11 @@ func init() {
 	rootCmd.AddCommand(newHealthCommand())
 	rootCmd.AddCommand(newAgentCommand())
 	rootCmd.AddCommand(newTelemetryCommand())
+	rootCmd.AddCommand(newAuditCommand())
+	rootCmd.AddCommand(newEraseCommand())
+	rootCmd.AddCommand(newExplainCommand())
+	rootCmd.AddCommand(newServeCommand())
+	rootCmd.AddCommand(newVerifyCommand())
 }
 
 func validateOutputFormat(format string) error {

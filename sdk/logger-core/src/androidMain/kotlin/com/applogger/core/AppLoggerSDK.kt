@@ -14,6 +14,8 @@ private const val DEFAULT_BUFFER_CAPACITY = 1000
 private const val ADAPTIVE_RAM_PERCENTAGE = 0.001
 private const val MIN_ADAPTIVE_BUFFER_CAPACITY = 50
 private const val MAX_ADAPTIVE_BUFFER_CAPACITY = 5000
+private const val BYTES_PER_MB = 1_048_576L
+private const val MAX_INSTALL_PACKAGE_LENGTH = 64
 
 /**
  * Android entry point for the AppLogger SDK.
@@ -48,6 +50,12 @@ object AppLoggerSDK : AppLogger {
     @Volatile
     private var sessionManagerRef: SessionManager? = null
 
+    @Volatile
+    private var consentLevel: ConsentLevel = ConsentLevel.MARKETING
+
+    @Volatile
+    private var appContextRef: android.content.Context? = null
+
     /**
      * Initializes the SDK. Must be called exactly once, in `Application.onCreate()`.
      * Subsequent calls are silently ignored (idempotent).
@@ -75,8 +83,16 @@ object AppLoggerSDK : AppLogger {
         if (!isInitialized.compareAndSet(false, true)) return
 
         val appContext = context.applicationContext
+        appContextRef = appContext
         val resolvedConfig = resolveConfig(appContext, config)
         val platform = PlatformDetector.detect(appContext)
+
+        // Restore persisted consent level (or use default from config)
+        val prefs = appContext.getSharedPreferences("applogger_prefs", Context.MODE_PRIVATE)
+        val savedConsent = prefs.getString("consent_level", null)
+        consentLevel = if (savedConsent != null) {
+            runCatching { ConsentLevel.valueOf(savedConsent) }.getOrElse { resolvedConfig.defaultConsentLevel }
+        } else resolvedConfig.defaultConsentLevel
 
         val deviceInfo = AndroidDeviceInfoProvider(appContext, platform).get()
         val sessionManager = SessionManager()
@@ -88,12 +104,19 @@ object AppLoggerSDK : AppLogger {
             maxCapacity = bufferCapacity,
             overflowPolicy = resolvedConfig.bufferOverflowPolicy
         )
+        val dataBudget = if (resolvedConfig.dailyDataLimitMb > 0)
+            DataBudgetManager(resolvedConfig.dailyDataLimitMb * BYTES_PER_MB)
+        else DataBudgetManager(DataBudgetManager.DISABLED)
+        val integrityManager = if (resolvedConfig.integritySecret.isNotBlank())
+            BatchIntegrityManager(resolvedConfig.integritySecret) else null
         val processor = BatchProcessor(
             buffer = buffer,
             transport = transport ?: NoOpTransport(),
             formatter = JsonLogFormatter(prettyPrint = resolvedConfig.isDebugMode),
             config = resolvedConfig,
-            offlineStorage = buildOfflineStorage(appContext, resolvedConfig)
+            offlineStorage = buildOfflineStorage(appContext, resolvedConfig),
+            dataBudget = dataBudget,
+            integrityManager = integrityManager
         )
         val impl = AppLoggerImpl(
             deviceInfo = deviceInfo,
@@ -101,8 +124,13 @@ object AppLoggerSDK : AppLogger {
             filter = filter,
             processor = processor,
             config = resolvedConfig,
-            systemSnapshotProvider = buildSystemSnapshotProvider(appContext)
+            systemSnapshotProvider = buildSystemSnapshotProvider(appContext),
+            consentProvider = { consentLevel },
+            deviceIdAnonymizer = { id -> sha256Hex(id) }
         )
+
+        // Capture install source and attach to global context
+        impl.addGlobalExtra("install_source", captureInstallSource(appContext))
 
         instance = impl
         implRef = impl
@@ -216,24 +244,6 @@ object AppLoggerSDK : AppLogger {
         implRef?.recordBreadcrumb(action, screen, metadata)
     }
 
-    /**
-     * Creates a [ScopedAppLogger] that automatically merges [attributes] into every event.
-     *
-     * Useful for isolating logs from a specific feature flow (playback session, checkout,
-     * onboarding) without polluting global state via [addGlobalExtra].
-     *
-     * ```kotlin
-     * val log = AppLoggerSDK.newScope(
-     *     "content_id"  to contentId,
-     *     "stream_type" to "4K_HDR"
-     * )
-     * log.error("Player", "Codec failed", exception)
-     * // → event includes content_id and stream_type automatically
-     * ```
-     */
-    fun newScope(vararg attributes: Pair<String, Any>): ScopedAppLogger =
-        instance.newScope(*attributes)
-
     override fun addGlobalExtra(key: String, value: String) {
         implRef?.addGlobalExtra(key, value)
     }
@@ -299,6 +309,44 @@ object AppLoggerSDK : AppLogger {
     }
 
     /**
+     * Updates the active consent level and persists it across app restarts.
+     * Events requiring a higher consent level than [level] are silently dropped.
+     */
+    fun setConsent(level: ConsentLevel) {
+        consentLevel = level
+        appContextRef?.getSharedPreferences("applogger_prefs", Context.MODE_PRIVATE)
+            ?.edit()?.putString("consent_level", level.name)?.apply()
+    }
+
+    /** Returns the current active consent level. */
+    fun getConsent(): ConsentLevel = consentLevel
+
+    /**
+     * Tags the session with an A/B test or experiment variant.
+     * Stored as top-level `variant` column for efficient group queries.
+     * Pass null to clear.
+     */
+    override fun setSessionVariant(variant: String?) {
+        implRef?.setSessionVariant(variant)
+    }
+
+    /** Attaches a user-scoped property. MARKETING-level data — suppressed in STRICT/PERFORMANCE mode. */
+    override fun setUserProperty(key: String, value: String) {
+        implRef?.addGlobalExtra("user_prop_$key", value)
+    }
+
+    /** Removes a user property set via [setUserProperty]. */
+    override fun removeUserProperty(key: String) {
+        implRef?.removeGlobalExtra("user_prop_$key")
+    }
+
+    /**
+     * Creates a [ScopedAppLogger] with an optional consent-level override.
+     */
+    fun newScope(vararg attributes: Pair<String, Any>, consentLevel: ConsentLevel? = null): ScopedAppLogger =
+        instance.newScope(*attributes, consentLevel = consentLevel)
+
+    /**
      * Resets the SDK to its uninitialized state.
      *
      * **FOR TESTING ONLY.** Allows re-initialization between test cases.
@@ -310,6 +358,8 @@ object AppLoggerSDK : AppLogger {
         instance = NoOpLogger()
         implRef = null
         sessionManagerRef = null
+        consentLevel = ConsentLevel.MARKETING
+        appContextRef = null
         AppLoggerHealth.initialized = false
         AppLoggerHealth.processor = null
         AppLoggerHealth.transport = null
@@ -406,6 +456,29 @@ object AppLoggerSDK : AppLogger {
             cm.activeNetworkInfo?.typeName?.lowercase() ?: "none"
         }
     } catch (_: Exception) { null }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun captureInstallSource(context: android.content.Context): String {
+        return try {
+            val installer = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getInstallerPackageName(context.packageName)
+            }
+            sanitizeInstallPackage(installer)
+        } catch (_: Exception) {
+            "unknown"
+        }
+    }
+
+    private fun sanitizeInstallPackage(pkg: String?): String = when (pkg?.trim()) {
+        null, "" -> "sideload"
+        "com.android.vending" -> "play_store"
+        "com.amazon.venezia" -> "amazon_appstore"
+        "com.huawei.appmarket" -> "huawei_appgallery"
+        else -> pkg.take(MAX_INSTALL_PACKAGE_LENGTH)
+    }
 
     private fun buildOfflineStorage(context: Context, config: AppLoggerConfig): OfflineStorage =
         when (config.offlinePersistenceMode) {

@@ -63,5 +63,9 @@ data class LogEvent(
     val metricTags: Map<String, String>? = null,
     // Distributed tracing — optionally propagated across devices (mobile → TV gRPC flows).
     // Set via AppLoggerSDK.setTraceId(id). Appears as trace_id column in Supabase.
-    val traceId: String? = null
+    val traceId: String? = null,
+    // A/B test or experiment variant for this session (from setSessionVariant()).
+    val variant: String? = null,
+    // Batch integrity ID — assigned by BatchIntegrityManager in Cycle D.
+    val batchId: String? = null
 )
