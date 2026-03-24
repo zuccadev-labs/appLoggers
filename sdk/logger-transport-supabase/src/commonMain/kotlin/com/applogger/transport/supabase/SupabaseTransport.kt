@@ -1,5 +1,6 @@
 package com.applogger.transport.supabase
 
+import com.applogger.core.BatchManifestCapable
 import com.applogger.core.LogTransport
 import com.applogger.core.TransportResult
 import com.applogger.core.model.LogEvent
@@ -71,6 +72,8 @@ private const val DEFAULT_RETRY_AFTER_SECONDS = 60L
  *                                    Should use cached state — no I/O.
  * @param httpClient                  Optional pre-configured [HttpClient] (e.g. with cert pinning).
  */
+private const val BATCH_MANIFESTS_TABLE = "log_batches"
+
 class SupabaseTransport(
     private val endpoint: String,
     private val apiKey: String,
@@ -78,7 +81,7 @@ class SupabaseTransport(
     private val metricsTableName: String = "app_metrics",
     private val networkAvailabilityProvider: (() -> Boolean)? = null,
     httpClient: HttpClient? = null
-) : LogTransport {
+) : LogTransport, BatchManifestCapable {
 
     private val json = Json {
         encodeDefaults = true
@@ -186,6 +189,24 @@ class SupabaseTransport(
     override fun isAvailable(): Boolean {
         if (endpoint.isBlank() || apiKey.isBlank()) return false
         return networkAvailabilityProvider?.invoke() ?: true
+    }
+
+    override suspend fun storeBatchManifest(batchId: String, hash: String, eventCount: Int) {
+        runCatching {
+            // sent_at omitted — the table default NOW() fills it server-side.
+            val payload = buildJsonObject {
+                put("batch_id", JsonPrimitive(batchId))
+                put("event_count", JsonPrimitive(eventCount))
+                put("batch_hash", JsonPrimitive(hash))
+            }
+            client.post("$restUrl/$BATCH_MANIFESTS_TABLE") {
+                header("apikey", apiKey)
+                header("Authorization", "Bearer $apiKey")
+                header("Prefer", "return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(payload.toString())
+            }
+        }
     }
 
     fun close() {

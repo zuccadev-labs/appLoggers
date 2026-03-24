@@ -22,6 +22,8 @@ actual fun platformLog(tag: String, message: String) {
     NSLog("[$tag] $message")
 }
 
+actual fun hmacSha256Hex(secret: String, data: String): String = "" // iOS stub — not required for JVM tests
+
 actual fun sha256Hex(input: String): String {
     val data = input.encodeToByteArray()
     val digest = UByteArray(CC_SHA256_DIGEST_LENGTH)
