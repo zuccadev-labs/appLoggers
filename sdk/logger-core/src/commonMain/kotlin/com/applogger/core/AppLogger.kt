@@ -137,4 +137,17 @@ interface AppLogger {
 
     /** Clears all global extra context. */
     fun clearGlobalExtra()
+
+    /**
+     * Tags the session with an A/B test or experiment variant.
+     * Stored as top-level `variant` column for efficient group queries.
+     * Pass null to clear.
+     */
+    fun setSessionVariant(variant: String?) {}  // default no-op; overridden by AppLoggerImpl
+
+    /** Attaches a user-scoped property. MARKETING-level data — suppressed in STRICT/PERFORMANCE mode. */
+    fun setUserProperty(key: String, value: String) = addGlobalExtra("user_prop_$key", value)
+
+    /** Removes a user property set via [setUserProperty]. */
+    fun removeUserProperty(key: String) = removeGlobalExtra("user_prop_$key")
 }

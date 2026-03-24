@@ -11,6 +11,8 @@ import kotlin.concurrent.Volatile
 import kotlin.math.min
 import kotlin.random.Random
 
+private const val BATCH_BYTES_ESTIMATE_FACTOR = 1.5
+
 /**
  * Core pipeline: buffers events and delivers them in batches with
  * exponential backoff + jitter on transport failure.
@@ -20,6 +22,7 @@ import kotlin.random.Random
  * - Cuando se agotan los reintentos, persiste en SQLite en lugar de solo DLQ.
  *   Con CRITICAL_ONLY solo persiste ERROR y CRITICAL; con ALL persiste todo.
  */
+@Suppress("LongParameterList")
 internal class BatchProcessor(
     private val buffer: LogBuffer,
     private val transport: LogTransport,
@@ -29,7 +32,9 @@ internal class BatchProcessor(
     private val offlineStorage: OfflineStorage = NoOpOfflineStorage,
     private val maxRetries: Int = 5,
     private val baseDelayMs: Long = 1_000L,
-    private val maxDelayMs: Long = 30_000L
+    private val maxDelayMs: Long = 30_000L,
+    private val dataBudget: DataBudgetManager = DataBudgetManager(DataBudgetManager.DISABLED),
+    private val integrityManager: BatchIntegrityManager? = null
 ) {
     private val scope = CoroutineScope(
         Dispatchers.Default + SupervisorJob() + CoroutineName("AppLogger-Processor")
@@ -55,6 +60,13 @@ internal class BatchProcessor(
     }
 
     fun enqueue(event: LogEvent) {
+        val isCritical = event.level == LogLevel.ERROR || event.level == LogLevel.CRITICAL
+        if (dataBudget.shouldShedLowPriority && !isCritical) {
+            if (config.verboseTransportLogging) {
+                platformLog("AppLogger", "Data budget exceeded: shedding ${event.level} event")
+            }
+            return
+        }
         val accepted = eventChannel.trySend(event).isSuccess
         if (!accepted && config.verboseTransportLogging) {
             platformLog("AppLogger", "Event dropped: channel at capacity")
@@ -93,25 +105,51 @@ internal class BatchProcessor(
         }
     }
 
-    internal suspend fun sendBatch() = sendMutex.withLock {
-        val batch = buffer.drain()
-        if (batch.isEmpty()) return
+    internal suspend fun sendBatch() {
+        sendMutex.withLock {
+            val batch = buffer.drain()
+            if (batch.isEmpty()) return@withLock
 
-        if (!transport.isAvailable()) {
-            // Sin conectividad: persiste offline si está configurado, sino devuelve al buffer
-            persistOrRequeue(batch)
-            return
-        }
-
-        val result = runCatching { transport.send(batch) }
-            .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
-
-        when (result) {
-            is TransportResult.Success -> {
-                consecutiveFailures = 0
-                lastSuccessfulFlushTimestamp = currentTimeMillis()
+            if (!transport.isAvailable()) {
+                // Sin conectividad: persiste offline si está configurado, sino devuelve al buffer
+                persistOrRequeue(batch)
+                return@withLock
             }
-            is TransportResult.Failure -> handleFailure(batch, result)
+
+            val packet = integrityManager?.takeIf { it.isEnabled }?.prepareBatch(batch)
+            val eventsToSend = packet?.events ?: batch
+
+            val result = runCatching { transport.send(eventsToSend) }
+                .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
+
+            when (result) {
+                is TransportResult.Success -> {
+                    consecutiveFailures = 0
+                    lastSuccessfulFlushTimestamp = currentTimeMillis()
+                    dataBudget.recordBytesSent(estimateBatchBytes(eventsToSend))
+                    packet?.let { scope.launch { storeBatchManifest(it) } }
+                }
+                is TransportResult.Failure -> handleFailure(eventsToSend, result)
+            }
+        }
+    }
+
+    private fun estimateBatchBytes(batch: List<LogEvent>): Long {
+        val perEventOverhead = 100L
+        val compressionFactor = BATCH_BYTES_ESTIMATE_FACTOR
+        val rawBytes = batch.sumOf {
+            it.message.length + it.tag.length + (it.extra?.toString()?.length ?: 0) + perEventOverhead
+        }
+        return (rawBytes * compressionFactor).toLong()
+    }
+
+    private suspend fun storeBatchManifest(packet: BatchPacket) {
+        runCatching {
+            (transport as? BatchManifestCapable)?.storeBatchManifest(
+                batchId = packet.batchId,
+                hash = packet.hash,
+                eventCount = packet.events.size
+            )
         }
     }
 
