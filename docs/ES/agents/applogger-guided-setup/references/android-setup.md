@@ -352,6 +352,42 @@ AppLoggerSDK.refreshRemoteConfig()
 6. Desactivas: `apploggers remote-config delete --fingerprint XYZ`
 7. El dispositivo vuelve a su config local (producción normal).
 
+## Campos auto-inyectados por el SDK en Android
+
+El SDK añade automáticamente los siguientes campos en cada evento sin instrumentación adicional:
+
+### Global extra inyectados en `initialize()`
+
+| Campo | Valor | Notas |
+|---|---|---|
+| `device_fingerprint` | SHA-256(ANDROID_ID + ":" + packageName) | Pseudonymized, GDPR Art. 25 |
+| `app_package` | `context.packageName` | Distingue apps en el mismo dispositivo |
+| `install_source` | `"play_store"`, `"amazon_appstore"`, `"huawei_appgallery"`, `"sideload"`, o nombre del instalador | Inferido de `PackageManager.getInstallerPackageName` |
+
+### Fields auto-añadidos solo en ERROR y CRITICAL (Android)
+
+En cada evento de nivel `error` o `critical`, el SDK captura en tiempo real:
+
+| Campo en `extra` | Valor | Notas |
+|---|---|---|
+| `memory_usage_pct` | `0`–`100` (porcentaje de RAM usada) | Capturado vía `ActivityManager.MemoryInfo` |
+| `thermal_status` | `"none"`, `"light"`, `"moderate"`, `"severe"`, `"critical"`, `"emergency"`, `"shutdown"` | Solo Android API 29+. Si falla, no se añade. |
+| `network_type` | `"wifi"`, `"cellular"`, `"ethernet"`, `"none"`, `"unknown"` | Capturado en el momento del error |
+
+Estos campos son valiosos para triage: permiten correlacionar errores con estados del dispositivo sin instrumentación extra.
+
+```sql
+-- Errores con dispositivo sobrecalentado
+SELECT * FROM app_logs
+WHERE level = 'error'
+  AND extra->>'thermal_status' IN ('severe', 'critical', 'emergency');
+
+-- Errores bajo memoria alta
+SELECT * FROM app_logs
+WHERE level = 'error'
+  AND (extra->>'memory_usage_pct')::int > 85;
+```
+
 ## Identificación de apps en el mismo dispositivo
 
 El SDK inyecta automáticamente `app_package` (el `packageName` de Android) como global extra en cada evento.

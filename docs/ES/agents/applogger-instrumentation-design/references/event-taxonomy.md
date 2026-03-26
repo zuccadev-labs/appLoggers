@@ -11,6 +11,35 @@
 | `critical` | Fallos que bloquean la app | Corrupción de estado, fallo de inicialización |
 | `metric` | Datos cuantitativos de performance | Tiempos de carga, uso de memoria, buffer |
 
+### Comportamientos automáticos del SDK por nivel
+
+**`anomaly_type` auto-inyectado** — Si pasas un `throwable` a `warn`, `error`, o `critical` sin incluir `anomaly_type` en `extra`, el SDK lo inyecta automáticamente:
+
+| Nivel | `anomaly_type` auto-inyectado |
+|---|---|
+| `warn` (con throwable) | `"warn"` |
+| `error` (con throwable) | `"error"` |
+| `critical` (con throwable) | `"critical"` |
+
+Si pasas `anomalyType` explícito en `warn()` o incluyes `"anomaly_type"` en `extra`, el valor del caller tiene prioridad — el SDK no sobreescribe.
+
+```kotlin
+// Sin anomalyType → auto-inyectado: anomaly_type = "error"
+AppLoggerSDK.error("NETWORK", "Request failed", throwable = e)
+
+// Con anomalyType explícito → preservado: anomaly_type = "TIMEOUT"
+AppLoggerSDK.warn("NETWORK", "Timeout", throwable = e, anomalyType = "TIMEOUT")
+```
+
+**Límites de truncación** — El SDK trunca silenciosamente valores que superen:
+
+| Campo | Límite |
+|---|---|
+| `tag` | 100 caracteres |
+| `message` | 10,000 caracteres |
+
+Valores más largos se cortan sin aviso. Diseña tags cortos (< 20 chars) y mensajes concisos.
+
 ---
 
 ## Taxonomía mínima recomendada
