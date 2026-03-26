@@ -16,6 +16,58 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [SDK 0.2.0-alpha.9 + CLI 0.1.5] — 2026-03-24
+
+### Added — SDK
+
+**iOS KMP: paridad completa de features (100% Kotlin Multiplatform, cero Swift/Ruby):**
+- **Device fingerprint** — `sha256Hex("$idfv:$bundleId")` via `UIDevice.currentDevice.identifierForVendor`. Automático al inicializar, consultable con `getDeviceFingerprint()`.
+- **Remote config polling** — `startRemoteConfig(intervalSeconds)` / `stopRemoteConfig()`. Polling via `CoroutineScope(Dispatchers.Default + SupervisorJob())` con `delay` loop. HTTP via `NSURLSession` con `dispatch_semaphore`.
+- **Beta tester** — `setBetaTester(email)` / `clearBetaTester()` inyecta `beta_tester_email` en global extras.
+- **Consent management** — `setConsent(true/false)` persiste en `NSUserDefaults.standardUserDefaults`. Sin consentimiento el SDK no envía eventos.
+- **Distributed tracing** — `setTraceId(id)` / `clearTraceId()` correlaciona eventos cross-device (mobile → TV → backend).
+- **Breadcrumbs** — `recordBreadcrumb(label)` registra trail de navegación adjunto a cada evento posterior.
+- **Scoped logger** — `scopedLogger(tag)` retorna logger con tag fijo para módulos o clases.
+- **Session variant** — `setVariant(name)` / `clearVariant()` etiqueta la sesión para A/B testing.
+- **Coroutine exception handler** — `AppLoggerExceptionHandler` captura excepciones no manejadas en coroutines.
+- **System snapshot** — `NSProcessInfo.thermalState` + `lowPowerModeEnabled` en device info.
+- **User properties** — `setUserId()` / `clearUserId()` para identificación opcional.
+
+**Batch manifest metadata:**
+- `BatchManifestCapable.storeBatchManifest()` ahora incluye `environment` y `sdkVersion` (parámetros con default, backward compatible).
+- `BatchProcessor` extrae `environment` y `sdkVersion` del primer evento del batch y los propaga al manifest.
+- `SupabaseTransport` envía `environment` y `sdk_version` en el payload de `log_batches`.
+
+### Added — CLI
+
+- **`--fingerprint` flag** en `telemetry query` — filtra logs por device fingerprint SHA-256 pseudonymizado via PostgREST JSONB: `extra->>device_fingerprint=eq.VALUE`. Solo disponible para `--source logs`.
+- **`health --deep` probes ampliados** — ahora verifica 5 tablas: `app_logs`, `app_metrics`, `log_batches`, `device_remote_config`, `beta_testers`. Helper `probeTable()` reutiliza `queryTelemetry` con tabla overrideada.
+- **`remote-config list`** — listar configuraciones remotas activas, filtrar por `--environment` y `--fingerprint`. Soporta `--output text|json|csv`.
+- **`remote-config set`** — crear/actualizar configuración remota por fingerprint o global. Control de `minLevel`, `sampling`, `debugMode`, filtros de tags.
+- **`remote-config delete`** — eliminar configuración remota por `--id` o `--fingerprint`.
+- **`erase`** — borrado GDPR por `--user-id` o `--device-id` con limpieza de batch manifests. Soporta `--output text|json|agent`.
+- **Agent schema actualizado** — `contract_version: 2.0.0` con `remote-config list/set/delete` y `erase` en la lista de comandos.
+
+### Added — Migraciones
+
+- **010** (`010_session_variant.sql`) — columna `variant` en `app_logs` para A/B testing.
+- **011** (`011_batch_integrity.sql`) — tabla `log_batches` con `batch_id`, `batch_hash`, `event_count`, `environment`, `sdk_version`.
+- **012** (`012_enterprise_indexes_views.sql`) — índices y vistas empresariales.
+- **013** (`013_device_remote_config.sql`) — tablas `device_remote_config` y `device_fingerprints`.
+- **014** (`014_beta_tester_correlation.sql`) — tabla `beta_testers` y correlación de eventos.
+
+### Changed — Documentation
+
+- **README.md**: sección "Características" ampliada con 13 nuevas features. Tabla de migraciones actualizada con 010-014. iOS quick start expandido con todas las nuevas APIs. Sección CLI ampliada con `remote-config` y `erase`.
+- **CHANGELOG.md**: nueva entrada con todos los cambios de esta versión.
+- **ios-kmp-setup.md**: secciones de fingerprint, beta tester, remote config, consent, tracing, breadcrumbs, scoped logger.
+- **ios-kmp-patterns.md**: patrones de integración para las nuevas features.
+- **checklist-ios-kmp.md**: checklist expandido con verificaciones de todas las nuevas features.
+- **cli/README.md**: comandos `remote-config` y `erase`, flag `--fingerprint`.
+- **14 skill/reference files actualizados** en sesión anterior con remote config, fingerprint, beta tester, auto-correlation.
+
+---
+
 ## [Docs patch — 2026-03-23 auditoría completa]
 
 ### Fixed

@@ -289,7 +289,7 @@ class AppLoggerImplTest {
 
         assertEquals("custom-device-id", fakeTransport.sentEvents[1].deviceId)
 
-        logger.clearDeviceId()
+        logger.setDeviceId(null)
         logger.info("TAG", "restored")
         delay(200)
         processor.sendBatch()

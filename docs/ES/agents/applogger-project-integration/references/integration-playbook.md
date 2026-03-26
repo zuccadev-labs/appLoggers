@@ -97,9 +97,60 @@ AppLoggerIos.shared.initialize(config = config, transport = transport)
 
 Logcat visibility rule: output is shown only when `isDebugMode=true` and `consoleOutput=true`.
 
+## Device fingerprint and remote config
+
+The SDK automatically captures a persistent, pseudonymized device fingerprint:
+`SHA-256(ANDROID_ID + ":" + package_name)`.
+
+### What the developer needs to know
+
+1. **No setup required** — fingerprint is captured and attached to every event automatically.
+2. **Read it** via `AppLoggerSDK.getDeviceFingerprint()` (Android) after `initialize()`.
+3. **Where it lives in Supabase**: `app_logs.extra->>'device_fingerprint'` (JSONB field).
+4. **Remote config table**: `device_remote_config.device_fingerprint` column links to this hash.
+
+### Remote config checklist
+
+1. Add `.remoteConfigEnabled(true)` to `AppLoggerConfig.Builder`.
+2. Optionally set `.remoteConfigIntervalSeconds(300)` (default 5 min, range 30-3600).
+3. Run migration 013 (`device_remote_config` table) on Supabase.
+4. Use CLI `apploggers remote-config set --fingerprint <hash> --debug true` to control devices.
+5. ERROR/CRITICAL events are **never filtered** by remote config — they always pass.
+
+### Database tables involved
+
+| Table | Column | Purpose |
+|---|---|---|
+| `app_logs` | `extra->>'device_fingerprint'` | JSONB field on every event |
+| `device_remote_config` | `device_fingerprint` | Config rule key (NULL = global) |
+
+### Required migration
+
+Migration 013 (`docs/ES/migraciones/013_device_remote_config.sql`) must be applied to Supabase.
+
+## Beta tester integration
+
+For apps distributed via Play Store beta/internal testing tracks:
+
+1. Add `APPLOGGER_BETA_TESTER=true` to `local.properties` (beta builds only).
+2. Map it to `BuildConfig.IS_BETA_TESTER` (boolean) in `build.gradle`.
+3. The **developer** captures the tester's email from their own auth flow (Google Sign-In, Firebase, custom login, etc.).
+4. Call `AppLoggerSDK.setBetaTester(email)` with the captured email at runtime.
+5. The SDK injects `is_beta_tester=true` and `beta_tester_email` into every event.
+6. Query beta tester events: `WHERE extra->>'is_beta_tester' = 'true'`.
+7. Erase tester data: `apploggers erase --user-id "tester@example.com"`.
+
+Important: the email is NOT a config variable — each tester's email is captured at runtime
+from the developer's auth logic. `APPLOGGER_BETA_TESTER=true` only activates the mode.
+
+For two apps on the same device, they share the same `device_id` but have different
+`device_fingerprint` hashes (fingerprint includes package_name). Use `device_id` or
+a shared `user_id` to correlate events across apps.
+
 ## What not to do on first pass
 
 1. Do not replace every existing logger call in the whole codebase.
 2. Do not add PII to logs.
 3. Do not add AppLogger to unrelated layers without a reason.
 4. Do not introduce platform-specific iOS host code if the project is KMP.
+5. Do not expose raw `ANDROID_ID` — the SDK already pseudonymizes it via SHA-256.

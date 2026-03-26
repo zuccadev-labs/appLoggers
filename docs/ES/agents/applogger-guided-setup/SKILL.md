@@ -42,6 +42,10 @@ Do not use this skill when:
 18. Recommend `androidNetworkAvailabilityProvider(context)` when constructing `SupabaseTransport` on Android.
 19. Recommend calling `config.validate()` during development to catch config issues early.
 20. iOS debug mode is read from `Info.plist` key `APPLOGGER_DEBUG` — not from code.
+21. Device fingerprint is SHA-256 pseudonymized (`sha256(androidId:packageName)`) — never log or expose the raw `ANDROID_ID`.
+22. `APPLOGGER_BETA_TESTER` is a boolean flag only. The developer captures the tester's email from their own auth flow at runtime (Google Sign-In, Firebase Auth, etc.) — never from config variables.
+23. Remote config polling interval must be between 30–3600 seconds. Default: 300.
+24. When two apps share the same device, each has a different fingerprint (includes package name), but `device_id` is shared. Use `app_package` global extra for distinction.
 
 ## Workflow
 

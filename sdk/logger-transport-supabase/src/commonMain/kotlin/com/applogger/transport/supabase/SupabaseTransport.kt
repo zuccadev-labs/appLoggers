@@ -1,5 +1,6 @@
 package com.applogger.transport.supabase
 
+import com.applogger.core.BatchManifestCapable
 import com.applogger.core.LogTransport
 import com.applogger.core.TransportResult
 import com.applogger.core.model.LogEvent
@@ -16,6 +17,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 private const val HTTP_TOO_MANY_REQUESTS = 429
@@ -70,6 +72,8 @@ private const val DEFAULT_RETRY_AFTER_SECONDS = 60L
  *                                    Should use cached state — no I/O.
  * @param httpClient                  Optional pre-configured [HttpClient] (e.g. with cert pinning).
  */
+private const val BATCH_MANIFESTS_TABLE = "log_batches"
+
 class SupabaseTransport(
     private val endpoint: String,
     private val apiKey: String,
@@ -77,7 +81,7 @@ class SupabaseTransport(
     private val metricsTableName: String = "app_metrics",
     private val networkAvailabilityProvider: (() -> Boolean)? = null,
     httpClient: HttpClient? = null
-) : LogTransport {
+) : LogTransport, BatchManifestCapable {
 
     private val json = Json {
         encodeDefaults = true
@@ -187,6 +191,32 @@ class SupabaseTransport(
         return networkAvailabilityProvider?.invoke() ?: true
     }
 
+    override suspend fun storeBatchManifest(
+        batchId: String,
+        hash: String,
+        eventCount: Int,
+        environment: String,
+        sdkVersion: String
+    ) {
+        runCatching {
+            // sent_at omitted — the table default NOW() fills it server-side.
+            val payload = buildJsonObject {
+                put("batch_id", JsonPrimitive(batchId))
+                put("event_count", JsonPrimitive(eventCount))
+                put("batch_hash", JsonPrimitive(hash))
+                if (environment.isNotBlank()) put("environment", JsonPrimitive(environment))
+                if (sdkVersion.isNotBlank()) put("sdk_version", JsonPrimitive(sdkVersion))
+            }
+            client.post("$restUrl/$BATCH_MANIFESTS_TABLE") {
+                header("apikey", apiKey)
+                header("Authorization", "Bearer $apiKey")
+                header("Prefer", "return=minimal")
+                contentType(ContentType.Application.Json)
+                setBody(payload.toString())
+            }
+        }
+    }
+
     fun close() {
         client.close()
     }
@@ -201,12 +231,25 @@ internal data class SupabaseLogEntry(
     @SerialName("throwable_type") val throwableType: String? = null,
     @SerialName("throwable_msg") val throwableMsg: String? = null,
     @SerialName("stack_trace") val stackTrace: List<String>? = null,
+    // Pillar 3 — Column Matcher: anomaly_type es una columna de primer nivel en app_logs,
+    // no un campo dentro del JSONB extra. El transporte extrae este valor del mapa extra
+    // (donde lo inyectó el SDK en Pillar 1) y lo promueve al payload raíz de la petición.
+    @SerialName("anomaly_type") val anomalyType: String? = null,
+    // Distributed tracing: allows correlating events across devices (mobile → TV → backend).
+    // Filter in Supabase: SELECT * FROM app_logs WHERE trace_id = 'abc-123' ORDER BY timestamp
+    @SerialName("trace_id") val traceId: String? = null,
+    // Client-side epoch millis — stored as BIGINT in app_logs for HMAC batch integrity
+    // verification. The CLI verify command recomputes the hash using this value, not
+    // server-generated created_at.
+    val timestamp: Long,
+    @SerialName("batch_id") val batchId: String? = null,
     @SerialName("device_info") val deviceInfo: Map<String, String>,
     @SerialName("api_level") val apiLevel: Int,
     @SerialName("sdk_version") val sdkVersion: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("device_id") val deviceId: String,
     @SerialName("user_id") val userId: String? = null,
+    val variant: String? = null,
     val extra: JsonObject? = null
 )
 
@@ -219,36 +262,54 @@ internal data class SupabaseMetricEntry(
     val environment: String,
     @SerialName("device_id") val deviceId: String,
     @SerialName("session_id") val sessionId: String,
-    @SerialName("sdk_version") val sdkVersion: String
+    @SerialName("sdk_version") val sdkVersion: String,
+    @SerialName("user_id") val userId: String? = null
 )
 
-private fun LogEvent.toSupabaseLog() = SupabaseLogEntry(
-    level = level.name,
-    tag = tag,
-    message = message,
-    environment = environment,
-    throwableType = throwableInfo?.type,
-    throwableMsg = throwableInfo?.message,
-    stackTrace = throwableInfo?.stackTrace,
-    deviceInfo = mapOf(
-        "brand" to deviceInfo.brand,
-        "model" to deviceInfo.model,
-        "os_version" to deviceInfo.osVersion,
-        "api_level" to deviceInfo.apiLevel.toString(),
-        "platform" to deviceInfo.platform,
-        "app_version" to deviceInfo.appVersion,
-        "app_build" to deviceInfo.appBuild.toString(),
-        "is_low_ram" to deviceInfo.isLowRamDevice.toString(),
-        "is_tv" to deviceInfo.isTV.toString(),
-        "connection_type" to deviceInfo.connectionType
-    ),
-    apiLevel = deviceInfo.apiLevel,
-    sdkVersion = sdkVersion,
-    sessionId = sessionId,
-    deviceId = deviceId,
-    userId = userId,
-    extra = extra?.toJsonObject()
-)
+private fun LogEvent.toSupabaseLog(): SupabaseLogEntry {
+    // Pillar 3 — Column Matcher:
+    // Extrae anomaly_type del mapa extra y lo promueve a columna de primer nivel.
+    // Esto evita que el valor quede enterrado en el JSONB extra y permite queries
+    // directas: SELECT * FROM app_logs WHERE anomaly_type = 'error'
+    val anomalyType = (extra?.get("anomaly_type") as? JsonPrimitive)?.content
+    val filteredExtra = extra
+        ?.filterKeys { it != "anomaly_type" }
+        ?.takeIf { it.isNotEmpty() }
+        ?.toJsonObject()
+
+    return SupabaseLogEntry(
+        level = level.name,
+        tag = tag,
+        message = message,
+        environment = environment,
+        throwableType = throwableInfo?.type,
+        throwableMsg = throwableInfo?.message,
+        stackTrace = throwableInfo?.stackTrace,
+        anomalyType = anomalyType,
+        traceId = traceId,
+        timestamp = timestamp,
+        batchId = batchId,
+        deviceInfo = mapOf(
+            "brand" to deviceInfo.brand,
+            "model" to deviceInfo.model,
+            "os_version" to deviceInfo.osVersion,
+            "api_level" to deviceInfo.apiLevel.toString(),
+            "platform" to deviceInfo.platform,
+            "app_version" to deviceInfo.appVersion,
+            "app_build" to deviceInfo.appBuild.toString(),
+            "is_low_ram" to deviceInfo.isLowRamDevice.toString(),
+            "is_tv" to deviceInfo.isTV.toString(),
+            "connection_type" to deviceInfo.connectionType
+        ),
+        apiLevel = deviceInfo.apiLevel,
+        sdkVersion = sdkVersion,
+        sessionId = sessionId,
+        deviceId = deviceId,
+        userId = userId,
+        variant = variant,
+        extra = filteredExtra
+    )
+}
 
 private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
     return SupabaseMetricEntry(
@@ -259,7 +320,8 @@ private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
         environment = environment,
         deviceId = deviceId,
         sessionId = sessionId,
-        sdkVersion = sdkVersion
+        sdkVersion = sdkVersion,
+        userId = userId
     )
 }
 

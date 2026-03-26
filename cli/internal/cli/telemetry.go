@@ -20,6 +20,7 @@ type telemetryFlags struct {
 	environment string
 	session     string
 	deviceID    string
+	fingerprint string
 	userID      string
 	pkg         string
 	errorCode   string
@@ -27,6 +28,9 @@ type telemetryFlags struct {
 	tag         string
 	name        string
 	anomalyType string
+	traceID     string
+	variant     string
+	batchID     string
 	extraKey    string
 	extraValue  string
 	sdkVersion  string
@@ -48,6 +52,7 @@ func addTelemetryFlags(cmd *cobra.Command, f *telemetryFlags) {
 	cmd.Flags().StringVar(&f.environment, "environment", "", "Environment filter: production|staging|development (logs and metrics)")
 	cmd.Flags().StringVar(&f.session, "session-id", "", "Session identifier filter")
 	cmd.Flags().StringVar(&f.deviceID, "device-id", "", "Device identifier filter")
+	cmd.Flags().StringVar(&f.fingerprint, "fingerprint", "", "Device fingerprint filter — SHA-256 pseudonymized device ID (logs only, queries extra JSONB)")
 	cmd.Flags().StringVar(&f.userID, "user-id", "", "Anonymous user identifier filter (logs only)")
 	cmd.Flags().StringVar(&f.pkg, "package", "", "Package/module filter from extra.package_name (logs only)")
 	cmd.Flags().StringVar(&f.errorCode, "error-code", "", "Error code filter from extra.error_code (logs only)")
@@ -55,6 +60,9 @@ func addTelemetryFlags(cmd *cobra.Command, f *telemetryFlags) {
 	cmd.Flags().StringVar(&f.tag, "tag", "", "Tag filter (logs only)")
 	cmd.Flags().StringVar(&f.name, "name", "", "Metric name filter (metrics only)")
 	cmd.Flags().StringVar(&f.anomalyType, "anomaly-type", "", "Anomaly type filter (logs only, e.g. slow_response)")
+	cmd.Flags().StringVar(&f.traceID, "trace-id", "", "Distributed trace ID filter (logs only)")
+	cmd.Flags().StringVar(&f.variant, "variant", "", "A/B test variant filter (logs only)")
+	cmd.Flags().StringVar(&f.batchID, "batch-id", "", "Batch ID filter (logs only)")
 	cmd.Flags().StringVar(&f.extraKey, "extra-key", "", "JSONB extra field key for ad-hoc filter (logs only, use with --extra-value)")
 	cmd.Flags().StringVar(&f.extraValue, "extra-value", "", "JSONB extra field value for ad-hoc filter (logs only, use with --extra-key)")
 	cmd.Flags().StringVar(&f.sdkVersion, "sdk-version", "", "SDK version filter (e.g. 0.2.0)")
@@ -175,6 +183,18 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 		if strings.TrimSpace(f.contains) != "" {
 			return telemetryQueryRequest{}, newUsageError("--contains is only valid when --source=logs")
 		}
+		if strings.TrimSpace(f.traceID) != "" {
+			return telemetryQueryRequest{}, newUsageError("--trace-id is only valid when --source=logs")
+		}
+		if strings.TrimSpace(f.variant) != "" {
+			return telemetryQueryRequest{}, newUsageError("--variant is only valid when --source=logs")
+		}
+		if strings.TrimSpace(f.batchID) != "" {
+			return telemetryQueryRequest{}, newUsageError("--batch-id is only valid when --source=logs")
+		}
+		if strings.TrimSpace(f.fingerprint) != "" {
+			return telemetryQueryRequest{}, newUsageError("--fingerprint is only valid when --source=logs")
+		}
 		if strings.TrimSpace(f.extraKey) != "" {
 			return telemetryQueryRequest{}, newUsageError("--extra-key is only valid when --source=logs")
 		}
@@ -203,6 +223,7 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 		Environment: strings.TrimSpace(f.environment),
 		SessionID:   strings.TrimSpace(f.session),
 		DeviceID:    strings.TrimSpace(f.deviceID),
+		Fingerprint: strings.TrimSpace(f.fingerprint),
 		UserID:      strings.TrimSpace(f.userID),
 		Package:     strings.TrimSpace(f.pkg),
 		ErrorCode:   strings.TrimSpace(f.errorCode),
@@ -210,6 +231,9 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 		Tag:         strings.TrimSpace(f.tag),
 		Name:        strings.TrimSpace(f.name),
 		AnomalyType: strings.TrimSpace(f.anomalyType),
+		TraceID:     strings.TrimSpace(f.traceID),
+		Variant:     strings.TrimSpace(f.variant),
+		BatchID:     strings.TrimSpace(f.batchID),
 		ExtraKey:    strings.TrimSpace(f.extraKey),
 		ExtraValue:  strings.TrimSpace(f.extraValue),
 		SDKVersion:  strings.TrimSpace(f.sdkVersion),
@@ -265,6 +289,9 @@ func newTelemetryCommand() *cobra.Command {
 			}
 			if outputFormat == "agent" {
 				return writeAgent(cmd.OutOrStdout(), response)
+			}
+			if outputFormat == "csv" {
+				return writeCSV(cmd.OutOrStdout(), response.Rows)
 			}
 			_, err = fmt.Fprintf(
 				cmd.OutOrStdout(),

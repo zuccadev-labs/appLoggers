@@ -96,6 +96,24 @@ apploggers telemetry query --source metrics --limit 5 --output json
 
 Se considera listo cuando `health --deep` retorna `ok: true` y las queries no retornan 403.
 
+### Validación de remote config
+
+```bash
+# Listar remote configs activos
+apploggers remote-config list --output json
+
+# Crear un config de prueba (global, no device-specific)
+apploggers remote-config set --environment staging --debug true --min-level debug --notes "validation test" --output json
+
+# Verificar que fue creado
+apploggers remote-config list --environment staging --output json
+
+# Limpiar config de prueba
+apploggers remote-config delete --id <ID_DEL_PASO_ANTERIOR> --output json
+```
+
+Si `remote-config list` retorna 403, verificar que el CLI usa `service_role key` (no `anon key`).
+
 ---
 
 ## Paso 4 — Multi-proyecto (opcional)

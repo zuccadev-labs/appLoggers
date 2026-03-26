@@ -167,6 +167,7 @@ All query filters are CLI flags — they are NOT configured in `cli.json`. The j
 | `--package` | `extra->>package_name` (JSONB) | exact | e.g. `com.company.billing` |
 | `--error-code` | `extra->>error_code` (JSONB) | exact | e.g. `E-42`, `AUTH_FAILED` |
 | `--extra-key / --extra-value` | `extra->>KEY` (JSONB) | exact | Ad-hoc filter on any extra field. Both flags required together. |
+| `--fingerprint` | `device_fingerprint` (top-level) | exact | SHA-256 pseudonymized device ID |
 | `--throwable` | adds `throwable_type`, `throwable_msg`, `stack_trace` | — | Flag only — adds columns to SELECT, no filter |
 | `--offset` | — | — | Pagination offset (0-based). Use with `--limit`. |
 | `--order` | `created_at` | `desc` or `asc` | Default: `desc` |

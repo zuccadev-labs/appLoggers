@@ -34,6 +34,10 @@ Do not use this skill when:
 10. Never assume `BuildConfig.LOGGER_*` exists; verify symbols first or add mapping explicitly.
 11. Never use Android entrypoint `AppLoggerSDK` in iOS KMP integration code.
 12. For iOS KMP integration, use `AppLoggerIos.shared.initialize(...)` from Kotlin.
+13. Device fingerprint is automatically captured on Android — SHA-256 pseudonymized. Do not log raw `ANDROID_ID`.
+14. When integrating beta tester mode, use `APPLOGGER_BETA_TESTER=true` as boolean flag. Email comes from the developer's auth flow at runtime via `AppLoggerSDK.setBetaTester(email)`.
+15. Remote config requires the `device_remote_config` table in Supabase (migration 013). Verify migrations are applied before enabling.
+16. Inject `app_package` global extra automatically for multi-app identification on the same device.
 
 ## Workflow
 

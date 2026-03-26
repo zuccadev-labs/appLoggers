@@ -2,6 +2,8 @@ package com.applogger.core
 
 private const val LARGE_BATCH_THRESHOLD = 50
 private const val SHORT_FLUSH_THRESHOLD = 10
+private const val REMOTE_CONFIG_INTERVAL_MIN = 30
+private const val REMOTE_CONFIG_INTERVAL_MAX = 3600
 
 /**
  * Immutable configuration for the AppLogger SDK.
@@ -63,8 +65,74 @@ data class AppLoggerConfig(
     val verboseTransportLogging: Boolean,
     val bufferSizeStrategy: BufferSizeStrategy,
     val bufferOverflowPolicy: BufferOverflowPolicy,
-    val offlinePersistenceMode: OfflinePersistenceMode
+    val offlinePersistenceMode: OfflinePersistenceMode,
+    /**
+     * Deduplication window for identical errors (same level + tag + message + throwable type).
+     * Within this window, only the first occurrence is sent; subsequent duplicates are suppressed
+     * and the final event is enriched with `occurrence_count = N`.
+     *
+     * Solves high-frequency event loops (e.g. playback ticks, sync polling) that would otherwise
+     * flood the backend with thousands of identical rows.
+     *
+     * Set to `0` to disable deduplication entirely. Default: `10_000` ms (10 seconds).
+     */
+    val deduplicationWindowMs: Long = 10_000L,
+    /**
+     * Number of breadcrumbs (user interaction records) retained in the circular buffer.
+     * Breadcrumbs are automatically attached to ERROR and CRITICAL events as a JSON array
+     * in the `breadcrumbs` extra field, giving full "what the user did before the crash" context.
+     *
+     * Set to `0` to disable. Default: `10`.
+     */
+    val breadcrumbCapacity: Int = 10,
+    /**
+     * Default consent level applied at SDK initialization.
+     * Events requiring a higher consent level are silently dropped.
+     *
+     * Default: [ConsentLevel.MARKETING] for backward compatibility with existing integrations.
+     * Set to [ConsentLevel.STRICT] for privacy-first apps that want explicit opt-in.
+     *
+     * Change at runtime via [AppLoggerSDK.setConsent].
+     */
+    val defaultConsentLevel: ConsentLevel = ConsentLevel.MARKETING,
+    /**
+     * When true, [ConsentLevel.STRICT] mode automatically applies GDPR Art. 5(1)(c)
+     * data minimization: user_id is suppressed, device_id is pseudonymized via one-way hash.
+     * Default: true.
+     */
+    val dataMinimizationEnabled: Boolean = true,
+    /**
+     * Secret key for batch integrity HMAC-SHA256 hashing.
+     * When blank (default), integrity hashing is disabled.
+     *
+     * IMPORTANT: Do NOT use the Supabase anon key. Generate a dedicated secret via
+     * `apploggers init --generate-integrity-secret` and store it outside the APK
+     * (e.g., in CI/CD secrets, loaded at build time as a BuildConfig field from a
+     * local.properties key that is never committed to git).
+     */
+    val integritySecret: String = "",
+    /**
+     * Daily data limit in megabytes. When reached, non-critical events are shed
+     * until the next UTC day. Set to 0 to disable (default).
+     */
+    val dailyDataLimitMb: Int = 0,
+    /**
+     * Enables remote configuration polling from the `device_remote_config` Supabase table.
+     * When enabled, the SDK fetches per-device or global overrides (minLevel, tag filters,
+     * sampling rate, debug mode) on initialization and periodically thereafter.
+     *
+     * Requires [endpoint] and [apiKey] to be configured.
+     * Default: false.
+     */
+    val remoteConfigEnabled: Boolean = false,
+    /**
+     * Interval in seconds between remote config polls.
+     * Only effective when [remoteConfigEnabled] is true.
+     * Default: 300 (5 minutes). Range: 30–3600.
+     */
+    val remoteConfigIntervalSeconds: Int = 300
 ) {
+    @Suppress("TooManyFunctions")
     class Builder {
         private var endpoint: String = ""
         private var apiKey: String = ""
@@ -80,6 +148,14 @@ data class AppLoggerConfig(
         private var bufferSizeStrategy: BufferSizeStrategy = BufferSizeStrategy.FIXED
         private var bufferOverflowPolicy: BufferOverflowPolicy = BufferOverflowPolicy.DISCARD_OLDEST
         private var offlinePersistenceMode: OfflinePersistenceMode = OfflinePersistenceMode.NONE
+        private var deduplicationWindowMs: Long = 10_000L
+        private var breadcrumbCapacity: Int = 10
+        private var defaultConsentLevel: ConsentLevel = ConsentLevel.MARKETING
+        private var dataMinimizationEnabled: Boolean = true
+        private var integritySecret: String = ""
+        private var dailyDataLimitMb: Int = 0
+        private var remoteConfigEnabled: Boolean = false
+        private var remoteConfigIntervalSeconds: Int = 300
 
         fun endpoint(url: String) = apply { endpoint = url }
         fun apiKey(key: String) = apply { apiKey = key }
@@ -95,6 +171,19 @@ data class AppLoggerConfig(
         fun bufferSizeStrategy(strategy: BufferSizeStrategy) = apply { bufferSizeStrategy = strategy }
         fun bufferOverflowPolicy(policy: BufferOverflowPolicy) = apply { bufferOverflowPolicy = policy }
         fun offlinePersistenceMode(mode: OfflinePersistenceMode) = apply { offlinePersistenceMode = mode }
+        /** @see AppLoggerConfig.deduplicationWindowMs */
+        fun deduplicationWindowMs(ms: Long) = apply { deduplicationWindowMs = maxOf(0L, ms) }
+        /** @see AppLoggerConfig.breadcrumbCapacity */
+        fun breadcrumbCapacity(n: Int) = apply { breadcrumbCapacity = maxOf(0, n) }
+
+        fun defaultConsentLevel(level: ConsentLevel) = apply { defaultConsentLevel = level }
+        fun dataMinimizationEnabled(enabled: Boolean) = apply { dataMinimizationEnabled = enabled }
+        fun integritySecret(secret: String) = apply { integritySecret = secret.trim() }
+        fun dailyDataLimitMb(mb: Int) = apply { dailyDataLimitMb = maxOf(0, mb) }
+        fun remoteConfigEnabled(enabled: Boolean) = apply { remoteConfigEnabled = enabled }
+        fun remoteConfigIntervalSeconds(sec: Int) = apply {
+            remoteConfigIntervalSeconds = sec.coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX)
+        }
 
         fun build(): AppLoggerConfig {
             require(endpoint.startsWith("https://") || isDebugMode || endpoint.isEmpty()) {
@@ -114,7 +203,16 @@ data class AppLoggerConfig(
                 verboseTransportLogging = verboseTransportLogging,
                 bufferSizeStrategy = bufferSizeStrategy,
                 bufferOverflowPolicy = bufferOverflowPolicy,
-                offlinePersistenceMode = offlinePersistenceMode
+                offlinePersistenceMode = offlinePersistenceMode,
+                deduplicationWindowMs = deduplicationWindowMs,
+                breadcrumbCapacity = breadcrumbCapacity,
+                defaultConsentLevel = defaultConsentLevel,
+                dataMinimizationEnabled = dataMinimizationEnabled,
+                integritySecret = integritySecret,
+                dailyDataLimitMb = dailyDataLimitMb,
+                remoteConfigEnabled = remoteConfigEnabled,
+                remoteConfigIntervalSeconds = remoteConfigIntervalSeconds
+                    .coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX)
             )
         }
     }
@@ -183,7 +281,10 @@ data class AppLoggerConfig(
             batchSize = minOf(batchSize, 5),
             flushIntervalSeconds = maxOf(flushIntervalSeconds, 60),
             maxStackTraceLines = minOf(maxStackTraceLines, 5),
-            flushOnlyWhenIdle = true
+            flushOnlyWhenIdle = true,
+            // On TV/low-RAM devices, reduce breadcrumb buffer to save memory.
+            // Deduplication window stays: it *saves* memory by collapsing duplicate events.
+            breadcrumbCapacity = minOf(breadcrumbCapacity, 5)
         )
     }
 }

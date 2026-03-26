@@ -13,6 +13,9 @@ Use this skill when AppLogger is already integrated but behavior is wrong:
 2. Health snapshot indicates degraded state.
 3. Buffer grows and does not drain.
 4. Transport errors keep happening.
+5. Remote config is not being applied (debug not activating/deactivating).
+6. Device fingerprint is empty or incorrect.
+7. Beta tester email is not appearing in events or auto-correlation is failing.
 
 Do not use this skill when:
 
@@ -36,8 +39,10 @@ Do not use this skill when:
 3. Inspect `local.properties` keys and append only missing AppLogger keys.
 4. Run health diagnostics.
 5. Trace emission path and transport path.
-6. Rank likely root causes.
-7. Apply fix and revalidate.
+6. Check remote config polling: is the timer running? Is the endpoint reachable? Is the fingerprint correct?
+7. Check beta tester mode: is `setBetaTester(email)` called? Are global extras injected? Is the Supabase trigger working?
+8. Rank likely root causes.
+9. Apply fix and revalidate.
 
 ## References bundled with this skill
 

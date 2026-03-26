@@ -113,9 +113,41 @@ interface AppLogger {
      */
     fun addGlobalExtra(key: String, value: String)
 
+    /**
+     * Sets a persistent contextual attribute attached to every subsequent event.
+     *
+     * Preferred over [addGlobalExtra] for first-class context like session, user tier,
+     * or experiment group — the name signals intent rather than implementation detail.
+     *
+     * ```kotlin
+     * // En Application.onCreate() o tras login:
+     * AppLoggerSDK.setGlobalAttribute("session_id", uuid)
+     * AppLoggerSDK.setGlobalAttribute("user_tier", "premium")
+     * AppLoggerSDK.setGlobalAttribute("ab_experiment", "checkout_v3")
+     * ```
+     *
+     * Una vez establecido, el SDK adjunta el par a todos los logs y métricas
+     * automáticamente, garantizando que columnas como `session_id` en Supabase
+     * nunca queden vacías.
+     */
+    fun setGlobalAttribute(key: String, value: String) = addGlobalExtra(key, value)
+
     /** Removes a single key from the global extra context. */
     fun removeGlobalExtra(key: String)
 
     /** Clears all global extra context. */
     fun clearGlobalExtra()
+
+    /**
+     * Tags the session with an A/B test or experiment variant.
+     * Stored as top-level `variant` column for efficient group queries.
+     * Pass null to clear.
+     */
+    fun setSessionVariant(variant: String?) {}  // default no-op; overridden by AppLoggerImpl
+
+    /** Attaches a user-scoped property. MARKETING-level data — suppressed in STRICT/PERFORMANCE mode. */
+    fun setUserProperty(key: String, value: String) = addGlobalExtra("user_prop_$key", value)
+
+    /** Removes a user property set via [setUserProperty]. */
+    fun removeUserProperty(key: String) = removeGlobalExtra("user_prop_$key")
 }

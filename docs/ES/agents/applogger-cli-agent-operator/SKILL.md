@@ -322,6 +322,7 @@ apploggers telemetry query \
   --error-code CODE \
   --anomaly-type TYPE \
   --extra-key KEY --extra-value VALUE \             # JSONB ad-hoc filter
+  --fingerprint DEVICE_HASH \                      # SHA-256 device fingerprint
   --sdk-version VERSION \
   --throwable \                                     # include stack traces
   --name METRIC_NAME \
@@ -382,6 +383,61 @@ apploggers telemetry tail \
   --min-severity error \
   --environment production \
   --interval 3
+```
+
+### `apploggers remote-config` — Remote Debug Control
+
+**When to use**: Activate/deactivate SDK debug functions remotely per device or globally without redeploying.
+
+```bash
+# List active remote configs
+apploggers remote-config list --output json
+apploggers remote-config list --environment production --output json
+apploggers remote-config list --fingerprint DEVICE_HASH --output json
+
+# Set remote config — enable debug for a specific device
+apploggers remote-config set \
+  --fingerprint "abc123sha256" \
+  --environment production \
+  --debug true \
+  --min-level debug \
+  --sampling-rate 1.0 \
+  --notes "Debugging user-reported crash" \
+  --output json
+
+# Set global config (no --fingerprint → applies to all devices)
+apploggers remote-config set \
+  --environment production \
+  --debug false \
+  --min-level info \
+  --output json
+
+# Delete remote config by fingerprint or ID
+apploggers remote-config delete --fingerprint "abc123sha256" --output json
+apploggers remote-config delete --id 42 --output json
+```
+
+**Flags for `set`**:
+
+| Flag | Type | Purpose |
+|---|---|---|
+| `--fingerprint` | string | Device fingerprint (SHA-256). Omit for global config. |
+| `--environment` | string | Target environment |
+| `--debug` | bool | Enable/disable SDK debug mode remotely |
+| `--min-level` | string | Minimum log level (`debug`, `info`, `warn`, `error`, `critical`) |
+| `--sampling-rate` | float | 0.0–1.0 sampling rate |
+| `--tags-allow` | string | Comma-separated allowed tags |
+| `--tags-block` | string | Comma-separated blocked tags |
+| `--notes` | string | Operator notes |
+| `--enabled` | bool | Enable/disable this config entry (default: true) |
+
+**Flow**: CLI writes to `device_remote_config` table → SDK polls every N seconds → SDK applies overrides (debug gate, minLevel, tag filtering, sampling). ERROR/CRITICAL always pass regardless of remote config.
+
+### `apploggers erase` — Beta Tester Data Erasure (GDPR)
+
+```bash
+# Erase beta tester data by email (GDPR Art. 17)
+apploggers erase --user-id tester@example.com --output json
 ```
 
 ---

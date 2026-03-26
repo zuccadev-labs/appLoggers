@@ -24,6 +24,7 @@ type telemetryQueryRequest struct {
 	Environment string `json:"environment,omitempty" toon:"environment,omitempty"`
 	SessionID   string `json:"session_id,omitempty" toon:"session_id,omitempty"`
 	DeviceID    string `json:"device_id,omitempty" toon:"device_id,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty" toon:"fingerprint,omitempty"`
 	UserID      string `json:"user_id,omitempty" toon:"user_id,omitempty"`
 	Package     string `json:"package,omitempty" toon:"package,omitempty"`
 	ErrorCode   string `json:"error_code,omitempty" toon:"error_code,omitempty"`
@@ -31,6 +32,9 @@ type telemetryQueryRequest struct {
 	Tag         string `json:"tag,omitempty" toon:"tag,omitempty"`
 	Name        string `json:"name,omitempty" toon:"name,omitempty"`
 	AnomalyType string `json:"anomaly_type,omitempty" toon:"anomaly_type,omitempty"`
+	TraceID     string `json:"trace_id,omitempty" toon:"trace_id,omitempty"`
+	Variant     string `json:"variant,omitempty" toon:"variant,omitempty"`
+	BatchID     string `json:"batch_id,omitempty" toon:"batch_id,omitempty"`
 	ExtraKey    string `json:"extra_key,omitempty" toon:"extra_key,omitempty"`
 	ExtraValue  string `json:"extra_value,omitempty" toon:"extra_value,omitempty"`
 	SDKVersion  string `json:"sdk_version,omitempty" toon:"sdk_version,omitempty"`
@@ -225,11 +229,23 @@ func doQuery(ctx context.Context, cfg supabaseConfig, req telemetryQueryRequest,
 		if req.Contains != "" {
 			query.Set("message", "ilike.*"+req.Contains+"*")
 		}
+		if req.Fingerprint != "" {
+			query.Set("extra->>device_fingerprint", "eq."+req.Fingerprint)
+		}
 		if req.Tag != "" {
 			query.Set("tag", "eq."+req.Tag)
 		}
 		if req.AnomalyType != "" {
 			query.Set("anomaly_type", "eq."+req.AnomalyType)
+		}
+		if req.TraceID != "" {
+			query.Set("trace_id", "eq."+req.TraceID)
+		}
+		if req.Variant != "" {
+			query.Set("variant", "eq."+req.Variant)
+		}
+		if req.BatchID != "" {
+			query.Set("batch_id", "eq."+req.BatchID)
 		}
 		// Generic JSONB extra filter
 		if req.ExtraKey != "" && req.ExtraValue != "" {

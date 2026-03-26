@@ -32,6 +32,24 @@ interface LogTransport {
 }
 
 /**
+ * Optional interface for transports that support batch manifest storage.
+ * Implement alongside [LogTransport] to enable batch integrity verification via the CLI.
+ */
+interface BatchManifestCapable {
+    /**
+     * Persists a batch manifest record for later integrity verification.
+     * Called after a batch is successfully sent.
+     */
+    suspend fun storeBatchManifest(
+        batchId: String,
+        hash: String,
+        eventCount: Int,
+        environment: String = "",
+        sdkVersion: String = ""
+    )
+}
+
+/**
  * Result of a [LogTransport.send] operation.
  */
 sealed class TransportResult {
