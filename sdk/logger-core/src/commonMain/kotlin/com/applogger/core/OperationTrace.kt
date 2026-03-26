@@ -115,7 +115,8 @@ class OperationTrace(
         }
         val durationMs = currentTimeMillis() - startTimeMs
         val timedOut = timeoutMs > 0L && durationMs >= timeoutMs
-        val extra = buildFinalTags(durationMs, extraAttributes, success = false, timedOut = timedOut).toMutableMap<String, Any>()
+        val finalTags = buildFinalTags(durationMs, extraAttributes, success = false, timedOut = timedOut)
+        val extra = finalTags.toMutableMap<String, Any>()
         if (failureReason != null) extra["failure_reason"] = failureReason
         logger.error(
             tag = "Trace.$operationName",
