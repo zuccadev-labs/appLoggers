@@ -148,6 +148,91 @@ log.e("Stall detected", throwable = e)
 
 ---
 
+## `logCatching{}` — Ejecución segura con log automático
+
+Ejecuta un bloque y captura cualquier excepción automáticamente loguea un evento ERROR. Elimina el boilerplate de try/catch en operaciones que deben loguear en fallo.
+
+### Firmas
+
+```kotlin
+// Sobre AppLogger — tag explícito
+fun <T> AppLogger.logCatching(
+    tag: String,
+    context: String = "operation",   // descripción de lo que se intentaba
+    extra: Map<String, Any>? = null, // metadata adicional en el evento de error
+    block: () -> T
+): T?
+
+// Sobre Any — tag inferido del nombre de clase
+fun <T> Any.logCatching(
+    logger: AppLogger,
+    context: String = "operation",
+    extra: Map<String, Any>? = null,
+    block: () -> T
+): T?
+```
+
+### Comportamiento exacto
+
+| Caso | Retorno | Logging |
+|---|---|---|
+| `block` ejecuta sin excepción | Resultado de `block` | Sin logging |
+| `block` lanza excepción | `null` | ERROR: `"<context> failed: <exception.message>"` con throwable y extra |
+
+El mensaje de error es siempre: `"$context failed: ${exception.message}"`
+
+### Ejemplos
+
+```kotlin
+// AppLogger.logCatching — tag explícito
+val result = logger.logCatching("NetworkClient", "fetch user") {
+    api.getUser(id)
+}
+// → result = User(...) en éxito
+// → result = null si throws; logged: ERROR [NetworkClient] "fetch user failed: <msg>"
+
+// Con extra para enriquecer el evento de error
+val content = logger.logCatching("PLAYER", "load content", extra = mapOf("content_id" to id)) {
+    contentApi.fetch(id)
+}
+// → Si falla: ERROR event incluye content_id en extra
+
+// Any.logCatching — tag inferido
+class OrderRepository(private val logger: AppLogger) {
+    fun submit(order: Order) = this.logCatching(logger, "submit order") {
+        api.submitOrder(order)
+    }
+    // → tag = "OrderRepository", message = "submit order failed: <msg>"
+}
+
+// Context por defecto es "operation" — úsalo solo en clases muy simples:
+val data = logger.logCatching("SYNC") { sync.fetch() }
+// → Si falla: "operation failed: <msg>" (poco descriptivo — preferir context explícito)
+```
+
+### Cuándo usar `logCatching` vs try/catch manual
+
+```kotlin
+// ✅ logCatching — operación atómica que retorna null en fallo
+val user = this.logCatching(logger, "load profile") {
+    userRepository.findById(userId)
+}
+if (user == null) showError()
+
+// ✅ try/catch manual — cuando necesitas lógica diferente por tipo de excepción
+try {
+    payment.charge(amount)
+} catch (e: InsufficientFundsException) {
+    logger.warn("PAYMENT", "Insufficient funds", anomalyType = "INSUFFICIENT_FUNDS")
+    showInsufficientFundsDialog()
+} catch (e: NetworkException) {
+    logger.error("PAYMENT", "Network error during charge", throwable = e)
+    retryLater()
+}
+```
+
+---
+
 ## `loggerTag<T>()` — Para companion objects
 
 Evita strings duplicados cuando el tag coincide con el nombre de la clase:

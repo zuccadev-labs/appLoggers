@@ -41,6 +41,14 @@ class HomeScreen(private val logger: AppLogger) {
 }
 ```
 
+> **Comportamiento exacto de `source`**: `Any.logM` añade `"source" -> className` a los tags **solo si el caller no pasó ya una key `"source"`**. Si los `tags` del caller incluyen `"source"`, ese valor se preserva sin ser sobreescrito. Implementación: `if (!containsKey("source")) put("source", sourceTag)`.
+
+```kotlin
+// "source" del caller se preserva
+this.logM(logger, "latency", 120.0, "ms", mapOf("source" to "CDN_edge"))
+// → tags.source = "CDN_edge"  (no sobreescrito por el nombre de clase)
+```
+
 ### `AppLogger.timed{}` — Medir latencia automáticamente
 
 ```kotlin
@@ -59,6 +67,16 @@ class SearchRepository(private val logger: AppLogger) {
         api.search(query)
     }
 }
+```
+
+> **Comportamiento exacto de `source`**: `Any.timed{}` aplica la misma política que `Any.logM` — añade `"source"` **solo si no está ya en los tags**. Si los `tags` del caller incluyen `"source"`, ese valor no se sobreescribe. Implementación: `if (!containsKey("source")) put("source", sourceTag)`.
+
+```kotlin
+// "source" explícito del caller se preserva
+this.timed(logger, "upload_time", "ms", mapOf("source" to "background_sync")) {
+    fileUploader.upload(file)
+}
+// → tags.source = "background_sync"  (no "SearchRepository")
 ```
 
 ---
