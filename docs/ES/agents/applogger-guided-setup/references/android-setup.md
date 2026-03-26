@@ -529,6 +529,59 @@ println("initialized=${health.isInitialized}, transport=${health.transportAvaila
 println("device_fingerprint=${AppLoggerSDK.getDeviceFingerprint()}")
 ```
 
+## OperationTrace — Spans de performance
+
+Mide el tiempo de cualquier operación y emite una métrica `trace.<name>` automáticamente:
+
+```kotlin
+import com.applogger.core.AppLoggerSDK
+import com.applogger.core.OperationTrace
+
+// Abrir span
+val trace = AppLoggerSDK.startTrace("api_call", "endpoint" to url)
+
+try {
+    val response = api.fetch(url)
+    trace.end(mapOf("status_code" to response.status))
+    // → emite métrica trace.api_call con duration_ms
+} catch (e: Exception) {
+    trace.endWithError(e, failureReason = "network_error")
+    // → emite evento ERROR Trace.api_call
+}
+```
+
+Fluent API:
+```kotlin
+AppLoggerSDK.startTrace("video_load", "content_id" to id)
+    .tag("quality", "4K")
+    .bytes(responseBytes.toLong())
+    .withTimeout(10_000)
+    .end()
+```
+
+Ver skill `applogger-advanced-features` para el API completa.
+
+## DataBudgetManager — Límite diario de datos
+
+Para apps sensibles al ancho de banda, configura un límite diario de bytes:
+
+```kotlin
+AppLoggerSDK.initialize(
+    context = this,
+    config = AppLoggerConfig.Builder()
+        .endpoint(BuildConfig.LOGGER_URL)
+        .apiKey(BuildConfig.LOGGER_KEY)
+        .environment("production")
+        .dailyDataLimitMb(50)   // 50 MB/día móvil, 100 MB/día WiFi (2× automático)
+        // 0 (default) = sin límite
+        .build(),
+    transport = transport
+)
+```
+
+Cuando se alcanza el límite, los eventos no críticos se descartan hasta el siguiente día UTC.
+ERROR y CRITICAL nunca se descartan.
+
 ## Guardrails
 
 1. Do not log PII (names, emails, phone numbers, device IMEI).
@@ -538,3 +591,5 @@ println("device_fingerprint=${AppLoggerSDK.getDeviceFingerprint()}")
 5. Call `validate()` during development to catch config issues early.
 6. The device fingerprint is pseudonymized (SHA-256) — it is not raw PII.
 7. Remote config polling does not affect app performance (background timer, best-effort).
+8. Always call `trace.end()` or `trace.endWithError()` — unclosed spans do not emit any event.
+9. `dailyDataLimitMb = 0` disables the budget (default). Set a positive value only when bandwidth cost matters.

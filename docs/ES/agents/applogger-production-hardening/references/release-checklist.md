@@ -12,3 +12,4 @@
 10. `expire_beta_tester_mappings()` is scheduled via pg_cron (GDPR Art. 5.1.e — 90-day TTL).
 11. Consent level (`STRICT` / `MARKETING`) configured correctly — `STRICT` suppresses `user_id` and pseudonymizes `device_id`.
 12. `environment("production")` is set explicitly in `AppLoggerConfig.Builder()`.
+13. DataBudgetManager: if `dailyDataLimitMb > 0`, verify that ERROR/CRITICAL events still arrive after the limit is exceeded. Verify the limit is appropriate for expected daily volume — too low causes silent shedding of non-critical telemetry.

@@ -25,6 +25,8 @@ Use this skill when the user needs:
 8. Recommend `logCatching{}` to replace try/catch boilerplate around operations that should log on failure.
 9. Recommend `loggerTag<T>()` for companion objects to avoid string literal tags.
 10. `extra` values accept `Map<String, Any>` — Int, Long, Double, Boolean are preserved as native JSON primitives in Supabase JSONB, enabling typed queries.
+11. For operations that need duration measurement, recommend `OperationTrace` via `AppLoggerSDK.startTrace(name, vararg attributes)` — it emits `trace.<name>` metric with `duration_ms` automatically on `end()` or an ERROR event on `endWithError(error)`.
+12. For bandwidth-sensitive production apps, recommend `dailyDataLimitMb(n)` in `AppLoggerConfig.Builder()` — the SDK sheds non-critical events when the daily byte limit is reached; ERROR and CRITICAL are never shed.
 
 ## Workflow
 

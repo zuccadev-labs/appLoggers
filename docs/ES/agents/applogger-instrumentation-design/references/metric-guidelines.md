@@ -97,6 +97,25 @@ class SearchRepository(private val logger: AppLogger) {
 | `db_query_time` | `ms` | `table`, `operation` |
 | `db_write_time` | `ms` | `table` |
 
+### Spans de OperationTrace (automáticos)
+
+Emitidos automáticamente por `OperationTrace.end()`. El nombre es `trace.<operationName>`.
+
+| Nombre | Unidad | Tags automáticos | Tags personalizados |
+|---|---|---|---|
+| `trace.<operationName>` | `ms` | `duration_ms`, `trace_id`, `success` | Todos los añadidos con `tag()` |
+| `trace.<operationName>` | `ms` | + `timed_out`, `timeout_ms` | Cuando `withTimeout()` expira |
+| `trace.<operationName>` | `ms` | + `bytes_transferred`, `throughput_mbps` | Cuando `bytes()` fue llamado |
+
+Ejemplo de span completo:
+```kotlin
+AppLoggerSDK.startTrace("api_call", "endpoint" to url)
+    .withTimeout(5_000)
+    .bytes(responseBytes.size.toLong())
+    .end()
+// → trace.api_call con duration_ms, throughput_mbps, success, timed_out (si aplica)
+```
+
 ### Negocio
 
 | Nombre | Unidad | Tags recomendados |

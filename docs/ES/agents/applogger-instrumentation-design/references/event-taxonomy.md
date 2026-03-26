@@ -188,6 +188,51 @@ El extra `is_beta_tester` y `beta_tester_email` se inyectan como global extras �
 
 En Supabase, el trigger `trg_correlate_beta_tester` auto-correlaciona el email del frontend al backend en el mismo dispositivo via `device_id → email` mapping en `beta_tester_devices`.
 
+### 8. OperationTrace span events
+
+`OperationTrace` emite automáticamente al cerrar el span. No se instrumenta manualmente — solo se abre y cierra el span.
+
+```kotlin
+// Android — abrir span al inicio de la operación
+val trace = AppLoggerSDK.startTrace("checkout_flow", "payment_method" to "card")
+
+// Añadir contexto durante la operación
+trace.tag("amount_cents", 9900)
+
+// Cerrar con éxito → emite métrica trace.checkout_flow
+trace.end(mapOf("order_id" to orderId))
+
+// O cerrar con error → emite evento ERROR-level
+trace.endWithError(exception, failureReason = "card_declined")
+```
+
+**Métricas emitidas por `end()`:**
+
+```
+name:  "trace.checkout_flow"
+value: 1250.0                    // duration_ms
+unit:  "ms"
+tags:  {
+  duration_ms: 1250,
+  trace_id: "uuid",
+  success: true,
+  payment_method: "card",        // atributo inicial
+  amount_cents: 9900,            // añadido con tag()
+  order_id: "order-xyz"          // extraAttributes en end()
+}
+```
+
+**Eventos ERROR emitidos por `endWithError()`:**
+
+```
+tag:     "Trace.checkout_flow"
+message: "trace.checkout_flow failed after 3001ms"
+extra:   { duration_ms: 3001, trace_id: "uuid", success: false,
+           failure_reason: "card_declined", payment_method: "card" }
+```
+
+Ver `references/` de `applogger-advanced-features` para el API completa.
+
 ### 7. Remote config events (automáticos)
 
 ```kotlin

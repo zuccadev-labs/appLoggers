@@ -27,6 +27,7 @@ Use this skill when the integration already works and needs production quality:
 10. Remote config: verify `remoteConfigIntervalSeconds` is between 30–3600. Default polling disabled unless endpoint configured.
 11. Beta tester mode: `APPLOGGER_BETA_TESTER=true` is boolean only. Email captured at runtime from developer's auth flow — never hardcode emails in config.
 12. Beta tester data auto-expires after 90 days (GDPR Art. 5.1.e). Verify `expire_beta_tester_mappings()` is scheduled in production.
+13. DataBudgetManager: for bandwidth-sensitive apps, set `dailyDataLimitMb(n)` in `AppLoggerConfig.Builder()`. Default is `0` (disabled). On WiFi, effective limit doubles automatically (wifiMultiplier = 2×). ERROR and CRITICAL events are never shed regardless of budget state.
 
 ## Workflow
 

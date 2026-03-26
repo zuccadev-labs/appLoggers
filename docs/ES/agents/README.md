@@ -22,6 +22,7 @@ Cada carpeta sigue el formato estándar de Agent Skills:
 | Production hardening | Endurecer seguridad, privacidad y parametros para release | [applogger-production-hardening](applogger-production-hardening) |
 | Instrumentation design | Definir estrategia de eventos, tags y metricas de alto valor | [applogger-instrumentation-design](applogger-instrumentation-design) |
 | Integration validation | Ejecutar smoke checks y criterios de aceptacion de la integracion | [applogger-integration-validation](applogger-integration-validation) |
+| **Advanced features** ⭐ | Usar OperationTrace spans, DataBudgetManager, consent, distributed tracing, breadcrumbs y A/B testing | [applogger-advanced-features](applogger-advanced-features) |
 
 ### Operacional Skills (In-Repository)
 
@@ -88,6 +89,16 @@ Usa este skill para validar si la integracion ya esta lista, por ejemplo:
 1. "Haz smoke test de AppLogger"
 2. "Valida la integracion"
 3. "Dame checklist de QA"
+
+### Advanced features
+
+Usa este skill cuando la integración básica ya funciona y se necesitan capacidades avanzadas, por ejemplo:
+
+1. "Instrumenta el tiempo de carga con spans"
+2. "Limita cuántos datos envía el SDK por día"
+3. "Agrega breadcrumbs para debugging de navegación"
+4. "Correla eventos del frontend y backend en el mismo dispositivo"
+5. "Captura excepciones de coroutines automáticamente"
 
 ## Alcance
 

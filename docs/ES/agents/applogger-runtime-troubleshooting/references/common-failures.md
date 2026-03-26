@@ -11,6 +11,10 @@
 9. Passing `throwable` as 3rd positional argument to `warn()` when `anomalyType` is also intended — pass by name: `warn(tag, message, throwable = e, anomalyType = "TYPE")`.
 10. Android compile failure due to missing placeholders: `BuildConfig.LOGGER_URL`, `BuildConfig.LOGGER_KEY`, `BuildConfig.LOGGER_DEBUG`.
 11. iOS/KMP compile failure caused by using Android entrypoint `AppLoggerSDK` instead of `AppLoggerIos.shared`.
+12. Events lost after process termination — `BatchProcessor.shutdown()` must be called (or the lifecycle integration must trigger it) to flush pending events before the process exits. If events disappear after kill, verify the shutdown/flush path is wired to the app lifecycle.
+13. OperationTrace span never emits — forgot to call `end()` or `endWithError()`. Spans emit only on explicit close — they do not auto-close.
+14. `dailyDataLimitMb` budget exceeded silently — non-critical events stop arriving mid-day with no error. Check if volume drops abruptly around the same time each day; increase the limit or disable it (`dailyDataLimitMb = 0`) if unintended.
+15. `remote-config delete` fails silently — verify the `id` UUID matches an existing row in `device_remote_config`. Use `apploggers remote-config list` first to confirm.
 
 Fix policy for `local.properties`:
 
