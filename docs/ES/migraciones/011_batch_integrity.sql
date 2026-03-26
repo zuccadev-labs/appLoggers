@@ -9,5 +9,18 @@ CREATE TABLE IF NOT EXISTS log_batches (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_log_batches_sent_at ON log_batches (sent_at DESC);
+
+-- RLS: SDK (anon) inserts batch manifests; CLI (service_role) reads for verification
+ALTER TABLE log_batches ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY batch_sdk_insert ON log_batches
+    FOR INSERT TO anon
+    WITH CHECK (true);
+
+CREATE POLICY batch_service_all ON log_batches
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
+
 ALTER TABLE app_logs ADD COLUMN IF NOT EXISTS batch_id UUID NULL;
 CREATE INDEX IF NOT EXISTS idx_app_logs_batch_id ON app_logs (batch_id) WHERE batch_id IS NOT NULL;

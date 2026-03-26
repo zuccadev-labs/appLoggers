@@ -76,6 +76,13 @@ func newAgentCommand() *cobra.Command {
 					{Command: "telemetry stream", Description: "SSE stream (text/event-stream) for frontend EventSource consumers — polls Supabase at configurable interval", OutputModes: []string{"text"}, Stable: false},
 					{Command: "telemetry tail", Description: "Human-friendly follow mode — prints new events as they arrive (tail -f equivalent)", OutputModes: []string{"text", "json"}, Stable: false},
 					{Command: "telemetry stats", Description: "Quick statistical summary: error rate, top tags, events per hour, by environment — supports all standard filters", OutputModes: []string{"text", "json", "agent"}, Stable: false},
+					{Command: "remote-config list", Description: "List active remote config entries — filter by --environment, --fingerprint", OutputModes: []string{"text", "json", "csv"}, Stable: true},
+					{Command: "remote-config set", Description: "Create/update remote config — control SDK debug, min-level, sampling, tag filters per device or globally", OutputModes: []string{"text", "json"}, Stable: true},
+					{Command: "remote-config delete", Description: "Delete remote config entry by --id or --fingerprint", OutputModes: []string{"text", "json"}, Stable: true},
+					{Command: "verify", Description: "Batch integrity verification via HMAC-SHA256 against log_batches manifest", OutputModes: []string{"text", "json", "agent"}, Stable: true},
+					{Command: "erase", Description: "GDPR Art. 17 data erasure by --user-id or --device-id with cascade to all tables", OutputModes: []string{"text", "json", "agent"}, Stable: true},
+					{Command: "audit privacy", Description: "Analyze logs for PII and consent compliance", OutputModes: []string{"text", "json", "agent"}, Stable: false},
+					{Command: "explain", Description: "Generate human-readable explanation of telemetry events", OutputModes: []string{"text", "json"}, Stable: false},
 				},
 			}
 			if outputFormat == "json" {

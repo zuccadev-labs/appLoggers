@@ -2,6 +2,8 @@ package com.applogger.core
 
 private const val LARGE_BATCH_THRESHOLD = 50
 private const val SHORT_FLUSH_THRESHOLD = 10
+private const val REMOTE_CONFIG_INTERVAL_MIN = 30
+private const val REMOTE_CONFIG_INTERVAL_MAX = 3600
 
 /**
  * Immutable configuration for the AppLogger SDK.
@@ -113,7 +115,22 @@ data class AppLoggerConfig(
      * Daily data limit in megabytes. When reached, non-critical events are shed
      * until the next UTC day. Set to 0 to disable (default).
      */
-    val dailyDataLimitMb: Int = 0
+    val dailyDataLimitMb: Int = 0,
+    /**
+     * Enables remote configuration polling from the `device_remote_config` Supabase table.
+     * When enabled, the SDK fetches per-device or global overrides (minLevel, tag filters,
+     * sampling rate, debug mode) on initialization and periodically thereafter.
+     *
+     * Requires [endpoint] and [apiKey] to be configured.
+     * Default: false.
+     */
+    val remoteConfigEnabled: Boolean = false,
+    /**
+     * Interval in seconds between remote config polls.
+     * Only effective when [remoteConfigEnabled] is true.
+     * Default: 300 (5 minutes). Range: 30–3600.
+     */
+    val remoteConfigIntervalSeconds: Int = 300
 ) {
     @Suppress("TooManyFunctions")
     class Builder {
@@ -137,6 +154,8 @@ data class AppLoggerConfig(
         private var dataMinimizationEnabled: Boolean = true
         private var integritySecret: String = ""
         private var dailyDataLimitMb: Int = 0
+        private var remoteConfigEnabled: Boolean = false
+        private var remoteConfigIntervalSeconds: Int = 300
 
         fun endpoint(url: String) = apply { endpoint = url }
         fun apiKey(key: String) = apply { apiKey = key }
@@ -161,6 +180,10 @@ data class AppLoggerConfig(
         fun dataMinimizationEnabled(enabled: Boolean) = apply { dataMinimizationEnabled = enabled }
         fun integritySecret(secret: String) = apply { integritySecret = secret.trim() }
         fun dailyDataLimitMb(mb: Int) = apply { dailyDataLimitMb = maxOf(0, mb) }
+        fun remoteConfigEnabled(enabled: Boolean) = apply { remoteConfigEnabled = enabled }
+        fun remoteConfigIntervalSeconds(sec: Int) = apply {
+            remoteConfigIntervalSeconds = sec.coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX)
+        }
 
         fun build(): AppLoggerConfig {
             require(endpoint.startsWith("https://") || isDebugMode || endpoint.isEmpty()) {
@@ -186,7 +209,10 @@ data class AppLoggerConfig(
                 defaultConsentLevel = defaultConsentLevel,
                 dataMinimizationEnabled = dataMinimizationEnabled,
                 integritySecret = integritySecret,
-                dailyDataLimitMb = dailyDataLimitMb
+                dailyDataLimitMb = dailyDataLimitMb,
+                remoteConfigEnabled = remoteConfigEnabled,
+                remoteConfigIntervalSeconds = remoteConfigIntervalSeconds
+                    .coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX)
             )
         }
     }

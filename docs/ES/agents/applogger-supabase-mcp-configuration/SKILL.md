@@ -40,10 +40,15 @@ Primary use cases:
 ## Expected backend contract
 
 1. `app_logs` and `app_metrics` tables exist.
-2. RLS enabled in both tables.
-3. anon can insert via `sdk_insert_*` policies.
-4. service_role can read via `monitor_read_*` policies.
-5. `authenticated_read_*` global policies are absent by default.
+2. `log_batches` table exists (batch integrity manifests).
+3. `device_remote_config` table exists (remote debug control per device).
+4. `beta_tester_devices` table exists (auto-correlation of tester emails).
+5. RLS enabled in all tables.
+6. anon can insert via `sdk_insert_*` policies.
+7. anon can SELECT `device_remote_config` (enabled rows only).
+8. service_role can read/write via `monitor_read_*` / `service_all` policies.
+9. `authenticated_read_*` global policies are absent by default.
+10. Trigger `trg_correlate_beta_tester` on `app_logs` auto-fills beta tester email.
 
 ## Gaps outside MCP
 

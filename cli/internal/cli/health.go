@@ -19,11 +19,14 @@ type healthPayload struct {
 }
 
 type healthDeepResult struct {
-	SupabaseReachable bool   `json:"supabase_reachable"`
-	LatencyMs         int64  `json:"latency_ms"`
-	LogsTableOK       bool   `json:"logs_table_ok"`
-	MetricsTableOK    bool   `json:"metrics_table_ok"`
-	Error             string `json:"error,omitempty"`
+	SupabaseReachable   bool   `json:"supabase_reachable"`
+	LatencyMs           int64  `json:"latency_ms"`
+	LogsTableOK         bool   `json:"logs_table_ok"`
+	MetricsTableOK      bool   `json:"metrics_table_ok"`
+	LogBatchesTableOK   bool   `json:"log_batches_table_ok"`
+	RemoteConfigTableOK bool   `json:"remote_config_table_ok"`
+	BetaTesterTableOK   bool   `json:"beta_tester_table_ok"`
+	Error               string `json:"error,omitempty"`
 }
 
 func newHealthCommand() *cobra.Command {
@@ -126,5 +129,21 @@ func probeSupabase(cfg supabaseConfig) *healthDeepResult {
 	cancel2() // explicit cancel
 	result.MetricsTableOK = metricsErr == nil
 
+	// Probe additional tables (non-blocking — degraded status not triggered by these)
+	result.LogBatchesTableOK = probeTable(cfg, "log_batches")
+	result.RemoteConfigTableOK = probeTable(cfg, "device_remote_config")
+	result.BetaTesterTableOK = probeTable(cfg, "beta_tester_devices")
+
 	return result
+}
+
+// probeTable performs a lightweight SELECT limit=1 against the given table.
+func probeTable(cfg supabaseConfig, table string) bool {
+	probeCfg := cfg
+	probeCfg.LogsTable = table
+	req := telemetryQueryRequest{Source: "logs", Limit: 1, Order: "desc"}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout())
+	_, err := queryTelemetry(ctx, probeCfg, req)
+	cancel()
+	return err == nil
 }

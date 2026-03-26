@@ -40,7 +40,13 @@ interface BatchManifestCapable {
      * Persists a batch manifest record for later integrity verification.
      * Called after a batch is successfully sent.
      */
-    suspend fun storeBatchManifest(batchId: String, hash: String, eventCount: Int)
+    suspend fun storeBatchManifest(
+        batchId: String,
+        hash: String,
+        eventCount: Int,
+        environment: String = "",
+        sdkVersion: String = ""
+    )
 }
 
 /**

@@ -2,11 +2,16 @@ package cli
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,6 +24,8 @@ const (
 	batchStatusOK         batchVerifyStatus = "OK"
 	batchStatusIncomplete batchVerifyStatus = "INCOMPLETE"
 	batchStatusNoHash     batchVerifyStatus = "NO_HASH"
+	batchStatusTampered   batchVerifyStatus = "TAMPERED"
+	batchStatusNoSecret   batchVerifyStatus = "NO_SECRET"
 )
 
 type batchVerifyResult struct {
@@ -38,6 +45,8 @@ type verifyReport struct {
 	OKCount      int                 `json:"ok_count"`
 	Incomplete   int                 `json:"incomplete_count"`
 	NoHash       int                 `json:"no_hash_count"`
+	NoSecret     int                 `json:"no_secret_count"`
+	Tampered     int                 `json:"tampered_count"`
 	Results      []batchVerifyResult `json:"results"`
 }
 
@@ -82,6 +91,8 @@ func newVerifyCommand() *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout())
 			defer cancel()
 
+			client := supabaseHTTPClient(cfg)
+
 			// Fetch batch manifests in range
 			batches, err := fetchBatchManifests(ctx, cfg, from, to, environment)
 			if err != nil {
@@ -89,7 +100,7 @@ func newVerifyCommand() *cobra.Command {
 			}
 
 			results := make([]batchVerifyResult, 0, len(batches))
-			okCount, incompleteCount, noHashCount := 0, 0, 0
+			okCount, incompleteCount, noHashCount, noSecretCount, tamperedCount := 0, 0, 0, 0, 0
 
 			for _, batch := range batches {
 				batchID, _ := batch["batch_id"].(string)
@@ -98,7 +109,7 @@ func newVerifyCommand() *cobra.Command {
 				hash, _ := batch["batch_hash"].(string)
 
 				// Count actual events for this batch_id
-				actualCount, err := countEventsByBatchID(ctx, cfg, batchID)
+				actualCount, err := countEventsByBatchID(ctx, cfg, client, batchID)
 				if err != nil {
 					actualCount = -1
 				}
@@ -108,12 +119,26 @@ func newVerifyCommand() *cobra.Command {
 				case strings.TrimSpace(hash) == "":
 					status = batchStatusNoHash
 					noHashCount++
-				case actualCount == expectedCount:
-					status = batchStatusOK
-					okCount++
-				default:
+				case actualCount != expectedCount:
 					status = batchStatusIncomplete
 					incompleteCount++
+				case cfg.IntegritySecret == "":
+					// Count matches but cannot verify HMAC without secret — NOT counted as OK
+					status = batchStatusNoSecret
+					noSecretCount++
+				default:
+					// Full HMAC verification: fetch events, compute hash, compare
+					computedHash, hashErr := computeBatchHMAC(ctx, cfg, client, batchID, cfg.IntegritySecret)
+					if hashErr != nil {
+						status = batchStatusIncomplete
+						incompleteCount++
+					} else if subtle.ConstantTimeCompare([]byte(computedHash), []byte(hash)) == 1 {
+						status = batchStatusOK
+						okCount++
+					} else {
+						status = batchStatusTampered
+						tamperedCount++
+					}
 				}
 
 				results = append(results, batchVerifyResult{
@@ -126,7 +151,7 @@ func newVerifyCommand() *cobra.Command {
 			}
 
 			report := verifyReport{
-				OK:           true,
+				OK:           tamperedCount == 0 && incompleteCount == 0,
 				From:         from,
 				To:           to,
 				Environment:  environment,
@@ -134,6 +159,8 @@ func newVerifyCommand() *cobra.Command {
 				OKCount:      okCount,
 				Incomplete:   incompleteCount,
 				NoHash:       noHashCount,
+				NoSecret:     noSecretCount,
+				Tampered:     tamperedCount,
 				Results:      results,
 			}
 
@@ -210,21 +237,28 @@ func fetchBatchManifests(ctx context.Context, cfg supabaseConfig, from, to, envi
 	return rows, nil
 }
 
-func countEventsByBatchID(ctx context.Context, cfg supabaseConfig, batchID string) (int, error) {
+// computeBatchHMAC fetches all events for a batch_id, sorts by id, builds the canonical
+// string and computes HMAC-SHA256 — mirroring the SDK's BatchIntegrityManager.computeHash().
+//
+// Canonical format: events sorted by id, joined with "|":
+//
+//	"${id}:${timestamp}:${level}:${tag}:${message[:200]}"
+func computeBatchHMAC(ctx context.Context, cfg supabaseConfig, client *http.Client, batchID, secret string) (string, error) {
 	base, err := url.Parse(strings.TrimSpace(cfg.URL))
 	if err != nil {
-		return 0, err
+		return "", fmt.Errorf("invalid URL: %w", err)
 	}
 	base.Path = path.Join(base.Path, "rest", "v1", cfg.LogsTable)
 	q := base.Query()
-	q.Set("select", "id")
+	q.Set("select", "id,timestamp,level,tag,message")
 	q.Set("batch_id", "eq."+batchID)
-	q.Set("limit", "1000")
+	q.Set("order", "id.asc")
+	q.Set("limit", "100000")
 	base.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	req.Header.Set("apikey", cfg.APIKey)
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
@@ -233,40 +267,65 @@ func countEventsByBatchID(ctx context.Context, cfg supabaseConfig, batchID strin
 		req.Header.Set("Accept-Profile", cfg.Schema)
 	}
 
-	client := supabaseHTTPClient(cfg)
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return 0, fmt.Errorf("status %d", resp.StatusCode)
+		return "", fmt.Errorf("HTTP %d fetching batch events", resp.StatusCode)
 	}
 
-	rows := make([]map[string]any, 0)
-	if len(strings.TrimSpace(string(body))) > 0 {
-		if err := decodeJSONBytes(body, &rows); err != nil {
-			return 0, err
-		}
+	var events []map[string]any
+	if err := decodeJSONBytes(body, &events); err != nil {
+		return "", err
 	}
-	return len(rows), nil
+
+	// Sort by id (should already be sorted, but enforce for correctness)
+	sort.Slice(events, func(i, j int) bool {
+		idI, _ := events[i]["id"].(string)
+		idJ, _ := events[j]["id"].(string)
+		return idI < idJ
+	})
+
+	// Build canonical string matching SDK: "${id}:${timestamp}:${level}:${tag}:${message[:200]}"
+	parts := make([]string, 0, len(events))
+	for _, evt := range events {
+		id, _ := evt["id"].(string)
+		// timestamp is a BIGINT (epoch millis) — PostgREST returns it as float64
+		tsFloat, _ := evt["timestamp"].(float64)
+		ts := fmt.Sprintf("%d", int64(tsFloat))
+		level, _ := evt["level"].(string)
+		tag, _ := evt["tag"].(string)
+		msg, _ := evt["message"].(string)
+		// Truncate at 200 characters (not bytes) to match SDK's message.take(200)
+		if runes := []rune(msg); len(runes) > 200 {
+			msg = string(runes[:200])
+		}
+		parts = append(parts, fmt.Sprintf("%s:%s:%s:%s:%s", id, ts, level, tag, msg))
+	}
+	canonical := strings.Join(parts, "|")
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(canonical))
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 func printVerifyReport(out io.Writer, r verifyReport) error {
 	_, err := fmt.Fprintf(out,
-		"verify:\n  from: %s\n  to: %s\n  total_batches: %d\n  ok: %d\n  incomplete: %d\n  no_hash: %d\n",
-		r.From, r.To, r.TotalBatches, r.OKCount, r.Incomplete, r.NoHash,
+		"verify:\n  from: %s\n  to: %s\n  total_batches: %d\n  ok: %d\n  incomplete: %d\n  no_hash: %d\n  no_secret: %d\n  tampered: %d\n",
+		r.From, r.To, r.TotalBatches, r.OKCount, r.Incomplete, r.NoHash, r.NoSecret, r.Tampered,
 	)
 	if err != nil {
 		return err
 	}
 	for _, res := range r.Results {
-		if res.Status != batchStatusOK {
+		if res.Status != batchStatusOK && res.Status != batchStatusNoSecret {
 			if _, e := fmt.Fprintf(out, "  [%s] batch=%s expected=%d actual=%d\n",
 				res.Status, res.BatchID, res.ExpectedCount, res.ActualCount); e != nil {
 				return e

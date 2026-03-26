@@ -164,3 +164,37 @@ if (issues.isNotEmpty()) {
 ```
 
 `validate()` detecta: endpoint en blanco, endpoint sin HTTPS en producción, apiKey en blanco o sin formato JWT, environment en blanco, combinación batchSize/flushInterval problemática, y `isDebugMode=true` con `environment="production"`.
+
+---
+
+## Remote Config — Tuning del polling
+
+El SDK puede recibir overrides remotos desde la tabla `device_remote_config` de Supabase. El polling se configura en el builder:
+
+```kotlin
+AppLoggerConfig.Builder()
+    .remoteConfigIntervalSeconds(300)  // 30–3600, default 300
+    .build()
+```
+
+| Escenario | Intervalo recomendado |
+|---|---|
+| Producción normal | 300 s (5 min) |
+| Debugging activo de un dispositivo | 60 s (1 min) |
+| Apps con bajo volumen | 600 s (10 min) |
+| Apps reguladas (mínima latencia de activación) | 30 s |
+
+El remote config permite activar/desactivar remotamente:
+
+- `debugEnabled` — habilita debug logging sin rebuild
+- `minLevel` — cambia el nivel mínimo de log
+- `tagsAllow` / `tagsBlock` — filtra tags específicos
+- `samplingRate` — 0.0–1.0 porcentaje de eventos que pasan
+
+> ERROR y CRITICAL siempre pasan independientemente del remote config.
+
+### Device fingerprint en remote config
+
+El CLI envía el fingerprint SHA-256 al crear un remote config entry. El SDK compara su propio fingerprint contra los registros de la tabla para aplicar configs device-specific o globales (fingerprint=NULL).
+
+Prioridad: config con fingerprint específico > config global (fingerprint=NULL).

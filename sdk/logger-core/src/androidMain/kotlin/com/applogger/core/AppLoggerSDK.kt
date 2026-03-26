@@ -16,6 +16,7 @@ private const val MIN_ADAPTIVE_BUFFER_CAPACITY = 50
 private const val MAX_ADAPTIVE_BUFFER_CAPACITY = 5000
 private const val BYTES_PER_MB = 1_048_576L
 private const val MAX_INSTALL_PACKAGE_LENGTH = 64
+private const val REMOTE_CONFIG_TIMEOUT_MS = 10_000
 
 /**
  * Android entry point for the AppLogger SDK.
@@ -55,6 +56,15 @@ object AppLoggerSDK : AppLogger {
 
     @Volatile
     private var appContextRef: android.content.Context? = null
+
+    @Volatile
+    private var deviceFingerprint: String = ""
+
+    @Volatile
+    private var resolvedConfigRef: AppLoggerConfig? = null
+
+    @Volatile
+    private var remoteConfigTimer: java.util.Timer? = null
 
     /**
      * Initializes the SDK. Must be called exactly once, in `Application.onCreate()`.
@@ -104,8 +114,10 @@ object AppLoggerSDK : AppLogger {
             maxCapacity = bufferCapacity,
             overflowPolicy = resolvedConfig.bufferOverflowPolicy
         )
+        val budgetPersistence = SharedPrefsDataBudgetPersistence(prefs)
+        val networkTypeProvider: () -> String = { captureNetworkType(appContext) ?: "unknown" }
         val dataBudget = if (resolvedConfig.dailyDataLimitMb > 0)
-            DataBudgetManager(resolvedConfig.dailyDataLimitMb * BYTES_PER_MB)
+            DataBudgetManager(resolvedConfig.dailyDataLimitMb * BYTES_PER_MB, budgetPersistence, networkTypeProvider)
         else DataBudgetManager(DataBudgetManager.DISABLED)
         val integrityManager = if (resolvedConfig.integritySecret.isNotBlank())
             BatchIntegrityManager(resolvedConfig.integritySecret) else null
@@ -128,17 +140,37 @@ object AppLoggerSDK : AppLogger {
             consentProvider = { consentLevel },
             deviceIdAnonymizer = { id -> sha256Hex(id) }
         )
+        wireInstance(appContext, resolvedConfig, impl, sessionManager, processor, transport, buffer, bufferCapacity)
+    }
 
-        // Capture install source and attach to global context
+    @Suppress("LongParameterList")
+    private fun wireInstance(
+        appContext: Context,
+        config: AppLoggerConfig,
+        impl: AppLoggerImpl,
+        sessionManager: SessionManager,
+        processor: BatchProcessor,
+        transport: LogTransport?,
+        buffer: InMemoryBuffer,
+        bufferCapacity: Int
+    ) {
+        deviceFingerprint = captureDeviceFingerprint(appContext)
+        impl.addGlobalExtra("device_fingerprint", deviceFingerprint)
+        impl.addGlobalExtra("app_package", appContext.packageName)
         impl.addGlobalExtra("install_source", captureInstallSource(appContext))
 
         instance = impl
         implRef = impl
         sessionManagerRef = sessionManager
+        resolvedConfigRef = config
         updateHealthReferences(processor, transport ?: NoOpTransport(), buffer, bufferCapacity)
 
-        if (!resolvedConfig.isDebugMode) AndroidCrashHandler(impl).install()
+        if (!config.isDebugMode) AndroidCrashHandler(impl).install()
         registerLifecycleObservers(impl, sessionManager)
+
+        if (config.remoteConfigEnabled) {
+            startRemoteConfigPolling(config, impl)
+        }
     }
 
     private fun resolveConfig(appContext: Context, config: AppLoggerConfig): AppLoggerConfig {
@@ -322,6 +354,51 @@ object AppLoggerSDK : AppLogger {
     fun getConsent(): ConsentLevel = consentLevel
 
     /**
+     * Marks the current user as a beta tester with their email for identification.
+     *
+     * The email must come from the developer's own auth flow (Google Sign-In,
+     * Firebase Auth, custom login, etc.) — the SDK does not capture it.
+     * `APPLOGGER_BETA_TESTER=true` in `local.properties` activates the mode;
+     * the developer calls this method with the email obtained at runtime.
+     *
+     * Injects `is_beta_tester = "true"` and `beta_tester_email` into every
+     * subsequent event's `extra` JSONB field.
+     *
+     * ## Usage
+     * ```kotlin
+     * // In your login/auth callback — NOT from a config variable
+     * if (BuildConfig.IS_BETA_TESTER) {
+     *     val email = googleAccount.email  // from YOUR auth flow
+     *     AppLoggerSDK.setBetaTester(email)
+     * }
+     * ```
+     *
+     * ## Query in Supabase
+     * ```sql
+     * SELECT * FROM app_logs WHERE extra->>'is_beta_tester' = 'true';
+     * SELECT * FROM app_logs WHERE extra->>'beta_tester_email' = 'tester@example.com';
+     * ```
+     *
+     * @param email The beta tester's email captured from the developer's auth flow.
+     *              Blank values are ignored.
+     */
+    fun setBetaTester(email: String) {
+        val trimmed = email.trim()
+        if (trimmed.isBlank()) return
+        implRef?.addGlobalExtra("beta_tester_email", trimmed)
+        implRef?.addGlobalExtra("is_beta_tester", "true")
+    }
+
+    /**
+     * Removes beta tester identification from subsequent events.
+     * Previously sent events retain the beta tester data.
+     */
+    fun clearBetaTester() {
+        implRef?.removeGlobalExtra("beta_tester_email")
+        implRef?.removeGlobalExtra("is_beta_tester")
+    }
+
+    /**
      * Tags the session with an A/B test or experiment variant.
      * Stored as top-level `variant` column for efficient group queries.
      * Pass null to clear.
@@ -354,12 +431,16 @@ object AppLoggerSDK : AppLogger {
      */
     @VisibleForTesting
     fun reset() {
+        remoteConfigTimer?.cancel()
+        remoteConfigTimer = null
         isInitialized.set(false)
         instance = NoOpLogger()
         implRef = null
         sessionManagerRef = null
+        resolvedConfigRef = null
         consentLevel = ConsentLevel.MARKETING
         appContextRef = null
+        deviceFingerprint = ""
         AppLoggerHealth.initialized = false
         AppLoggerHealth.processor = null
         AppLoggerHealth.transport = null
@@ -480,6 +561,171 @@ object AppLoggerSDK : AppLogger {
         else -> pkg.take(MAX_INSTALL_PACKAGE_LENGTH)
     }
 
+    /**
+     * Returns the persistent device fingerprint captured during initialization.
+     * On Android this is `Settings.Secure.ANDROID_ID` — survives app reinstalls.
+     * Returns empty string if SDK is not initialized.
+     */
+    fun getDeviceFingerprint(): String = deviceFingerprint
+
+    /**
+     * Manually triggers a remote config refresh from the `device_remote_config` table.
+     * No-op if remote config is not enabled or SDK is not initialized.
+     */
+    fun refreshRemoteConfig() {
+        appContextRef ?: return
+        val impl = implRef ?: return
+        val cfg = resolvedConfigRef ?: return
+        if (!cfg.remoteConfigEnabled) return
+        fetchAndApplyRemoteConfig(cfg, impl)
+    }
+
+    /**
+     * Captures a persistent, pseudonymized device fingerprint.
+     *
+     * Formula: `SHA-256(ANDROID_ID + ":" + package_name)`
+     *
+     * Properties:
+     * - **Persistent**: survives app reinstalls (only resets on factory reset).
+     * - **Unique per app**: two apps on the same device produce different hashes.
+     * - **GDPR Art. 25 compliant**: pseudonymized — cannot be reversed to the raw ANDROID_ID.
+     * - **Deterministic**: same device + same app = same hash, always.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun captureDeviceFingerprint(context: android.content.Context): String {
+        return try {
+            val androidId = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ) ?: return ""
+            val packageName = context.packageName ?: return ""
+            sha256Hex("$androidId:$packageName")
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    /**
+     * Fetches remote config from the `device_remote_config` table and applies overrides.
+     * Queries: device-specific rule first (by fingerprint), then global fallback.
+     * Thread-safe: can be called from any thread.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun fetchAndApplyRemoteConfig(
+        config: AppLoggerConfig,
+        impl: AppLoggerImpl
+    ) {
+        val fingerprint = deviceFingerprint
+        val env = config.environment
+        val baseUrl = "${config.endpoint.trimEnd('/')}/rest/v1/device_remote_config"
+
+        try {
+            // Query: device-specific + global, enabled only, ordered so device-specific wins
+            val query = buildString {
+                append(baseUrl)
+                append("?enabled=eq.true")
+                append("&select=min_level,debug_enabled,tags_allow,tags_block,sampling_rate,device_fingerprint")
+                append("&or=(device_fingerprint.eq.$fingerprint,device_fingerprint.is.null)")
+                if (env.isNotBlank()) {
+                    append("&or=(environment.eq.$env,environment.is.null)")
+                }
+                append("&order=device_fingerprint.desc.nullslast")
+                append("&limit=2")
+            }
+
+            val url = java.net.URL(query)
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("apikey", config.apiKey)
+            conn.setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+            conn.setRequestProperty("Accept", "application/json")
+            conn.connectTimeout = REMOTE_CONFIG_TIMEOUT_MS
+            conn.readTimeout = REMOTE_CONFIG_TIMEOUT_MS
+
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                conn.disconnect()
+                return
+            }
+
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            conn.disconnect()
+
+            val overrides = parseRemoteConfigResponse(body)
+            impl.applyRemoteConfig(overrides)
+        } catch (_: Exception) {
+            // Remote config is best-effort — never crash the app
+        }
+    }
+
+    /**
+     * Parses the PostgREST JSON array response into [RemoteConfigOverrides].
+     * First row with non-null device_fingerprint wins (device-specific),
+     * otherwise falls back to global row.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun parseRemoteConfigResponse(json: String): RemoteConfigOverrides? {
+        return try {
+            val arr = org.json.JSONArray(json)
+            if (arr.length() == 0) return null
+
+            // Pick the best row: device-specific (non-null fingerprint) wins
+            var bestRow: org.json.JSONObject? = null
+            for (i in 0 until arr.length()) {
+                val row = arr.getJSONObject(i)
+                if (!row.isNull("device_fingerprint")) {
+                    bestRow = row
+                    break
+                }
+                if (bestRow == null) bestRow = row
+            }
+            if (bestRow == null) return null
+
+            val minLevel = if (bestRow.isNull("min_level")) null else {
+                runCatching { LogMinLevel.valueOf(bestRow.getString("min_level").uppercase()) }.getOrNull()
+            }
+            val debugEnabled = if (bestRow.isNull("debug_enabled")) null else bestRow.getBoolean("debug_enabled")
+            val samplingRate = if (bestRow.isNull("sampling_rate")) null else bestRow.getDouble("sampling_rate")
+
+            val allowedTags = if (bestRow.isNull("tags_allow")) null else {
+                val a = bestRow.getJSONArray("tags_allow")
+                (0 until a.length()).map { a.getString(it) }.toSet()
+            }
+            val blockedTags = if (bestRow.isNull("tags_block")) null else {
+                val a = bestRow.getJSONArray("tags_block")
+                (0 until a.length()).map { a.getString(it) }.toSet()
+            }
+
+            RemoteConfigOverrides(
+                minLevel = minLevel,
+                debugEnabled = debugEnabled,
+                allowedTags = allowedTags,
+                blockedTags = blockedTags,
+                samplingRate = samplingRate
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Starts the background polling timer for remote config.
+     * Uses a simple Timer thread — lightweight, no coroutine dependency.
+     */
+    private fun startRemoteConfigPolling(
+        config: AppLoggerConfig,
+        impl: AppLoggerImpl
+    ) {
+        val intervalMs = config.remoteConfigIntervalSeconds * 1000L
+        val timer = java.util.Timer("AppLogger-RemoteConfig", true)
+        timer.schedule(object : java.util.TimerTask() {
+            override fun run() {
+                fetchAndApplyRemoteConfig(config, impl)
+            }
+        }, 0L, intervalMs)
+        remoteConfigTimer = timer
+    }
+
     private fun buildOfflineStorage(context: Context, config: AppLoggerConfig): OfflineStorage =
         when (config.offlinePersistenceMode) {
             OfflinePersistenceMode.NONE -> NoOpOfflineStorage
@@ -559,6 +805,24 @@ internal class NoOpTransport : LogTransport {
  *
  * The returned lambda uses cached network state — no I/O on the calling thread.
  */
+/**
+ * SharedPreferences-backed persistence for [DataBudgetManager].
+ * Survives process restarts within the same UTC day.
+ */
+private class SharedPrefsDataBudgetPersistence(
+    private val prefs: android.content.SharedPreferences
+) : com.applogger.core.internal.DataBudgetPersistence {
+    override fun loadBytesUsed(): Long = prefs.getLong(KEY_BYTES, 0L)
+    override fun loadDayIndex(): Int = prefs.getInt(KEY_DAY, 0)
+    override fun save(bytesUsed: Long, dayIndex: Int) {
+        prefs.edit().putLong(KEY_BYTES, bytesUsed).putInt(KEY_DAY, dayIndex).apply()
+    }
+    companion object {
+        private const val KEY_BYTES = "data_budget_bytes_today"
+        private const val KEY_DAY = "data_budget_day_index"
+    }
+}
+
 fun androidNetworkAvailabilityProvider(context: Context): () -> Boolean {
     val appContext = context.applicationContext
     return {

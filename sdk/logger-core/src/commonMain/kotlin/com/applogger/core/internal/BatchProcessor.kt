@@ -60,6 +60,7 @@ internal class BatchProcessor(
     }
 
     fun enqueue(event: LogEvent) {
+        if (!scope.isActive) return
         val isCritical = event.level == LogLevel.ERROR || event.level == LogLevel.CRITICAL
         if (dataBudget.shouldShedLowPriority && !isCritical) {
             if (config.verboseTransportLogging) {
@@ -67,9 +68,9 @@ internal class BatchProcessor(
             }
             return
         }
-        val accepted = eventChannel.trySend(event).isSuccess
-        if (!accepted && config.verboseTransportLogging) {
-            platformLog("AppLogger", "Event dropped: channel at capacity")
+        val result = eventChannel.trySend(event)
+        if (result.isFailure && config.verboseTransportLogging) {
+            platformLog("AppLogger", "Event dropped: channel closed or at capacity")
         }
     }
 
@@ -145,10 +146,13 @@ internal class BatchProcessor(
 
     private suspend fun storeBatchManifest(packet: BatchPacket) {
         runCatching {
+            val firstEvent = packet.events.firstOrNull()
             (transport as? BatchManifestCapable)?.storeBatchManifest(
                 batchId = packet.batchId,
                 hash = packet.hash,
-                eventCount = packet.events.size
+                eventCount = packet.events.size,
+                environment = firstEvent?.environment ?: "",
+                sdkVersion = firstEvent?.sdkVersion ?: ""
             )
         }
     }
@@ -183,7 +187,13 @@ internal class BatchProcessor(
             if (config.verboseTransportLogging) {
                 platformLog("AppLogger", "Retry #$consecutiveFailures in ${delayMs}ms")
             }
-            delay(delayMs)
+            try {
+                delay(delayMs)
+            } catch (_: CancellationException) {
+                // Scope cancelled during backoff — persist events instead of losing them
+                persistOrRequeue(batch)
+                return
+            }
         } else {
             // Reintentos agotados: persiste offline si está configurado, sino DLQ en memoria.
             // NO reseteamos consecutiveFailures aquí — el transporte sigue caído.
@@ -196,9 +206,10 @@ internal class BatchProcessor(
             if (config.verboseTransportLogging) {
                 platformLog("AppLogger", "Max retries exhausted, ${batch.size} events persisted/DLQ")
             }
-            // Reset solo el contador de intentos del batch actual, no el estado global de fallos.
-            // Esto permite que el próximo batch empiece con backoff máximo, no desde cero.
-            consecutiveFailures = maxRetries
+            // Reset al penúltimo nivel: el próximo batch fallido incrementa a maxRetries
+            // y obtiene UN reintento con backoff máximo antes de ir a DLQ.
+            // Evita que consecutiveFailures > maxRetries provoque 0 retries en batches siguientes.
+            consecutiveFailures = maxRetries - 1
         }
     }
 
@@ -214,6 +225,8 @@ internal class BatchProcessor(
     }
 
     fun shutdown() {
+        // Drain any remaining buffered events before closing
+        runCatching { kotlinx.coroutines.runBlocking { sendBatch() } }
         eventChannel.close()
         scope.cancel()
     }

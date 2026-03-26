@@ -12,12 +12,16 @@
 8. `008_add_metrics_environment.sql` — agrega `environment` top-level en `app_metrics`
 9. `009_add_missing_indexes.sql` — índices adicionales de performance
 
-9. `009_add_missing_indexes.sql` — índices adicionales de performance
+10. `010_log_batches.sql` — manifest table for batch integrity
+11. `011_add_variant_column.sql` — session variant / A/B test column
+12. `012_enterprise_indexes_views.sql` — GIN indexes on JSONB, analytics views
+13. `013_device_remote_config.sql` — remote config per device (remote debug control)
+14. `014_beta_tester_correlation.sql` — beta tester email auto-correlation trigger
 
 ## Verification checklist
 
 1. `mcp_supabase_list_migrations` includes all expected steps.
-2. `mcp_supabase_list_tables` shows `app_logs` and `app_metrics`.
+2. `mcp_supabase_list_tables` shows `app_logs`, `app_metrics`, `log_batches`, `device_remote_config`, `beta_tester_devices`.
 3. RLS exists and is aligned with operational model.
 4. Security advisors reviewed and recorded.
 5. Performance advisors reviewed and recorded.

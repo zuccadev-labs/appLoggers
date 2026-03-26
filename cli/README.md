@@ -13,9 +13,16 @@ AppLogger CLI is the command-line entry point for telemetry exploration and oper
 - Baseline commands:
   - `version`
   - `capabilities`
-  - `health`
+  - `health` / `health --deep`
   - `agent schema`
   - `telemetry query` (Supabase-backed)
+  - `telemetry stream` (SSE)
+  - `telemetry tail` (follow mode)
+  - `telemetry stats` (aggregation)
+  - `remote-config list` / `set` / `delete`
+  - `erase` (GDPR data erasure)
+  - `verify` (batch integrity)
+  - `upgrade`
 
 ## Agent-First Contract
 
@@ -266,6 +273,9 @@ applogger-cli telemetry query \
 - `severity`: logs only, group by `level`
 - `tag`: logs only, group by `tag`
 - `name`: metrics only, group by metric `name`
+- `day`: group by day UTC
+- `week`: group by week (Monday)
+- `environment`: group by environment (`production`, `staging`, `development`)
 
 ### Log Payload Notes
 
@@ -278,7 +288,53 @@ applogger-cli telemetry query \
 - `--package` maps to `extra.package_name` for module/package-level segmentation in logs.
 - `--error-code` maps to `extra.error_code` for operational error grouping.
 - `--contains` applies `ilike` filtering over `message` for fast development triage.
+- `--fingerprint` filters by SHA-256 pseudonymized device fingerprint via PostgREST JSONB: `extra->>device_fingerprint=eq.VALUE`. Logs only.
 - Project-based responses include `project` and `config_source` when the CLI resolved a project profile.
+
+### Remote Config Commands
+
+Manage device-level SDK configuration overrides stored in `device_remote_config` table:
+
+```bash
+# List active remote configs
+apploggers remote-config list --output json
+apploggers remote-config list --environment production --output json
+apploggers remote-config list --fingerprint "sha256..." --output json
+
+# Set remote config for a device (by fingerprint) or globally
+apploggers remote-config set \
+  --fingerprint "sha256..." \
+  --min-level warn \
+  --sampling 0.5 \
+  --debug false \
+  --output json
+
+# Delete remote config
+apploggers remote-config delete --fingerprint "sha256..." --output json
+apploggers remote-config delete --id 42 --output json
+```
+
+### GDPR Erasure Command
+
+Delete user or device data across all tables (`app_logs`, `app_metrics`, `log_batches`):
+
+```bash
+# Erase by user ID
+apploggers erase --user-id "user-123" --output json
+
+# Erase by device ID
+apploggers erase --device-id "device-456" --output json
+```
+
+### Health Deep Probe
+
+`health --deep` now probes 5 tables: `app_logs`, `app_metrics`, `log_batches`, `device_remote_config`, `beta_testers`:
+
+```bash
+apploggers health --deep --output json
+# Returns: supabase_reachable, latency_ms, logs_table_ok, metrics_table_ok,
+#          log_batches_table_ok, remote_config_table_ok, beta_tester_table_ok
+```
 
 ## Development
 

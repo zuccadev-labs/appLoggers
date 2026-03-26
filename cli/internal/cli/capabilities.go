@@ -45,6 +45,13 @@ func buildCapabilitiesPayload() capabilitiesPayload {
 			{Name: "telemetry stream", Description: "SSE stream (text/event-stream) for frontend EventSource consumers", Stability: "preview"},
 			{Name: "telemetry tail", Description: "Follow mode — prints new events as they arrive (tail -f equivalent), supports --output json", Stability: "preview"},
 			{Name: "telemetry stats", Description: "Quick statistical summary: error rate, top tags, events per hour, by environment — supports all standard filters", Stability: "preview"},
+			{Name: "remote-config list", Description: "List active remote config overrides for a device fingerprint", Stability: "preview"},
+			{Name: "remote-config set", Description: "Set a remote config override (key=value) for a device fingerprint", Stability: "preview"},
+			{Name: "remote-config delete", Description: "Delete a remote config override for a device fingerprint", Stability: "preview"},
+			{Name: "verify", Description: "Verify batch integrity via HMAC-SHA256 against the log_batches manifest table", Stability: "stable"},
+			{Name: "audit", Description: "Export or purge PII-bearing records for GDPR compliance (privacy audit)", Stability: "preview"},
+			{Name: "erase", Description: "GDPR Art. 17 right-to-erasure: delete all data for a device_id or user_id", Stability: "preview"},
+			{Name: "explain", Description: "Generate a human-readable explanation of SDK telemetry events", Stability: "preview"},
 		},
 	}
 }

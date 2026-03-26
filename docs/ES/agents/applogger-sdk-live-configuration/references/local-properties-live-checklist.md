@@ -12,6 +12,10 @@
 2. `APPLOGGER_ANON_KEY`
 3. `APPLOGGER_DEBUG` — in the standard mapping, set `true` to enable `debugMode` and `consoleOutput` together (Logcat output)
 
+## Optional keys
+
+1. `APPLOGGER_BETA_TESTER` — boolean. Activates beta tester mode. Email is captured at runtime from the developer's auth flow, not from config.
+
 ## Edit rules
 
 1. Append only missing AppLogger keys.

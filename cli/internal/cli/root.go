@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -90,14 +92,15 @@ func init() {
 	rootCmd.AddCommand(newExplainCommand())
 	rootCmd.AddCommand(newServeCommand())
 	rootCmd.AddCommand(newVerifyCommand())
+	rootCmd.AddCommand(newRemoteConfigCommand())
 }
 
 func validateOutputFormat(format string) error {
 	switch format {
-	case "text", "json", "agent":
+	case "text", "json", "agent", "csv":
 		return nil
 	default:
-		return newUsageError("invalid --output value %q (expected text|json|agent)", format)
+		return newUsageError("invalid --output value %q (expected text|json|agent|csv)", format)
 	}
 }
 
@@ -111,4 +114,52 @@ func writeJSON(out io.Writer, payload any) error {
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(payload)
+}
+
+// writeCSV writes a slice of maps as CSV with automatic header detection.
+func writeCSV(out io.Writer, rows []map[string]any) error {
+	if len(rows) == 0 {
+		_, err := fmt.Fprintln(out, "(no rows)")
+		return err
+	}
+
+	// Collect all unique keys for header (deterministic order)
+	keySet := map[string]bool{}
+	for _, row := range rows {
+		for k := range row {
+			keySet[k] = true
+		}
+	}
+	headers := make([]string, 0, len(keySet))
+	for k := range keySet {
+		headers = append(headers, k)
+	}
+	sort.Strings(headers)
+
+	// Write header
+	if _, err := fmt.Fprintln(out, strings.Join(headers, ",")); err != nil {
+		return err
+	}
+
+	// Write rows
+	for _, row := range rows {
+		vals := make([]string, len(headers))
+		for i, h := range headers {
+			v, ok := row[h]
+			if !ok || v == nil {
+				vals[i] = ""
+				continue
+			}
+			s := fmt.Sprintf("%v", v)
+			// Escape CSV: quote if contains comma, newline, or double-quote
+			if strings.ContainsAny(s, ",\"\n") {
+				s = "\"" + strings.ReplaceAll(s, "\"", "\"\"") + "\""
+			}
+			vals[i] = s
+		}
+		if _, err := fmt.Fprintln(out, strings.Join(vals, ",")); err != nil {
+			return err
+		}
+	}
+	return nil
 }

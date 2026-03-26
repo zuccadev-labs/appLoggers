@@ -100,6 +100,134 @@ AppLoggerIos.shared.removeGlobalExtra("ab_test")
 AppLoggerIos.shared.clearGlobalExtra()
 ```
 
+## Device fingerprint
+
+El SDK calcula automáticamente un fingerprint SHA-256 pseudonymizado del dispositivo al inicializar:
+
+```kotlin
+// Fórmula: sha256Hex("$idfv:$bundleId")
+// Donde idfv = UIDevice.currentDevice.identifierForVendor
+// y bundleId = NSBundle.mainBundle.bundleIdentifier
+
+val fingerprint = AppLoggerIos.shared.getDeviceFingerprint()
+// → "a3f8c2e1..." (64 hex chars)
+```
+
+El fingerprint se inyecta automáticamente en `extra.device_fingerprint` de cada evento. El CLI puede filtrar con `--fingerprint`.
+
+## Remote config
+
+Polling periódico a la tabla `device_remote_config` de Supabase para ajustar el comportamiento del SDK sin redesplegar:
+
+```kotlin
+// Iniciar polling (default: 300 segundos)
+AppLoggerIos.shared.startRemoteConfig(intervalSeconds = 300)
+
+// El SDK aplica automáticamente:
+// - minLevel → descarta eventos por debajo del nivel configurado
+// - sampling → probabilidad de envío (0.0 a 1.0)
+// - debugMode → activa/desactiva logs locales
+// - tagFilter → solo envía tags específicos
+
+// Detener polling
+AppLoggerIos.shared.stopRemoteConfig()
+```
+
+Implementación interna: `NSURLSession.sharedSession.dataTaskWithRequest` con `dispatch_semaphore` para fetch síncrono dentro de la coroutine del polling.
+
+## Beta tester
+
+Marcar un dispositivo como beta tester para filtrado dedicado:
+
+```kotlin
+// Activar — inyecta beta_tester_email en global extras
+AppLoggerIos.shared.setBetaTester("tester@company.com")
+
+// Desactivar
+AppLoggerIos.shared.clearBetaTester()
+```
+
+El CLI puede filtrar beta testers con `--extra-key beta_tester_email`.
+
+## Consent management
+
+Control de consentimiento del usuario. Sin consentimiento, el SDK no envía eventos:
+
+```kotlin
+// Otorgar consentimiento (persiste en NSUserDefaults)
+AppLoggerIos.shared.setConsent(true)
+
+// Revocar consentimiento
+AppLoggerIos.shared.setConsent(false)
+
+// El SDK verifica el consentimiento antes de cada envío
+```
+
+## Distributed tracing
+
+Correlacionar eventos entre dispositivos (mobile → TV → backend):
+
+```kotlin
+// Establecer trace ID (compartir entre dispositivos via API)
+AppLoggerIos.shared.setTraceId("order-abc-123")
+
+// El trace_id se adjunta a cada evento posterior
+// Query en CLI: --extra-key trace_id --extra-value "order-abc-123"
+
+// Limpiar
+AppLoggerIos.shared.clearTraceId()
+```
+
+## Breadcrumbs
+
+Trail de navegación adjunto a cada evento posterior:
+
+```kotlin
+// Registrar breadcrumbs al navegar
+AppLoggerIos.shared.recordBreadcrumb("HomeScreen")
+AppLoggerIos.shared.recordBreadcrumb("SearchScreen")
+AppLoggerIos.shared.recordBreadcrumb("PlayerScreen")
+
+// Los breadcrumbs se incluyen en extra.breadcrumbs de cada evento
+// Útil para debugging: ver qué pantallas visitó el usuario antes del error
+```
+
+## Scoped logger
+
+Logger con tag fijo para un módulo o clase:
+
+```kotlin
+val playerLog = AppLoggerIos.shared.scopedLogger("PLAYER")
+playerLog.info("Playback started")
+playerLog.warn("Buffer low")
+playerLog.error("Playback failed", throwable = null)
+// Todos los eventos usan tag = "PLAYER"
+```
+
+## Session variant
+
+Etiquetar la sesión para A/B testing:
+
+```kotlin
+AppLoggerIos.shared.setVariant("checkout_v2")
+// El variant se adjunta a cada evento de la sesión
+
+AppLoggerIos.shared.clearVariant()
+```
+
+## Coroutine exception handler
+
+Capturar excepciones no manejadas en coroutines:
+
+```kotlin
+import com.applogger.core.AppLoggerExceptionHandler
+
+val scope = CoroutineScope(
+    Dispatchers.Default + AppLoggerExceptionHandler
+)
+// Las excepciones no manejadas se loguean como CRITICAL automáticamente
+```
+
 ## Flush en background
 
 iOS no tiene lifecycle observer automático. Llamar `flush()` manualmente al entrar en background:
@@ -137,7 +265,10 @@ println("initialized=${health.isInitialized}, transport=${health.transportAvaila
 ## Guardrails
 
 1. Do not use `AppLoggerSDK` in iOS — use `AppLoggerIos.shared`.
-2. Do not propose native Swift host setup outside KMP.
+2. Do not propose native Swift host setup outside KMP. The project is 100% KMP — no Swift/Ruby implementation files.
 3. Keep secrets outside versioned files.
 4. Always set `environment` to distinguish production from staging data.
 5. Call `flush()` manually before the app enters background.
+6. Always call `setConsent(true)` before expecting events to be sent.
+7. Remote config interval must be between 30 and 3600 seconds.
+8. Device fingerprint is SHA-256 pseudonymized — never store raw device identifiers.

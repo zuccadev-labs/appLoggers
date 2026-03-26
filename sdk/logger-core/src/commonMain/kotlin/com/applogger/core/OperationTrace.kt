@@ -1,5 +1,6 @@
 package com.applogger.core
 
+import com.applogger.core.internal.platformSynchronized
 import kotlin.concurrent.Volatile
 
 private const val BYTES_PER_MB = 1_048_576.0
@@ -37,21 +38,46 @@ class OperationTrace(
     initialAttributes: Map<String, Any> = emptyMap()
 ) {
     private val attributes: MutableMap<String, Any> = initialAttributes.toMutableMap()
+    private val attributesLock = Any()
 
     @Volatile private var bytesCount: Long = 0L
     @Volatile private var ended: Boolean = false
+    @Volatile private var timeoutMs: Long = 0L
 
     /** Attaches a key-value attribute to this span. Fluent — returns `this`. */
     fun tag(key: String, value: Any): OperationTrace {
-        if (!ended) attributes[key] = value
+        platformSynchronized(attributesLock) { if (!ended) attributes[key] = value }
         return this
     }
 
     /** Records bytes transferred, enabling auto-computation of `throughput_mbps` on [end]. */
     fun bytes(count: Long): OperationTrace {
-        if (!ended) bytesCount = count
+        platformSynchronized(attributesLock) { if (!ended) bytesCount = count }
         return this
     }
+
+    /**
+     * Sets a timeout deadline for this span. Fluent — returns `this`.
+     *
+     * When [end] is called after the deadline, the span is still emitted but tagged
+     * with `timed_out = true`. Use [isExpired] to check proactively and call
+     * [endWithError] with `failureReason = "timeout"` if desired.
+     *
+     * ```kotlin
+     * val trace = AppLoggerSDK.startTrace("api_call").withTimeout(5000)
+     * // ... perform operation ...
+     * if (trace.isExpired) trace.endWithError(TimeoutException(), failureReason = "timeout")
+     * else trace.end()
+     * ```
+     */
+    fun withTimeout(ms: Long): OperationTrace {
+        platformSynchronized(attributesLock) { if (!ended) timeoutMs = ms }
+        return this
+    }
+
+    /** Returns `true` if a timeout was set via [withTimeout] and the deadline has passed. */
+    val isExpired: Boolean
+        get() = timeoutMs > 0L && (currentTimeMillis() - startTimeMs) >= timeoutMs
 
     /**
      * Ends the span successfully and emits a `trace.<operationName>` metric.
@@ -61,10 +87,13 @@ class OperationTrace(
      * @param extraAttributes Additional attributes merged at end time.
      */
     fun end(extraAttributes: Map<String, Any>? = null) {
-        if (ended) return
-        ended = true
+        platformSynchronized(attributesLock) {
+            if (ended) return
+            ended = true
+        }
         val durationMs = currentTimeMillis() - startTimeMs
-        val tags = buildFinalTags(durationMs, extraAttributes, success = true)
+        val timedOut = timeoutMs > 0L && durationMs >= timeoutMs
+        val tags = buildFinalTags(durationMs, extraAttributes, success = !timedOut, timedOut = timedOut)
         logger.metric("trace.$operationName", durationMs.toDouble(), "ms", tags.mapValues { it.value.toString() })
     }
 
@@ -80,10 +109,13 @@ class OperationTrace(
         failureReason: String? = null,
         extraAttributes: Map<String, Any>? = null
     ) {
-        if (ended) return
-        ended = true
+        platformSynchronized(attributesLock) {
+            if (ended) return
+            ended = true
+        }
         val durationMs = currentTimeMillis() - startTimeMs
-        val extra = buildFinalTags(durationMs, extraAttributes, success = false).toMutableMap<String, Any>()
+        val timedOut = timeoutMs > 0L && durationMs >= timeoutMs
+        val extra = buildFinalTags(durationMs, extraAttributes, success = false, timedOut = timedOut).toMutableMap<String, Any>()
         if (failureReason != null) extra["failure_reason"] = failureReason
         logger.error(
             tag = "Trace.$operationName",
@@ -96,13 +128,18 @@ class OperationTrace(
     private fun buildFinalTags(
         durationMs: Long,
         extraAttributes: Map<String, Any>?,
-        success: Boolean
+        success: Boolean,
+        timedOut: Boolean = false
     ): Map<String, Any> {
         val result = mutableMapOf<String, Any>()
         result["duration_ms"] = durationMs
         result["trace_id"] = traceId
         result["success"] = success
-        result.putAll(attributes)
+        if (timedOut) {
+            result["timed_out"] = true
+            result["timeout_ms"] = timeoutMs
+        }
+        platformSynchronized(attributesLock) { result.putAll(attributes) }
         if (bytesCount > 0L) {
             result["bytes_transferred"] = bytesCount
             val seconds = durationMs / MS_PER_SECOND

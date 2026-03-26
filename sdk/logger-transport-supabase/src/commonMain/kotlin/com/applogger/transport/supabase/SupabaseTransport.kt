@@ -191,13 +191,21 @@ class SupabaseTransport(
         return networkAvailabilityProvider?.invoke() ?: true
     }
 
-    override suspend fun storeBatchManifest(batchId: String, hash: String, eventCount: Int) {
+    override suspend fun storeBatchManifest(
+        batchId: String,
+        hash: String,
+        eventCount: Int,
+        environment: String,
+        sdkVersion: String
+    ) {
         runCatching {
             // sent_at omitted — the table default NOW() fills it server-side.
             val payload = buildJsonObject {
                 put("batch_id", JsonPrimitive(batchId))
                 put("event_count", JsonPrimitive(eventCount))
                 put("batch_hash", JsonPrimitive(hash))
+                if (environment.isNotBlank()) put("environment", JsonPrimitive(environment))
+                if (sdkVersion.isNotBlank()) put("sdk_version", JsonPrimitive(sdkVersion))
             }
             client.post("$restUrl/$BATCH_MANIFESTS_TABLE") {
                 header("apikey", apiKey)
@@ -230,12 +238,18 @@ internal data class SupabaseLogEntry(
     // Distributed tracing: allows correlating events across devices (mobile → TV → backend).
     // Filter in Supabase: SELECT * FROM app_logs WHERE trace_id = 'abc-123' ORDER BY timestamp
     @SerialName("trace_id") val traceId: String? = null,
+    // Client-side epoch millis — stored as BIGINT in app_logs for HMAC batch integrity
+    // verification. The CLI verify command recomputes the hash using this value, not
+    // server-generated created_at.
+    val timestamp: Long,
+    @SerialName("batch_id") val batchId: String? = null,
     @SerialName("device_info") val deviceInfo: Map<String, String>,
     @SerialName("api_level") val apiLevel: Int,
     @SerialName("sdk_version") val sdkVersion: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("device_id") val deviceId: String,
     @SerialName("user_id") val userId: String? = null,
+    val variant: String? = null,
     val extra: JsonObject? = null
 )
 
@@ -248,7 +262,8 @@ internal data class SupabaseMetricEntry(
     val environment: String,
     @SerialName("device_id") val deviceId: String,
     @SerialName("session_id") val sessionId: String,
-    @SerialName("sdk_version") val sdkVersion: String
+    @SerialName("sdk_version") val sdkVersion: String,
+    @SerialName("user_id") val userId: String? = null
 )
 
 private fun LogEvent.toSupabaseLog(): SupabaseLogEntry {
@@ -272,6 +287,8 @@ private fun LogEvent.toSupabaseLog(): SupabaseLogEntry {
         stackTrace = throwableInfo?.stackTrace,
         anomalyType = anomalyType,
         traceId = traceId,
+        timestamp = timestamp,
+        batchId = batchId,
         deviceInfo = mapOf(
             "brand" to deviceInfo.brand,
             "model" to deviceInfo.model,
@@ -289,6 +306,7 @@ private fun LogEvent.toSupabaseLog(): SupabaseLogEntry {
         sessionId = sessionId,
         deviceId = deviceId,
         userId = userId,
+        variant = variant,
         extra = filteredExtra
     )
 }
@@ -302,7 +320,8 @@ private fun LogEvent.toSupabaseMetric(): SupabaseMetricEntry {
         environment = environment,
         deviceId = deviceId,
         sessionId = sessionId,
-        sdkVersion = sdkVersion
+        sdkVersion = sdkVersion,
+        userId = userId
     )
 }
 

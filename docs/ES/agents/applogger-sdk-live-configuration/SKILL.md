@@ -33,6 +33,10 @@ Examples:
 2. `APPLOGGER_ANON_KEY`
 3. `APPLOGGER_DEBUG`
 
+## Optional SDK config keys
+
+1. `APPLOGGER_BETA_TESTER` — boolean (`true`/`false`). Activates beta tester mode. The tester's email is NOT a config key — it comes from the developer's auth flow at runtime via `AppLoggerSDK.setBetaTester(email)`.
+
 ## Debug output behavior
 
 1. Logcat output on Android appears only when `isDebugMode=true` and `consoleOutput=true`.

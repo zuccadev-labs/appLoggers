@@ -85,6 +85,18 @@ appLoggers/
 - **Filtrado por nivel** — `minLevel` descarta eventos antes del pipeline sin coste de serialización
 - **Entornos** — `environment` etiqueta cada evento para separar producción de staging en Supabase
 - **Debug sin código** — `APPLOGGER_DEBUG=true` en manifest (Android) o `Info.plist` (iOS) activa debug mode
+- **Device fingerprint** — SHA-256 pseudonymizado (`androidId:packageName` / `IDFV:bundleId`) para segmentación sin PII
+- **Remote config** — polling periódico a Supabase para ajustar `minLevel`, `sampling`, `debugMode` por dispositivo o globalmente
+- **Beta tester** — marca dispositivos como beta testers con email para filtrado dedicado
+- **Consent management** — `setConsent(true/false)` persiste en `SharedPreferences` / `NSUserDefaults`; sin consentimiento el SDK no envía eventos
+- **Distributed tracing** — `setTraceId()` correlaciona eventos cross-device (mobile → TV → backend)
+- **Breadcrumbs** — `recordBreadcrumb()` registra trail de navegación adjunto a cada evento posterior
+- **Scoped logger** — `scopedLogger(tag)` retorna logger con tag fijo para módulos o clases
+- **Session variant** — `setVariant("A"/"B")` etiqueta la sesión para A/B testing
+- **Coroutine exception handler** — `AppLoggerExceptionHandler` captura excepciones no manejadas en coroutines
+- **Batch integrity** — SHA-256 hash por batch + manifest en `log_batches` para verificación CLI
+- **iOS KMP full parity** — 100% Kotlin Multiplatform, cero archivos Swift/Ruby de implementación
+- **GDPR erasure** — CLI `erase` borra datos por `--user-id` o `--device-id` con limpieza de batch manifests
 
 ## Versionado Profesional
 
@@ -136,8 +148,27 @@ apploggers telemetry agent-response \
   --preview-limit 3 \
   --output agent
 
-# Validar salud del backend
-apploggers health --output json
+# Validar salud del backend (incluye probes de remote_config, beta_testers, log_batches)
+apploggers health --deep --output json
+
+# Filtrar por device fingerprint
+apploggers telemetry query \
+  --source logs \
+  --fingerprint "sha256..." \
+  --output json
+
+# Remote config — listar, crear, eliminar configuraciones por dispositivo
+apploggers remote-config list --environment production --output json
+apploggers remote-config set \
+  --fingerprint "sha256..." \
+  --min-level warn \
+  --sampling 0.5 \
+  --debug false
+apploggers remote-config delete --fingerprint "sha256..."
+
+# GDPR erasure — borrar datos por usuario o dispositivo
+apploggers erase --user-id "user-123" --output json
+apploggers erase --device-id "device-456" --output json
 ```
 
 ### Documentación CLI
@@ -447,11 +478,44 @@ AppLoggerSDK.addGlobalExtra("ab_test", "checkout_v2") // adjunta a todos los eve
 // Debug mode: leer APPLOGGER_DEBUG de Info.plist automáticamente (sin cambiar código)
 AppLoggerIos.shared.initialize(config = config, transport = transport)
 
+// Logging básico
 AppLoggerIos.shared.error("PLAYER", "Playback failed", throwable = null)
 AppLoggerIos.shared.metric("buffer_time", 420.0, "ms")
+
+// Sesión e identidad
 AppLoggerIos.shared.newSession()
 AppLoggerIos.shared.addGlobalExtra("experiment", "group_b")
-AppLoggerIos.shared.flush()  // llamar al entrar en background
+
+// Device fingerprint (SHA-256 de IDFV:bundleId — automático al inicializar)
+val fingerprint = AppLoggerIos.shared.getDeviceFingerprint()
+
+// Distributed tracing — correlacionar eventos cross-device
+AppLoggerIos.shared.setTraceId("order-abc-123")
+
+// Breadcrumbs — trail de navegación
+AppLoggerIos.shared.recordBreadcrumb("HomeScreen")
+AppLoggerIos.shared.recordBreadcrumb("PlayerScreen")
+
+// Beta tester
+AppLoggerIos.shared.setBetaTester("tester@company.com")
+
+// Consent (persiste en NSUserDefaults)
+AppLoggerIos.shared.setConsent(true)
+
+// Session variant para A/B testing
+AppLoggerIos.shared.setVariant("checkout_v2")
+
+// Scoped logger con tag fijo
+val playerLog = AppLoggerIos.shared.scopedLogger("PLAYER")
+playerLog.info("Playback started")
+playerLog.error("Playback failed", throwable = null)
+
+// Remote config — polling automático al inicializar
+AppLoggerIos.shared.startRemoteConfig(intervalSeconds = 300)
+AppLoggerIos.shared.stopRemoteConfig()
+
+// Flush manual al entrar en background
+AppLoggerIos.shared.flush()
 ```
 
 ---
@@ -472,6 +536,11 @@ AppLoggerIos.shared.flush()  // llamar al entrar en background
 | 7 | `docs/ES/migraciones/007_add_environment_anomaly_type.sql` | Columnas `environment` y `anomaly_type` en `app_logs` |
 | 8 | `docs/ES/migraciones/008_add_metrics_environment.sql` | Columna `environment` en `app_metrics` |
 | 9 | `docs/ES/migraciones/009_add_missing_indexes.sql` | Índices adicionales de performance |
+| 10 | `docs/ES/migraciones/010_session_variant.sql` | Columna `variant` en `app_logs` para A/B testing |
+| 11 | `docs/ES/migraciones/011_batch_integrity.sql` | Tabla `log_batches` para verificación de integridad |
+| 12 | `docs/ES/migraciones/012_enterprise_indexes_views.sql` | Índices y vistas empresariales |
+| 13 | `docs/ES/migraciones/013_device_remote_config.sql` | Tablas `device_remote_config` y `device_fingerprints` |
+| 14 | `docs/ES/migraciones/014_beta_tester_correlation.sql` | Tabla `beta_testers` y correlación de eventos |
 
 3. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`
 
@@ -671,6 +740,11 @@ Cuando el SDK esté estable, se publicará a Maven Central para distribución si
 | [007 - Environment + anomaly_type](docs/ES/migraciones/007_add_environment_anomaly_type.sql) | Columnas `environment` y `anomaly_type` en `app_logs` |
 | [008 - Metrics environment](docs/ES/migraciones/008_add_metrics_environment.sql) | Columna `environment` en `app_metrics` |
 | [009 - Índices adicionales](docs/ES/migraciones/009_add_missing_indexes.sql) | Índices adicionales de performance |
+| [010 - Session variant](docs/ES/migraciones/010_session_variant.sql) | Columna `variant` en `app_logs` |
+| [011 - Batch integrity](docs/ES/migraciones/011_batch_integrity.sql) | Tabla `log_batches` |
+| [012 - Enterprise indexes](docs/ES/migraciones/012_enterprise_indexes_views.sql) | Índices y vistas empresariales |
+| [013 - Device remote config](docs/ES/migraciones/013_device_remote_config.sql) | Tablas `device_remote_config` y `device_fingerprints` |
+| [014 - Beta tester correlation](docs/ES/migraciones/014_beta_tester_correlation.sql) | Tabla `beta_testers` y correlación |
 
 ### 📋 Procesos
 

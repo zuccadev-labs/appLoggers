@@ -82,7 +82,10 @@ func newExplainCommand() *cobra.Command {
 			}
 			ctx2, cancel2 := context.WithTimeout(context.Background(), cfg.timeout())
 			defer cancel2()
-			similarRows, _ := doQueryWithRetry(ctx2, cfg, similarReq, 3)
+			similarRows, similarErr := doQueryWithRetry(ctx2, cfg, similarReq, 3)
+			if similarErr != nil {
+				similarRows = nil
+			}
 
 			// Build device model correlations
 			correlationMap := map[string]*explainCorrelation{}

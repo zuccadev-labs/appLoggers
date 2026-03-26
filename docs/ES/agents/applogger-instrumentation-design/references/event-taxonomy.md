@@ -167,3 +167,41 @@ AppLoggerSDK.error("AUTH", "Error for user: ${user.email}")  // INCORRECTO
 // ❌ Nunca loguear tokens o credenciales
 AppLoggerSDK.debug("AUTH", "Token: $accessToken")  // NUNCA
 ```
+
+### 6. Beta tester events (optional)
+
+```kotlin
+// Activar modo beta tester (email del auth flow del desarrollador)
+AppLoggerSDK.setBetaTester("tester@example.com")
+
+// Evento normal — automáticamente incluye is_beta_tester=true y beta_tester_email
+AppLoggerSDK.error("PLAYER", "Playback failed on beta build", throwable = e, extra = mapOf(
+    "content_id" to "movie_123",
+    "build_type" to "beta"
+))
+
+// Desactivar modo beta tester
+AppLoggerSDK.clearBetaTester()
+```
+
+El extra `is_beta_tester` y `beta_tester_email` se inyectan como global extras — aparecen en TODOS los eventos mientras el modo esté activo.
+
+En Supabase, el trigger `trg_correlate_beta_tester` auto-correlaciona el email del frontend al backend en el mismo dispositivo via `device_id → email` mapping en `beta_tester_devices`.
+
+### 7. Remote config events (automáticos)
+
+```kotlin
+// El SDK loguea automáticamente cuando aplica remote config
+// Tag: REMOTE_CONFIG, Level: DEBUG
+// No es necesario instrumentar manualmente
+```
+
+Para consultar eventos filtrados por remote config:
+
+```bash
+# Filtrar beta testers en CLI
+apploggers telemetry query --source logs --extra-key is_beta_tester --extra-value true --output json
+
+# Filtrar por device fingerprint
+apploggers telemetry query --source logs --fingerprint "abc123sha256" --output json
+```

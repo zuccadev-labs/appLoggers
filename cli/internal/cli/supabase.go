@@ -9,14 +9,15 @@ import (
 )
 
 type supabaseConfig struct {
-	Project        string
-	ConfigSource   string
-	URL            string
-	APIKey         string
-	Schema         string
-	LogsTable      string
-	MetricsTable   string
-	TimeoutSeconds int
+	Project         string
+	ConfigSource    string
+	URL             string
+	APIKey          string
+	Schema          string
+	LogsTable       string
+	MetricsTable    string
+	TimeoutSeconds  int
+	IntegritySecret string
 }
 
 func loadSupabaseConfig() (supabaseConfig, error) {
@@ -32,13 +33,14 @@ func loadSupabaseConfig() (supabaseConfig, error) {
 	}
 
 	cfg := supabaseConfig{
-		ConfigSource:   "environment",
-		URL:            firstNonEmptyEnv("appLogger_supabaseUrl", "APPLOGGER_SUPABASE_URL", "SUPABASE_URL"),
-		APIKey:         firstNonEmptyEnv("appLogger_supabaseKey", "APPLOGGER_SUPABASE_KEY", "SUPABASE_KEY"),
-		Schema:         firstNonEmptyEnv("appLogger_supabaseSchema", "APPLOGGER_SUPABASE_SCHEMA"),
-		LogsTable:      firstNonEmptyEnv("appLogger_supabaseLogTable", "APPLOGGER_SUPABASE_LOG_TABLE"),
-		MetricsTable:   firstNonEmptyEnv("appLogger_supabaseMetricTable", "APPLOGGER_SUPABASE_METRIC_TABLE"),
-		TimeoutSeconds: 15,
+		ConfigSource:    "environment",
+		URL:             firstNonEmptyEnv("appLogger_supabaseUrl", "APPLOGGER_SUPABASE_URL", "SUPABASE_URL"),
+		APIKey:          firstNonEmptyEnv("appLogger_supabaseKey", "APPLOGGER_SUPABASE_KEY", "SUPABASE_KEY"),
+		Schema:          firstNonEmptyEnv("appLogger_supabaseSchema", "APPLOGGER_SUPABASE_SCHEMA"),
+		LogsTable:       firstNonEmptyEnv("appLogger_supabaseLogTable", "APPLOGGER_SUPABASE_LOG_TABLE"),
+		MetricsTable:    firstNonEmptyEnv("appLogger_supabaseMetricTable", "APPLOGGER_SUPABASE_METRIC_TABLE"),
+		IntegritySecret: firstNonEmptyEnv("APPLOGGER_INTEGRITY_SECRET", "appLogger_integritySecret"),
+		TimeoutSeconds:  15,
 	}
 
 	if cfg.Schema == "" {
