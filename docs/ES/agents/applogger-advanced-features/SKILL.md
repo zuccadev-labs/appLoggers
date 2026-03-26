@@ -14,7 +14,7 @@ Use this skill when the integration is already working and the user needs:
 3. Consent management (`setConsent`).
 4. Cross-device correlation (`setTraceId`).
 5. Navigation breadcrumbs (`recordBreadcrumb`).
-6. A/B test variant tagging (`setVariant`).
+6. A/B test variant tagging (`setSessionVariant`).
 7. Unhandled coroutine exception capture (`AppLoggerExceptionHandler`).
 
 Examples:

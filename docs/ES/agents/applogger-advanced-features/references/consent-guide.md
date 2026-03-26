@@ -107,14 +107,15 @@ AppLoggerSDK.setConsent(ConsentLevel.PERFORMANCE)
 ### Patrón 2 — Scope con consent override
 
 ```kotlin
-// Datos de performance que siempre son PERFORMANCE, aunque el nivel global sea STRICT
+// INFO normalmente requiere MARKETING — pero este scope lo etiqueta como PERFORMANCE
 val perfLog = AppLoggerSDK.newScope(
     "component" to "network",
     consentLevel = ConsentLevel.PERFORMANCE
 )
 perfLog.info("NETWORK", "Request latency: 120ms")
-// → emite incluso en STRICT global porque el scope requiere PERFORMANCE explícitamente
-// ATENCIÓN: solo funciona si el scope consent >= nivel activo global
+// → emite cuando el nivel global es PERFORMANCE (donde INFO normalmente sería descartado)
+// ❌ NO emite si el nivel global es STRICT — el scope no puede superar el límite global
+// Regla: el evento pasa solo si scope consentLevel <= nivel activo global
 ```
 
 ## Data minimization (GDPR Art. 5(1)(c))
