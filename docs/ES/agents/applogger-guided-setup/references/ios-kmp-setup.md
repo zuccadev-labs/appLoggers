@@ -151,17 +151,28 @@ El CLI puede filtrar beta testers con `--extra-key beta_tester_email`.
 
 ## Consent management
 
-Control de consentimiento del usuario. Sin consentimiento, el SDK no envía eventos:
+Controla el nivel de procesamiento de datos. Persiste en `NSUserDefaults`.
 
 ```kotlin
-// Otorgar consentimiento (persiste en NSUserDefaults)
-AppLoggerIos.shared.setConsent(true)
+import com.applogger.core.ConsentLevel
 
-// Revocar consentimiento
-AppLoggerIos.shared.setConsent(false)
+// Telemetría completa — requiere opt-in explícito del usuario
+AppLoggerIos.shared.setConsent(ConsentLevel.MARKETING)
 
-// El SDK verifica el consentimiento antes de cada envío
+// Solo métricas y performance — requiere T&C aceptados
+AppLoggerIos.shared.setConsent(ConsentLevel.PERFORMANCE)
+
+// Solo errores críticos, anonimizados — sin opt-in requerido
+AppLoggerIos.shared.setConsent(ConsentLevel.STRICT)
+
+// Leer nivel actual
+val level: ConsentLevel = AppLoggerIos.shared.getConsent()
 ```
+
+El SDK filtra eventos según el nivel activo:
+- `STRICT`: solo CRITICAL/ERROR pasan, `user_id` suprimido, `device_id` pseudonimizado
+- `PERFORMANCE`: + METRIC y WARN pasan
+- `MARKETING`: todos los eventos pasan (default)
 
 ## Distributed tracing
 
@@ -183,25 +194,55 @@ AppLoggerIos.shared.clearTraceId()
 Trail de navegación adjunto a cada evento posterior:
 
 ```kotlin
-// Registrar breadcrumbs al navegar
-AppLoggerIos.shared.recordBreadcrumb("HomeScreen")
-AppLoggerIos.shared.recordBreadcrumb("SearchScreen")
-AppLoggerIos.shared.recordBreadcrumb("PlayerScreen")
+// Registrar breadcrumbs al navegar — signature completa:
+// recordBreadcrumb(action: String, screen: String? = null, metadata: Map<String, String>? = null)
+AppLoggerIos.shared.recordBreadcrumb("tap_play")
+AppLoggerIos.shared.recordBreadcrumb("screen_enter", screen = "PlayerScreen")
+AppLoggerIos.shared.recordBreadcrumb("api_call", screen = "HomeScreen", metadata = mapOf("endpoint" to "/feed"))
 
 // Los breadcrumbs se incluyen en extra.breadcrumbs de cada evento
 // Útil para debugging: ver qué pantallas visitó el usuario antes del error
 ```
 
-## Scoped logger
+## Scoped logger (TaggedLogger — withTag)
 
-Logger con tag fijo para un módulo o clase:
+Logger con tag fijo para un módulo o clase. Usa `withTag()` — extension function en `AppLogger`:
 
 ```kotlin
-val playerLog = AppLoggerIos.shared.scopedLogger("PLAYER")
-playerLog.info("Playback started")
-playerLog.warn("Buffer low")
-playerLog.error("Playback failed", throwable = null)
+// Crear logger con tag fijo
+val playerLog = AppLoggerIos.shared.withTag("PLAYER")
+playerLog.i("Playback started")
+playerLog.w("Buffer low", anomalyType = "buffer_underrun")
+playerLog.e("Playback failed", throwable = e)
 // Todos los eventos usan tag = "PLAYER"
+
+// withTag también acepta receiver para inferir el tag del nombre de clase
+class PlayerController {
+    private val log = AppLoggerIos.shared.withTag(this)  // tag = "PlayerController"
+}
+```
+
+## Scoped logger (ScopedAppLogger — newScope)
+
+Logger que pre-inyecta atributos contextuales en todos los eventos:
+
+```kotlin
+// Scope para una sesión de reproducción específica
+val sessionLog = AppLoggerIos.shared.newScope(
+    "content_id" to "movie_123",
+    "quality" to "4K",
+    "drm" to "fairplay"
+)
+sessionLog.error("PLAYER", "Stall detected", stallException)
+// → event incluye content_id, quality, drm automáticamente
+
+// Child scope — hereda atributos del padre y añade más
+val segLog = sessionLog.childScope("segment_id" to "seg_042", "offset_ms" to 72000)
+segLog.warn("SEGMENT", "Buffer underrun", anomalyType = "buffer_underrun")
+
+// Combinar scope + tag fijo — patrón recomendado para clases
+val log = AppLoggerIos.shared.newScope("content_id" to contentId).withTag("PlayerController")
+log.e("Codec error", throwable = e)
 ```
 
 ## Session variant
@@ -209,10 +250,11 @@ playerLog.error("Playback failed", throwable = null)
 Etiquetar la sesión para A/B testing:
 
 ```kotlin
-AppLoggerIos.shared.setVariant("checkout_v2")
-// El variant se adjunta a cada evento de la sesión
+// setSessionVariant acepta String? — pasar null para limpiar
+AppLoggerIos.shared.setSessionVariant("checkout_v2")
+// El variant se adjunta como campo top-level en cada evento
 
-AppLoggerIos.shared.clearVariant()
+AppLoggerIos.shared.setSessionVariant(null)  // limpiar
 ```
 
 ## Coroutine exception handler
@@ -220,10 +262,9 @@ AppLoggerIos.shared.clearVariant()
 Capturar excepciones no manejadas en coroutines:
 
 ```kotlin
-import com.applogger.core.AppLoggerExceptionHandler
-
+// exceptionHandler es una propiedad de AppLoggerIos — NO una importación separada
 val scope = CoroutineScope(
-    Dispatchers.Default + AppLoggerExceptionHandler
+    Dispatchers.Default + AppLoggerIos.shared.exceptionHandler
 )
 // Las excepciones no manejadas se loguean como CRITICAL automáticamente
 ```

@@ -17,42 +17,45 @@
 10. Verify CLI `--fingerprint` filter returns matching events.
 
 ## Consent
-11. Verify `setConsent(true)` persists in `NSUserDefaults`.
-12. Verify events are NOT sent when consent is `false`.
-13. Verify events resume after `setConsent(true)`.
+11. Verify `setConsent(ConsentLevel.MARKETING)` persists in `NSUserDefaults`.
+12. Verify events are NOT sent (INFO/DEBUG) when consent is `ConsentLevel.STRICT`.
+13. Verify ERROR/CRITICAL events still arrive in `ConsentLevel.STRICT` mode.
+14. Verify `getConsent()` returns the persisted level after app restart.
 
 ## Remote config
-14. Verify `startRemoteConfig(intervalSeconds)` starts polling.
-15. Verify remote config changes (e.g., `minLevel`) are applied within one polling interval.
-16. Verify `stopRemoteConfig()` stops polling.
-17. Verify interval is between 30 and 3600 seconds.
+15. Verify `startRemoteConfig(intervalSeconds)` starts polling.
+16. Verify remote config changes (e.g., `minLevel`) are applied within one polling interval.
+17. Verify `stopRemoteConfig()` stops polling.
+18. Verify interval is between 30 and 3600 seconds.
 
 ## Beta tester
-18. Verify `setBetaTester(email)` adds `beta_tester_email` to event extras.
-19. Verify `clearBetaTester()` removes `beta_tester_email`.
+19. Verify `setBetaTester(email)` adds `beta_tester_email` to event extras.
+20. Verify `clearBetaTester()` removes `beta_tester_email`.
 
 ## Distributed tracing
-20. Verify `setTraceId(id)` adds `trace_id` to all subsequent events.
-21. Verify `clearTraceId()` removes `trace_id`.
-22. Verify events from two devices with the same `trace_id` can be correlated in CLI.
+21. Verify `setTraceId(id)` adds `trace_id` to all subsequent events.
+22. Verify `clearTraceId()` removes `trace_id`.
+23. Verify events from two devices with the same `trace_id` can be correlated in CLI.
 
 ## Breadcrumbs
-23. Verify `recordBreadcrumb(label)` accumulates in `extra.breadcrumbs`.
-24. Verify breadcrumbs are included in error events.
+24. Verify `recordBreadcrumb(action, screen?, metadata?)` accumulates in `extra.breadcrumbs`.
+25. Verify breadcrumbs are included in error events.
 
 ## Scoped logger
-25. Verify `scopedLogger(tag)` produces events with the correct fixed tag.
-26. Verify scoped logger supports all log levels (`d/i/w/e/c/metric`).
+26. Verify `withTag("TAG")` produces events with the correct fixed tag.
+27. Verify scoped logger supports all log levels (`i/w/e/c/metric`).
+28. Verify `newScope("key" to value)` pre-injects attributes in all events from the scope.
+29. Verify `childScope("key" to value)` inherits parent scope attributes.
 
 ## Session & variant
-27. Verify `newSession()` generates a new `session_id`.
-28. Verify `setVariant(name)` appears in event data.
-29. Verify `clearVariant()` removes variant from subsequent events.
+30. Verify `newSession()` generates a new `session_id`.
+31. Verify `setSessionVariant("variant_name")` appears as `variant` field in event data.
+32. Verify `setSessionVariant(null)` clears variant from subsequent events.
 
 ## Background & lifecycle
-30. Verify `flush()` is called when app enters background.
-31. Verify no crash or hang occurs during flush.
+33. Verify `flush()` is called when app enters background.
+34. Verify no crash or hang occurs during flush.
 
 ## System snapshot
-32. Verify `NSProcessInfo.thermalState` is captured in device info.
-33. Verify `lowPowerModeEnabled` is captured in device info.
+35. Verify `NSProcessInfo.thermalState` is captured in device info.
+36. Verify `lowPowerModeEnabled` is captured in device info.

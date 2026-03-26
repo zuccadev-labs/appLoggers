@@ -20,10 +20,12 @@ Use this skill when the user needs:
 3. Keep naming stable and searchable.
 4. All log levels (`debug`, `info`, `warn`, `error`, `critical`) accept an optional `throwable: Throwable?` parameter — recommend it for any error or anomaly event.
 5. For classes that hold an `AppLogger` reference, recommend `Any.logD/I/W/E/C(logger, ...)` from `AppLoggerExtensions` to avoid repeating the tag manually.
-6. Recommend `withTag()` for classes that always log under the same domain tag.
+6. Recommend `withTag()` for classes that always log under the same domain tag — returns a `TaggedLogger` with fixed tag.
 7. Recommend `timed{}` for measuring latency of any operation.
 8. Recommend `logCatching{}` to replace try/catch boilerplate around operations that should log on failure.
 9. Recommend `loggerTag<T>()` for companion objects to avoid string literal tags.
+13. Recommend `newScope(vararg attributes)` when multiple events in a flow share the same context — avoids passing the same extra on every call. Use `childScope()` for nested contexts (session → player → segment).
+14. Do NOT recommend `addGlobalExtra()` for per-operation context — it pollutes the entire SDK. Use `newScope()` for isolated, per-operation context that doesn't affect other concurrent callers.
 10. `extra` values accept `Map<String, Any>` — Int, Long, Double, Boolean are preserved as native JSON primitives in Supabase JSONB, enabling typed queries.
 11. For operations that need duration measurement, recommend `OperationTrace` via `AppLoggerSDK.startTrace(name, vararg attributes)` — it emits `trace.<name>` metric with `duration_ms` automatically on `end()` or an ERROR event on `endWithError(error)`.
 12. For bandwidth-sensitive production apps, recommend `dailyDataLimitMb(n)` in `AppLoggerConfig.Builder()` — the SDK sheds non-critical events when the daily byte limit is reached; ERROR and CRITICAL are never shed.

@@ -16,6 +16,11 @@
 14. `dailyDataLimitMb` budget exceeded silently — non-critical events stop arriving mid-day with no error. Check if volume drops abruptly around the same time each day; increase the limit or disable it (`dailyDataLimitMb = 0`) if unintended.
 15. `remote-config delete` fails silently — verify the `id` UUID matches an existing row in `device_remote_config`. Use `apploggers remote-config list` first to confirm.
 
+16. `setConsent(true/false)` compile error — the API takes `ConsentLevel` enum, not Boolean: `setConsent(ConsentLevel.MARKETING)` / `setConsent(ConsentLevel.STRICT)`.
+17. `setVariant()` / `clearVariant()` not found — the real method is `setSessionVariant(variant: String?)`. Pass `null` to clear.
+18. `AppLoggerExceptionHandler` unresolved import — it's not an importable class. It's a property: `AppLoggerSDK.exceptionHandler` or `AppLoggerIos.shared.exceptionHandler`.
+19. `scopedLogger(tag)` not found — use `withTag(tag)` extension function to get a `TaggedLogger`. For attribute-injecting scope, use `newScope("key" to value)`.
+
 Fix policy for `local.properties`:
 
 1. Add only missing keys.

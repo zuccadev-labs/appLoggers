@@ -177,7 +177,33 @@ AppLoggerSDK.addGlobalExtra("ab_test", "checkout_v2")
 AppLoggerSDK.addGlobalExtra("experiment", "group_b")
 AppLoggerSDK.removeGlobalExtra("ab_test")
 AppLoggerSDK.clearGlobalExtra()
+
+// Session variant — A/B testing (campo top-level, no en extra)
+AppLoggerSDK.setSessionVariant("checkout_v2")
+AppLoggerSDK.setSessionVariant(null)  // limpiar
+
+// User properties — suprimidas en modo STRICT/PERFORMANCE
+AppLoggerSDK.setUserProperty("user_tier", "premium")
+AppLoggerSDK.setUserProperty("subscription", "annual")
+AppLoggerSDK.removeUserProperty("user_tier")
 ```
+
+## Consent management
+
+```kotlin
+import com.applogger.core.ConsentLevel
+
+// Cambiar nivel de consentimiento en runtime (persiste en SharedPreferences)
+AppLoggerSDK.setConsent(ConsentLevel.MARKETING)   // telemetría completa — opt-in recibido
+AppLoggerSDK.setConsent(ConsentLevel.PERFORMANCE) // solo métricas — T&C aceptados
+AppLoggerSDK.setConsent(ConsentLevel.STRICT)       // solo errores — sin consentimiento
+
+val level: ConsentLevel = AppLoggerSDK.getConsent()
+```
+
+Consent inference automática: CRITICAL/ERROR → STRICT, METRIC/WARN → PERFORMANCE, INFO/DEBUG → MARKETING.
+En modo STRICT: `user_id=null`, `device_id` pseudonimizado.
+Configurar nivel por defecto al inicializar: `.defaultConsentLevel(ConsentLevel.STRICT)` en el Builder.
 
 ## Device fingerprint (identificación persistente de dispositivo)
 

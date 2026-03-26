@@ -63,6 +63,7 @@ Do not use this skill when:
 
 1. `references/android-setup.md`
 2. `references/ios-kmp-setup.md`
+3. `references/config-reference.md` — all 25 AppLoggerConfig.Builder options with defaults and ranges
 
 ## Output standard
 

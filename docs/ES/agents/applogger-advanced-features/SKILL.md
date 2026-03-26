@@ -201,38 +201,60 @@ Esto garantiza que el límite diario se respeta incluso si la app se reinicia va
 
 ## Consent Management
 
-Controla si el SDK envía eventos. Sin consentimiento, los eventos se retienen (no se envían).
+Controla el nivel de procesamiento de datos. El SDK filtra eventos según el nivel activo.
 
-### iOS KMP
-
-```kotlin
-// Otorgar consentimiento (persiste en NSUserDefaults)
-AppLoggerIos.shared.setConsent(true)
-
-// Revocar consentimiento — eventos dejan de enviarse
-AppLoggerIos.shared.setConsent(false)
-```
-
-### Android
-
-El consentimiento en Android se gestiona mediante `minLevel` y `debugMode` en `AppLoggerConfig`.
-Para apps que requieren consentimiento GDPR explícito:
+### API — Android y iOS KMP
 
 ```kotlin
-// Patrón: inicializar con minLevel CRITICAL, subir a INFO tras consentimiento
-if (userHasConsented) {
-    AppLoggerSDK.setMinLevel(LogMinLevel.INFO)
-} else {
-    AppLoggerSDK.setMinLevel(LogMinLevel.CRITICAL)
-}
+import com.applogger.core.ConsentLevel
+
+// Android
+AppLoggerSDK.setConsent(ConsentLevel.MARKETING)   // telemetría completa (requiere opt-in)
+AppLoggerSDK.setConsent(ConsentLevel.PERFORMANCE) // + métricas y timing (requiere T&C)
+AppLoggerSDK.setConsent(ConsentLevel.STRICT)       // solo errores críticos, anonimizados
+
+val level: ConsentLevel = AppLoggerSDK.getConsent()
+
+// iOS KMP — mismo API
+AppLoggerIos.shared.setConsent(ConsentLevel.MARKETING)
+AppLoggerIos.shared.setConsent(ConsentLevel.STRICT)
+val level = AppLoggerIos.shared.getConsent()
 ```
 
 ### Niveles de consentimiento
 
-| Nivel | Comportamiento |
-|---|---|
-| `STRICT` | Solo errores críticos. `user_id` suprimido. `device_id` pseudonimizado. |
-| `MARKETING` | Telemetría completa habilitada incluyendo `user_id`. |
+| Nivel | Eventos que pasan | `user_id` | `device_id` | Base legal (GDPR) |
+|---|---|---|---|---|
+| `STRICT` | Solo CRITICAL/ERROR | Suprimido | SHA-256 pseudonimizado | Art. 6(1)(f) — interés legítimo |
+| `PERFORMANCE` | + METRIC y WARN | Opcional | Normal | "Service Improvement" consent |
+| `MARKETING` | Todos (default) | Presente | Normal | Art. 7 — opt-in explícito |
+
+### Inferencia automática de consentimiento
+
+El SDK infiere el nivel requerido por cada evento:
+- CRITICAL/ERROR → requiere `STRICT` mínimo (siempre pasan)
+- METRIC/WARN → requieren `PERFORMANCE` mínimo
+- INFO/DEBUG → requieren `MARKETING`
+
+### Override por scope
+
+```kotlin
+// Scope que siempre requiere mínimo PERFORMANCE, aunque el evento sea INFO
+val perfLog = AppLoggerSDK.newScope(
+    "component" to "network",
+    consentLevel = ConsentLevel.PERFORMANCE
+)
+perfLog.info("TAG", "Request latency: 120ms")  // pasa incluso en modo PERFORMANCE
+```
+
+### Configurar consent por defecto al inicializar
+
+```kotlin
+AppLoggerConfig.Builder()
+    .defaultConsentLevel(ConsentLevel.STRICT)  // iniciar en STRICT hasta obtener opt-in
+    .dataMinimizationEnabled(true)              // default true — anonimizar en STRICT
+    .build()
+```
 
 ---
 
@@ -240,22 +262,18 @@ if (userHasConsented) {
 
 Correlaciona eventos de múltiples dispositivos (mobile → TV → backend) usando un `trace_id` compartido.
 
-### iOS KMP
+### API — Android y iOS KMP
 
 ```kotlin
-// Establecer trace ID compartido (viene de tu API)
-AppLoggerIos.shared.setTraceId("order-abc-123")
-
-// El trace_id se adjunta a cada evento posterior
-AppLoggerIos.shared.clearTraceId()
-```
-
-### Android
-
-```kotlin
-AppLoggerSDK.addGlobalExtra("trace_id", "order-abc-123")
+// Android
+AppLoggerSDK.setTraceId("order-abc-123")
 // ...
-AppLoggerSDK.removeGlobalExtra("trace_id")
+AppLoggerSDK.clearTraceId()
+
+// iOS KMP
+AppLoggerIos.shared.setTraceId("order-abc-123")
+// ...
+AppLoggerIos.shared.clearTraceId()
 ```
 
 ### Consultar en CLI
@@ -271,22 +289,26 @@ apploggers telemetry query --source logs \
 
 ## Breadcrumbs — Trail de navegación
 
-Registra un historial de pantallas o eventos visitados antes de un error.
+Registra un historial de acciones/pantallas visitadas antes de un error.
 
-### iOS KMP
+### API — Android y iOS KMP
 
 ```kotlin
-AppLoggerIos.shared.recordBreadcrumb("HomeScreen")
-AppLoggerIos.shared.recordBreadcrumb("SearchScreen")
-AppLoggerIos.shared.recordBreadcrumb("PlayerScreen")
+// Signature completa: recordBreadcrumb(action, screen?, metadata?)
+AppLoggerSDK.recordBreadcrumb("tap_play")
+AppLoggerSDK.recordBreadcrumb("screen_enter", screen = "PlayerScreen")
+AppLoggerSDK.recordBreadcrumb("api_call", screen = "HomeScreen", metadata = mapOf("endpoint" to "/feed"))
 
-// Los breadcrumbs aparecen en extra.breadcrumbs de cada evento posterior
+// iOS KMP — mismo API
+AppLoggerIos.shared.recordBreadcrumb("tap_play")
+AppLoggerIos.shared.recordBreadcrumb("screen_enter", screen = "PlayerScreen")
 ```
 
-### Android — Patrón equivalente
-
+El SDK retiene los últimos `breadcrumbCapacity` breadcrumbs (default: 10). Configurable:
 ```kotlin
-AppLoggerSDK.addGlobalExtra("breadcrumbs", listOf("HomeScreen", "SearchScreen"))
+AppLoggerConfig.Builder()
+    .breadcrumbCapacity(20)  // 0 = desactivado
+    .build()
 ```
 
 ### Por qué es útil
@@ -300,19 +322,17 @@ antes del fallo — sin necesidad de reproducir el problema manualmente.
 
 Etiqueta la sesión para distinguir variantes de experimentos.
 
-### iOS KMP
+### API — Android y iOS KMP
 
 ```kotlin
-AppLoggerIos.shared.setVariant("checkout_v2")
-// Todos los eventos de esta sesión llevan el variant
-AppLoggerIos.shared.clearVariant()
-```
+// Android — setSessionVariant acepta String?, null para limpiar
+AppLoggerSDK.setSessionVariant("checkout_v2")
+// Todos los eventos llevan "variant" como campo top-level
+AppLoggerSDK.setSessionVariant(null)  // limpiar
 
-### Android
-
-```kotlin
-AppLoggerSDK.addGlobalExtra("variant", "checkout_v2")
-AppLoggerSDK.removeGlobalExtra("variant")
+// iOS KMP — mismo API
+AppLoggerIos.shared.setSessionVariant("checkout_v2")
+AppLoggerIos.shared.setSessionVariant(null)
 ```
 
 ### Consultar resultados de A/B en Supabase
@@ -335,16 +355,74 @@ ORDER BY variant, level;
 Captura automáticamente todas las excepciones no manejadas en coroutines.
 
 ```kotlin
-import com.applogger.core.AppLoggerExceptionHandler
+// exceptionHandler es una PROPIEDAD del SDK — no una importación separada
 
-// Usar en cualquier CoroutineScope
-val scope = CoroutineScope(Dispatchers.Default + AppLoggerExceptionHandler)
+// Android
+val scope = CoroutineScope(Dispatchers.Default + AppLoggerSDK.exceptionHandler)
+// O en ViewModel:
+val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + AppLoggerSDK.exceptionHandler)
 
-// Las excepciones no capturadas se loguean como CRITICAL automáticamente
-// No necesitas try/catch en cada coroutine
+// iOS KMP
+val scope = CoroutineScope(Dispatchers.Default + AppLoggerIos.shared.exceptionHandler)
 ```
 
-Este handler es especialmente útil en `viewModelScope`, `lifecycleScope`, y scopes de servicio.
+Las excepciones no capturadas se loguean como CRITICAL con `anomaly_type = "coroutine_crash"`.
+Útil en `viewModelScope`, `lifecycleScope`, y scopes de servicio/background.
+
+---
+
+## ScopedAppLogger — Scope con atributos pre-inyectados
+
+`newScope()` crea un logger que automáticamente inyecta atributos en todos los eventos — sin boilerplate por llamada.
+
+```kotlin
+// Android
+val log = AppLoggerSDK.newScope(
+    "content_id" to contentId,
+    "user_tier"  to "premium",
+    "session_id" to sessionId
+)
+log.error("PLAYER", "Stall detected", stallException)
+// → event incluye content_id, user_tier, session_id automáticamente
+
+// iOS KMP
+val log = AppLoggerIos.shared.newScope("content_id" to contentId)
+log.warn("PLAYER", "Buffer low", anomalyType = "buffer_underrun")
+```
+
+### childScope — herencia de atributos
+
+```kotlin
+val sessionLog = AppLoggerSDK.newScope("session_id" to sessionId)
+// Child scope hereda session_id y añade más:
+val playerLog = sessionLog.childScope("content_id" to contentId, "quality" to "4K")
+playerLog.error("PLAYER", "Codec error", e)
+// → event incluye session_id + content_id + quality
+```
+
+### Combinar scope + tag fijo (patrón recomendado)
+
+```kotlin
+// ScopedAppLogger implementa AppLogger → withTag funciona
+val log = AppLoggerSDK.newScope("content_id" to contentId).withTag("PlayerController")
+log.e("Stall detected", throwable = e)  // tag="PlayerController", extra incluye content_id
+```
+
+### Consent override por scope
+
+```kotlin
+// Solo emitir PERFORMANCE+ para este scope (ignorar inferencia de nivel)
+val perfLog = AppLoggerSDK.newScope(
+    "component" to "network",
+    consentLevel = ConsentLevel.PERFORMANCE
+)
+```
+
+### Priority chain (menor → mayor prioridad)
+
+`globalExtra` → scope attributes → per-call `extra`
+
+Per-call `extra` siempre gana sobre el scope. Scope attributes ganan sobre globalExtra.
 
 ---
 
@@ -357,11 +435,18 @@ Este handler es especialmente útil en `viewModelScope`, `lifecycleScope`, y sco
 5. El WiFi multiplier es `2×` por defecto — no se puede cambiar vía config actual.
 6. Nunca usar `AppLoggerSDK` en iOS KMP — usar `AppLoggerIos.shared`.
 7. Los breadcrumbs se acumulan durante la sesión — limpiarlos en logout si contienen rutas sensibles.
+8. `setConsent()` acepta `ConsentLevel` enum (STRICT/PERFORMANCE/MARKETING) — NO un Boolean.
+9. `setSessionVariant(null)` limpia el variant — no existe `clearVariant()`.
+10. `exceptionHandler` es una propiedad del SDK singleton — no es un import separado.
+11. `setUserProperty(key, value)` almacena como `user_prop_<key>` en extra — suprimido en STRICT/PERFORMANCE.
+12. `newScope()` crea un `ScopedAppLogger` aislado — no contamina el SDK global con `addGlobalExtra`.
 
 ## References bundled with this skill
 
 1. `references/operation-trace-guide.md`
 2. `references/data-budget-guide.md`
+3. `references/consent-guide.md`
+4. `references/scoped-logger-guide.md`
 
 ## Output standard
 
