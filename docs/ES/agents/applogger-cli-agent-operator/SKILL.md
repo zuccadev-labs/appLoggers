@@ -351,7 +351,7 @@ apploggers telemetry agent-response \
 
 ### `apploggers telemetry stats`
 
-**When to use**: Quick context before a detailed query. Error rate, top tags, distribution by environment.
+**When to use**: Resumen estadístico: error rate, top tags, eventos por hora. Soporta todos los filtros estándar.
 
 ```bash
 apploggers telemetry stats \
@@ -363,7 +363,7 @@ apploggers telemetry stats \
 
 ### `apploggers telemetry stream`
 
-**When to use**: Frontend SSE integration. Pipe to an HTTP proxy that exposes it as `text/event-stream`.
+**When to use**: Streaming SSE (`text/event-stream`) para frontend EventSource.
 
 ```bash
 apploggers telemetry stream \
@@ -375,7 +375,7 @@ apploggers telemetry stream \
 
 ### `apploggers telemetry tail`
 
-**When to use**: Real-time debugging from terminal. Human-readable follow mode.
+**When to use**: Modo follow (`tail -f`) para logs en tiempo real.
 
 ```bash
 apploggers telemetry tail \
@@ -432,6 +432,39 @@ apploggers remote-config delete --id 42 --output json
 | `--enabled` | bool | Enable/disable this config entry (default: true) |
 
 **Flow**: CLI writes to `device_remote_config` table → SDK polls every N seconds → SDK applies overrides (debug gate, minLevel, tag filtering, sampling). ERROR/CRITICAL always pass regardless of remote config.
+
+### `apploggers verify` — Verificación de integridad HMAC
+
+**Cuándo usar**: Verificación de integridad HMAC-SHA256 de batches contra tabla `log_batches`.
+
+```bash
+apploggers verify \
+  --from 2026-03-20T00:00:00Z \
+  --to 2026-03-25T23:59:59Z \
+  --environment production \
+  --output json
+
+# Ejemplo de salida:
+# { "ok": true, "total_batches": 42, "tampered": 0 }
+```
+
+**Flags**: `--from`, `--to`, `--environment`
+
+### `apploggers explain <error-id>` — Análisis de error
+
+**Cuándo usar**: Análisis de error: contexto del evento, eventos similares, correlación por dispositivo, sugerencia.
+
+```bash
+apploggers explain abc-123-uuid --output json
+```
+
+### `apploggers audit privacy` — Auditoría de PII y compliance
+
+**Cuándo usar**: Análisis de PII y compliance de consentimiento en logs.
+
+```bash
+apploggers audit privacy --output json
+```
 
 ### `apploggers erase` — Beta Tester Data Erasure (GDPR)
 

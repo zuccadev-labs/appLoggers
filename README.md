@@ -97,6 +97,9 @@ appLoggers/
 - **Batch integrity** — SHA-256 hash por batch + manifest en `log_batches` para verificación CLI
 - **iOS KMP full parity** — 100% Kotlin Multiplatform, cero archivos Swift/Ruby de implementación
 - **GDPR erasure** — CLI `erase` borra datos por `--user-id` o `--device-id` con limpieza de batch manifests
+- **OperationTrace span API** — `startTrace(name)`, `.tag()`, `.bytes()`, `.end()`, `.endWithError()` para trazabilidad de operaciones
+- **DataBudgetManager** — límite diario de bytes con multiplicador WiFi (2×) y protección contra overflow
+- **Thread safety iOS real** — `platformSynchronized` con `NSRecursiveLock` (eliminado el no-op)
 
 ## Versionado Profesional
 
@@ -169,6 +172,20 @@ apploggers remote-config delete --fingerprint "sha256..."
 # GDPR erasure — borrar datos por usuario o dispositivo
 apploggers erase --user-id "user-123" --output json
 apploggers erase --device-id "device-456" --output json
+
+# Verificación de integridad HMAC-SHA256
+apploggers verify --from 2024-01-01T00:00:00Z --output json
+
+# Análisis de errores con correlación
+apploggers explain abc-123 --output json
+
+# Análisis PII y compliance
+apploggers audit privacy --output json
+
+# Estadísticas, streaming SSE, modo follow
+apploggers telemetry stats --environment production --output json
+apploggers telemetry stream --environment production
+apploggers telemetry tail --environment production --min-severity error
 ```
 
 ### Documentación CLI
@@ -541,6 +558,8 @@ AppLoggerIos.shared.flush()
 | 12 | `docs/ES/migraciones/012_enterprise_indexes_views.sql` | Índices y vistas empresariales |
 | 13 | `docs/ES/migraciones/013_device_remote_config.sql` | Tablas `device_remote_config` y `device_fingerprints` |
 | 14 | `docs/ES/migraciones/014_beta_tester_correlation.sql` | Tabla `beta_testers` y correlación de eventos |
+| 15 | `docs/ES/migraciones/015_add_client_timestamp.sql` | Columna timestamp BIGINT en `app_logs` |
+| 16 | `docs/ES/migraciones/016_add_metrics_user_id.sql` | Columna `user_id` en `app_metrics` |
 
 3. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`
 

@@ -20,6 +20,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ### Added — SDK
 
+**OperationTrace & Data Budget:**
+- **OperationTrace span API** — `startTrace(name)`, `.tag()`, `.bytes()`, `.withTimeout()`, `.end()`, `.endWithError()` con métricas automáticas
+- **DataBudgetManager** — límite diario de bytes con multiplicador WiFi (2×) y protección contra overflow
+- **BatchProcessor** — flush automático en shutdown para no perder eventos buffereados
+- **iOS: `platformSynchronized`** — con `NSRecursiveLock` real (eliminado el no-op)
+- **iOS: parseo de `tags_allow`/`tags_block`** — como JSON array (TEXT[]) en lugar de string
+- **SupabaseMetricEntry** — envía `user_id` para GDPR Art. 17
+
 **iOS KMP: paridad completa de features (100% Kotlin Multiplatform, cero Swift/Ruby):**
 - **Device fingerprint** — `sha256Hex("$idfv:$bundleId")` via `UIDevice.currentDevice.identifierForVendor`. Automático al inicializar, consultable con `getDeviceFingerprint()`.
 - **Remote config polling** — `startRemoteConfig(intervalSeconds)` / `stopRemoteConfig()`. Polling via `CoroutineScope(Dispatchers.Default + SupervisorJob())` con `delay` loop. HTTP via `NSURLSession` con `dispatch_semaphore`.
@@ -40,6 +48,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ### Added — CLI
 
+- **`verify`** — verificación de integridad HMAC-SHA256 con truncación UTF-8 por caracteres
+- **`explain <error-id>`** — análisis de errores con correlación de dispositivos
+- **`audit privacy`** — análisis de PII y compliance de consentimiento
+- **`telemetry stats`** — resumen estadístico rápido
+- **`telemetry stream`** — streaming SSE para frontends
+- **`telemetry tail`** — modo follow en tiempo real
 - **`--fingerprint` flag** en `telemetry query` — filtra logs por device fingerprint SHA-256 pseudonymizado via PostgREST JSONB: `extra->>device_fingerprint=eq.VALUE`. Solo disponible para `--source logs`.
 - **`health --deep` probes ampliados** — ahora verifica 5 tablas: `app_logs`, `app_metrics`, `log_batches`, `device_remote_config`, `beta_testers`. Helper `probeTable()` reutiliza `queryTelemetry` con tabla overrideada.
 - **`remote-config list`** — listar configuraciones remotas activas, filtrar por `--environment` y `--fingerprint`. Soporta `--output text|json|csv`.
@@ -55,6 +69,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 - **012** (`012_enterprise_indexes_views.sql`) — índices y vistas empresariales.
 - **013** (`013_device_remote_config.sql`) — tablas `device_remote_config` y `device_fingerprints`.
 - **014** (`014_beta_tester_correlation.sql`) — tabla `beta_testers` y correlación de eventos.
+- **015** (`015_add_client_timestamp.sql`) — columna timestamp BIGINT en `app_logs`
+- **016** (`016_add_metrics_user_id.sql`) — columna `user_id` en `app_metrics`
+
+### Fixed
+
+- CLI: truncación UTF-8 en `verify.go` usa `[]rune` en vez de bytes
+- CLI: `batchStatusNoSecret` separado de `okCount` para no enmascarar manipulación
+- CLI: erase atómico con `return=representation` (elimina race condition)
+- SDK: `OperationTrace` — check `ended` dentro del lock (fix TOCTOU race)
+- SDK: `BatchProcessor.enqueue()` — guard `scope.isActive` antes de `trySend()`
+- SDK: `handleFailure` — catch `CancellationException` durante delay, persiste eventos
 
 ### Changed — Documentation
 

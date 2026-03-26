@@ -14,3 +14,7 @@ All gates must pass:
 10. Two-app correlation: frontend sends email → Supabase trigger stores mapping → backend on same device auto-fills email via `trg_correlate_beta_tester`.
 11. `app_package` global extra is present in all events (distinguishes apps on same device).
 12. `environment` field is set and matches expected value (`production`, `staging`, `development`).
+13. HMAC batch integrity — el comando `verify` retorna `ok=true` y `tampered=0` para todos los batches del rango.
+14. GDPR cascade — `erase --confirm` borra de las 5 tablas (app_logs, app_metrics, beta_tester_devices, device_remote_config, log_batches).
+15. OperationTrace — `startTrace`/`end` emite metric `trace.*` con `duration_ms`.
+16. DataBudget — `recordBytesSent` respeta límite diario, `shouldShedLowPriority` activa cuando se excede.
