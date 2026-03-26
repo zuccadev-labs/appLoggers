@@ -58,21 +58,26 @@ Do not cross these entry points between platforms.
 
 ```kotlin
 val transport = SupabaseTransport(
- endpoint = BuildConfig.LOGGER_URL,
- apiKey = BuildConfig.LOGGER_KEY
+    endpoint = BuildConfig.LOGGER_URL,
+    apiKey = BuildConfig.LOGGER_KEY,
+    networkAvailabilityProvider = androidNetworkAvailabilityProvider(this)
 )
 
 AppLoggerSDK.initialize(
- context = this,
- config = AppLoggerConfig.Builder()
-  .endpoint(BuildConfig.LOGGER_URL)
-  .apiKey(BuildConfig.LOGGER_KEY)
-  .debugMode(BuildConfig.LOGGER_DEBUG)
-  .consoleOutput(BuildConfig.LOGGER_DEBUG)
-  .batchSize(20)
-  .flushIntervalSeconds(30)
-  .build(),
- transport = transport
+    context = this,
+    config = AppLoggerConfig.Builder()
+        .endpoint(BuildConfig.LOGGER_URL)
+        .apiKey(BuildConfig.LOGGER_KEY)
+        .environment("production")          // "production" | "staging" | "development"
+        .debugMode(BuildConfig.LOGGER_DEBUG)
+        .consoleOutput(BuildConfig.LOGGER_DEBUG)
+        .minLevel(LogMinLevel.INFO)          // descarta DEBUG en producción
+        .batchSize(20)
+        .flushIntervalSeconds(30)
+        .remoteConfigEnabled(true)          // activa polling de config remota
+        .remoteConfigIntervalSeconds(300)
+        .build(),
+    transport = transport
 )
 ```
 
@@ -82,17 +87,21 @@ Before applying this snippet, verify that `BuildConfig.LOGGER_URL`, `BuildConfig
 
 ```kotlin
 val config = AppLoggerConfig.Builder()
- .endpoint(url)
- .apiKey(anonKey)
- .debugMode(debugMode)
- .consoleOutput(debugMode)
- .batchSize(20)
- .flushIntervalSeconds(30)
- .build()
+    .endpoint(url)
+    .apiKey(anonKey)
+    .environment("production")          // "production" | "staging" | "development"
+    .debugMode(debugMode)
+    .consoleOutput(debugMode)
+    .minLevel(LogMinLevel.INFO)         // descarta DEBUG en producción
+    .batchSize(20)
+    .flushIntervalSeconds(30)
+    .build()
 
 val transport = SupabaseTransport(endpoint = url, apiKey = anonKey)
 
 AppLoggerIos.shared.initialize(config = config, transport = transport)
+// Iniciar polling de config remota (opcional)
+AppLoggerIos.shared.startRemoteConfig(intervalSeconds = 300)
 ```
 
 Logcat visibility rule: output is shown only when `isDebugMode=true` and `consoleOutput=true`.
@@ -146,6 +155,24 @@ from the developer's auth logic. `APPLOGGER_BETA_TESTER=true` only activates the
 For two apps on the same device, they share the same `device_id` but have different
 `device_fingerprint` hashes (fingerprint includes package_name). Use `device_id` or
 a shared `user_id` to correlate events across apps.
+
+## OperationTrace — Span de performance
+
+Para medir el tiempo de operaciones críticas y detectar degradación:
+
+```kotlin
+// Android — en Application o cualquier clase que tenga AppLogger
+val trace = AppLoggerSDK.startTrace("api_call", "endpoint" to url)
+try {
+    val result = api.fetch(url)
+    trace.end(mapOf("status_code" to result.status))
+} catch (e: Exception) {
+    trace.endWithError(e, failureReason = "network_error")
+}
+// → Emite métrica trace.api_call con duration_ms
+```
+
+Ver skill `applogger-advanced-features` para el API completa de OperationTrace.
 
 ## What not to do on first pass
 

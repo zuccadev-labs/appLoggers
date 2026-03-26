@@ -262,6 +262,53 @@ val health = AppLoggerHealth.snapshot()
 println("initialized=${health.isInitialized}, transport=${health.transportAvailable}, buffered=${health.bufferedEvents}")
 ```
 
+## OperationTrace — Spans de performance
+
+Mide el tiempo de cualquier operación en código commonMain o iosMain:
+
+```kotlin
+import com.applogger.core.AppLoggerIos
+import com.applogger.core.OperationTrace
+
+// Abrir span
+val trace = AppLoggerIos.shared.startTrace("sync_operation", "source" to "cloud")
+
+try {
+    syncManager.sync()
+    trace.end()
+    // → emite métrica trace.sync_operation con duration_ms
+} catch (e: Exception) {
+    trace.endWithError(e, failureReason = "sync_failed")
+    // → emite evento ERROR Trace.sync_operation
+}
+```
+
+Fluent API:
+```kotlin
+AppLoggerIos.shared.startTrace("upload", "filename" to filename)
+    .bytes(fileBytes.size.toLong())
+    .withTimeout(30_000)
+    .end()
+// → emite trace.upload con throughput_mbps calculado
+```
+
+Ver skill `applogger-advanced-features` para el API completa.
+
+## DataBudgetManager — Límite diario de datos
+
+```kotlin
+val config = AppLoggerConfig.Builder()
+    .endpoint(url)
+    .apiKey(anonKey)
+    .environment("production")
+    .dailyDataLimitMb(50)   // 50 MB/día. 0 (default) = sin límite
+    .build()
+AppLoggerIos.shared.initialize(config = config, transport = transport)
+```
+
+El límite persiste en `NSUserDefaults` entre reinicios. En WiFi, el límite efectivo es `50 × 2 = 100 MB`.
+ERROR y CRITICAL nunca se descartan independientemente del límite.
+
 ## Guardrails
 
 1. Do not use `AppLoggerSDK` in iOS — use `AppLoggerIos.shared`.
@@ -272,3 +319,5 @@ println("initialized=${health.isInitialized}, transport=${health.transportAvaila
 6. Always call `setConsent(true)` before expecting events to be sent.
 7. Remote config interval must be between 30 and 3600 seconds.
 8. Device fingerprint is SHA-256 pseudonymized — never store raw device identifiers.
+9. Always call `trace.end()` or `trace.endWithError()` — unclosed spans emit nothing.
+10. `dailyDataLimitMb = 0` disables the budget (default). Persistence via NSUserDefaults survives app restarts within the same UTC day.
