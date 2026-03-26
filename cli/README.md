@@ -22,6 +22,8 @@ AppLogger CLI is the command-line entry point for telemetry exploration and oper
   - `remote-config list` / `set` / `delete`
   - `erase` (GDPR data erasure)
   - `verify` (batch integrity)
+  - `explain <error-id>` — Error analysis with device correlation
+  - `audit privacy` — PII and consent compliance analysis
   - `upgrade`
 
 ## Agent-First Contract
@@ -263,6 +265,21 @@ applogger-cli telemetry query \
   --severity error \
   --limit 50 \
   --output json
+
+# Verify batch integrity (HMAC-SHA256)
+apploggers verify --from 2024-01-01T00:00:00Z --output json
+
+# Explain an error with device correlation
+apploggers explain abc-123 --output json
+
+# Telemetry stats summary
+apploggers telemetry stats --environment production --output json
+
+# SSE streaming for frontends
+apploggers telemetry stream --environment production
+
+# Follow mode (tail) with severity filter
+apploggers telemetry tail --environment production --min-severity error
 ```
 
 ### Aggregation Modes
