@@ -112,6 +112,11 @@ data class AppLoggerConfig(
      */
     val integritySecret: String = "",
     /**
+     * Versioned identifier associated with [integritySecret]. Persisted in batch manifests
+     * so the CLI can resolve the correct historical key during verification.
+     */
+    val integritySecretId: String = "",
+    /**
      * Daily data limit in megabytes. When reached, non-critical events are shed
      * until the next UTC day. Set to 0 to disable (default).
      */
@@ -130,7 +135,14 @@ data class AppLoggerConfig(
      * Only effective when [remoteConfigEnabled] is true.
      * Default: 300 (5 minutes). Range: 30–3600.
      */
-    val remoteConfigIntervalSeconds: Int = 300
+    val remoteConfigIntervalSeconds: Int = 300,
+    /**
+     * Enables optional forensic caller capture for source_file/source_method and a richer
+     * source_scope when the SDK can resolve the callsite.
+     *
+     * Default: false. Keep disabled on the hot path unless you explicitly need callsite forensics.
+     */
+    val captureCallerInfo: Boolean = false
 ) {
     @Suppress("TooManyFunctions")
     class Builder {
@@ -153,9 +165,11 @@ data class AppLoggerConfig(
         private var defaultConsentLevel: ConsentLevel = ConsentLevel.MARKETING
         private var dataMinimizationEnabled: Boolean = true
         private var integritySecret: String = ""
+        private var integritySecretId: String = ""
         private var dailyDataLimitMb: Int = 0
         private var remoteConfigEnabled: Boolean = false
         private var remoteConfigIntervalSeconds: Int = 300
+        private var captureCallerInfo: Boolean = false
 
         fun endpoint(url: String) = apply { endpoint = url }
         fun apiKey(key: String) = apply { apiKey = key }
@@ -179,11 +193,13 @@ data class AppLoggerConfig(
         fun defaultConsentLevel(level: ConsentLevel) = apply { defaultConsentLevel = level }
         fun dataMinimizationEnabled(enabled: Boolean) = apply { dataMinimizationEnabled = enabled }
         fun integritySecret(secret: String) = apply { integritySecret = secret.trim() }
+        fun integritySecretId(id: String) = apply { integritySecretId = id.trim() }
         fun dailyDataLimitMb(mb: Int) = apply { dailyDataLimitMb = maxOf(0, mb) }
         fun remoteConfigEnabled(enabled: Boolean) = apply { remoteConfigEnabled = enabled }
         fun remoteConfigIntervalSeconds(sec: Int) = apply {
             remoteConfigIntervalSeconds = sec.coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX)
         }
+        fun captureCallerInfo(enabled: Boolean) = apply { captureCallerInfo = enabled }
 
         fun build(): AppLoggerConfig {
             require(endpoint.startsWith("https://") || isDebugMode || endpoint.isEmpty()) {
@@ -209,10 +225,12 @@ data class AppLoggerConfig(
                 defaultConsentLevel = defaultConsentLevel,
                 dataMinimizationEnabled = dataMinimizationEnabled,
                 integritySecret = integritySecret,
+                integritySecretId = integritySecretId,
                 dailyDataLimitMb = dailyDataLimitMb,
                 remoteConfigEnabled = remoteConfigEnabled,
                 remoteConfigIntervalSeconds = remoteConfigIntervalSeconds
-                    .coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX)
+                    .coerceIn(REMOTE_CONFIG_INTERVAL_MIN, REMOTE_CONFIG_INTERVAL_MAX),
+                captureCallerInfo = captureCallerInfo
             )
         }
     }

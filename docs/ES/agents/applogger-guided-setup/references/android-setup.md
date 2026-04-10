@@ -481,6 +481,35 @@ class MyApp : Application() {
 }
 ```
 
+### Dónde hacerlo en apps reales
+
+La ubicación correcta no es el botón de la pantalla de login por sí solo, sino la capa que
+confirma la autenticación exitosa.
+
+- Compose/UI: captura el email que el usuario escribió.
+- AuthService/ViewModel/Repository: después de que tu proveedor auth confirme la sesión, llama `AppLoggerSDK.setBetaTester(email)`.
+- Logout o session reset: llama `AppLoggerSDK.clearBetaTester()` para no arrastrar el correo a una sesión posterior.
+
+Ejemplo con login propio:
+
+```kotlin
+suspend fun signIn(email: String, password: String) {
+    val user = authBackend.signIn(email, password)
+
+    if (BuildConfig.IS_BETA_TESTER) {
+        AppLoggerSDK.setBetaTester(email)
+    }
+
+    AppLoggerSDK.setAnonymousUserId(user.id)
+}
+
+suspend fun signOut() {
+    authBackend.signOut()
+    AppLoggerSDK.clearBetaTester()
+    AppLoggerSDK.clearAnonymousUserId()
+}
+```
+
 ### Qué se inyecta en cada evento
 
 Cuando `setBetaTester()` está activo, cada evento lleva en `extra`:

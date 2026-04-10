@@ -28,6 +28,10 @@ Use this skill when the integration already works and needs production quality:
 11. Beta tester mode: `APPLOGGER_BETA_TESTER=true` is boolean only. Email captured at runtime from developer's auth flow — never hardcode emails in config.
 12. Beta tester data auto-expires after 90 days (GDPR Art. 5.1.e). Verify `expire_beta_tester_mappings()` is scheduled in production.
 13. DataBudgetManager: for bandwidth-sensitive apps, set `dailyDataLimitMb(n)` in `AppLoggerConfig.Builder()`. Default is `0` (disabled). On WiFi, effective limit doubles automatically (wifiMultiplier = 2×). ERROR and CRITICAL events are never shed regardless of budget state.
+14. Avoid duplicating AppLogger URL/key in packaged asset files if the same values are already mapped via secure build configuration.
+15. For headless/service apps, review shutdown paths and ensure there is an intentional `flush()` before process teardown.
+16. For constrained devices such as TVs, kiosks, or low-storage appliances, choose `offlinePersistenceMode` deliberately instead of keeping the default implicitly.
+17. Keep production log messages searchable and low-noise; avoid PII, raw tokens, and decorative message formats.
 
 ## Workflow
 
@@ -36,6 +40,14 @@ Use this skill when the integration already works and needs production quality:
 3. Tune batch, flush, and overflow settings.
 4. Validate release defaults.
 5. Produce hardening checklist.
+
+## Hardening focus for mature Android service integrations
+
+1. Ensure `minLevel(LogMinLevel.INFO)` or stricter in production.
+2. Use `config.validate()` in development builds so bad prod/debug combinations are caught before release.
+3. Tune buffer overflow and flush interval for the process lifetime profile: aggressive flush for headless services, slower flush for interactive apps.
+4. If storage is constrained, justify `OfflinePersistenceMode.NONE`; otherwise prefer an explicit durable mode.
+5. Review uncaught-exception handlers so AppLogger logging and upstream crash handling are both preserved.
 
 ## References bundled with this skill
 

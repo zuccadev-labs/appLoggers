@@ -83,6 +83,54 @@ AppLoggerSDK.initialize(
 
 Before applying this snippet, verify that `BuildConfig.LOGGER_URL`, `BuildConfig.LOGGER_KEY`, and `BuildConfig.LOGGER_DEBUG` exist. If they do not exist, map values from your current config source first.
 
+## Mature Android service-app pattern
+
+When the consumer app behaves like a TV service, kiosk app, local server, or worker-heavy Android app, prefer this stronger pattern:
+
+1. Build a dedicated initializer object instead of inlining setup in `Application`.
+2. Initialize in `Application.onCreate()` before any service, worker, receiver, or embedded API server starts producing telemetry.
+3. After `initialize()`, set a pseudonymous identity from `AppLoggerSDK.getDeviceFingerprint()` if the app needs per-device correlation before user auth.
+4. Add `app_package` once through `addGlobalExtra()`.
+5. Emit both a startup BOOT log and an initial `AppLoggerHealth.snapshot()` log.
+6. If the app has controlled shutdown points, emit final health and call `AppLoggerSDK.flush()`.
+
+Example structure:
+
+```kotlin
+object AppLoggerInitializer {
+    fun init(context: Context) {
+        val transport = SupabaseTransport(
+            endpoint = BuildConfig.LOGGER_URL,
+            apiKey = BuildConfig.LOGGER_KEY,
+            networkAvailabilityProvider = androidNetworkAvailabilityProvider(context)
+        )
+
+        val config = AppLoggerConfig.Builder()
+            .endpoint(BuildConfig.LOGGER_URL)
+            .apiKey(BuildConfig.LOGGER_KEY)
+            .environment(BuildConfig.LOGGER_ENVIRONMENT)
+            .debugMode(BuildConfig.LOGGER_DEBUG)
+            .consoleOutput(BuildConfig.LOGGER_DEBUG)
+            .minLevel(LogMinLevel.INFO)
+            .remoteConfigEnabled(true)
+            .build()
+
+        if (BuildConfig.DEBUG) config.validate()
+
+        AppLoggerSDK.initialize(context = context, config = config, transport = transport)
+
+        AppLoggerSDK.getDeviceFingerprint()?.takeIf { it.isNotBlank() }?.let {
+            AppLoggerSDK.setAnonymousUserId(it)
+        }
+
+        AppLoggerSDK.addGlobalExtra("app_package", BuildConfig.APPLICATION_ID)
+        AppLoggerSDK.logI("BOOT", "App started")
+    }
+}
+```
+
+This is the preferred baseline for mature Android consumers already running background services or multiple server surfaces.
+
 ## Canonical initialization snippet (iOS KMP)
 
 ```kotlin
@@ -126,12 +174,23 @@ The SDK automatically captures a persistent, pseudonymized device fingerprint:
 4. Use CLI `apploggers remote-config set --fingerprint <hash> --debug true` to control devices.
 5. ERROR/CRITICAL events are **never filtered** by remote config — they always pass.
 
+### Dos identificadores de dispositivo — no confundir
+
+| Identificador | Dónde vive | Origen | Vacío posible |
+|---|---|---|---|
+| `device_id` | Columna top-level en `app_logs` y `app_metrics` | UUID v5: `SHA256(platform+brand+model+osVersion+apiLevel+appVersion+appBuild)` | **Nunca** — siempre un UUID válido |
+| `device_fingerprint` | `extra->>'device_fingerprint'` (JSONB) | SHA-256(`ANDROID_ID:package_name`) | **Sí** — en emuladores o tras factory reset |
+
+- **`device_id`** es estable por modelo+versión de app. Dos dispositivos idénticos del mismo modelo tendrán el mismo `device_id`. Para `device_remote_config`, usar `device_fingerprint` (es único por dispositivo físico).
+- **`device_fingerprint`** puede ser string vacío `""` en emuladores (ANDROID_ID = null). Esto no afecta a `device_id`. El remote config global (fingerprint = NULL en la tabla) sirve como fallback.
+
 ### Database tables involved
 
 | Table | Column | Purpose |
 |---|---|---|
-| `app_logs` | `extra->>'device_fingerprint'` | JSONB field on every event |
-| `device_remote_config` | `device_fingerprint` | Config rule key (NULL = global) |
+| `app_logs` | `device_id` | UUID v5 de metadatos del dispositivo — top-level column, nunca vacío |
+| `app_logs` | `extra->>'device_fingerprint'` | JSONB: SHA-256(ANDROID_ID+package) — puede ser "" en emuladores |
+| `device_remote_config` | `device_fingerprint` | Config rule key (NULL = global rule, aplica a todos) |
 
 ### Required migration
 
@@ -181,3 +240,6 @@ Ver skill `applogger-advanced-features` para el API completa de OperationTrace.
 3. Do not add AppLogger to unrelated layers without a reason.
 4. Do not introduce platform-specific iOS host code if the project is KMP.
 5. Do not expose raw `ANDROID_ID` — the SDK already pseudonymizes it via SHA-256.
+6. Do not log JWTs, emails, stable user IDs, or refresh tokens in message strings.
+7. Do not keep production log messages full of emojis or unstable prose if operators will query them mechanically.
+8. Do not duplicate AppLogger endpoint/key in both `BuildConfig` and packaged asset/config files unless both are truly required.

@@ -22,13 +22,16 @@ type cliProjectProfile struct {
 }
 
 type cliProjectSupabaseProfile struct {
-	URL            string `json:"url"`
-	APIKey         string `json:"api_key,omitempty"`
-	APIKeyEnv      string `json:"api_key_env,omitempty"`
-	Schema         string `json:"schema,omitempty"`
-	LogsTable      string `json:"logs_table,omitempty"`
-	MetricsTable   string `json:"metrics_table,omitempty"`
-	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+	URL               string            `json:"url"`
+	APIKey            string            `json:"api_key,omitempty"`
+	APIKeyEnv         string            `json:"api_key_env,omitempty"`
+	Schema            string            `json:"schema,omitempty"`
+	LogsTable         string            `json:"logs_table,omitempty"`
+	MetricsTable      string            `json:"metrics_table,omitempty"`
+	IntegritySecret   string            `json:"integrity_secret,omitempty"`
+	IntegritySecretID string            `json:"integrity_secret_id,omitempty"`
+	IntegritySecrets  map[string]string `json:"integrity_secrets,omitempty"`
+	TimeoutSeconds    int               `json:"timeout_seconds,omitempty"`
 }
 
 func loadSupabaseConfigFromProjectConfig() (supabaseConfig, error) {
@@ -105,21 +108,24 @@ func loadSupabaseConfigFromProjectConfig() (supabaseConfig, error) {
 	}
 
 	cfg := supabaseConfig{
-		Project:        selected.Name,
-		ConfigSource:   "project_config",
-		URL:            strings.TrimSpace(selected.Supabase.URL),
-		APIKey:         apiKey,
-		Schema:         strings.TrimSpace(selected.Supabase.Schema),
-		LogsTable:      strings.TrimSpace(selected.Supabase.LogsTable),
-		MetricsTable:   strings.TrimSpace(selected.Supabase.MetricsTable),
-		TimeoutSeconds: timeoutSeconds,
+		Project:           selected.Name,
+		ConfigSource:      "project_config",
+		URL:               strings.TrimSpace(selected.Supabase.URL),
+		APIKey:            apiKey,
+		Schema:            strings.TrimSpace(selected.Supabase.Schema),
+		LogsTable:         strings.TrimSpace(selected.Supabase.LogsTable),
+		MetricsTable:      strings.TrimSpace(selected.Supabase.MetricsTable),
+		IntegritySecret:   strings.TrimSpace(selected.Supabase.IntegritySecret),
+		IntegritySecretID: strings.TrimSpace(selected.Supabase.IntegritySecretID),
+		IntegritySecrets:  normalizeIntegritySecrets(selected.Supabase.IntegritySecrets),
+		TimeoutSeconds:    timeoutSeconds,
 	}
 
 	if cfg.URL == "" {
 		return cfg, fmt.Errorf("project %q is missing supabase.url in %s", selected.Name, configPath)
 	}
 	if cfg.Schema == "" {
-		cfg.Schema = "public"
+		cfg.Schema = "apploggers"
 	}
 	if cfg.LogsTable == "" {
 		cfg.LogsTable = "app_logs"

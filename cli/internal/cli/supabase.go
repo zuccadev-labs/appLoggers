@@ -9,15 +9,17 @@ import (
 )
 
 type supabaseConfig struct {
-	Project         string
-	ConfigSource    string
-	URL             string
-	APIKey          string
-	Schema          string
-	LogsTable       string
-	MetricsTable    string
-	TimeoutSeconds  int
-	IntegritySecret string
+	Project           string
+	ConfigSource      string
+	URL               string
+	APIKey            string
+	Schema            string
+	LogsTable         string
+	MetricsTable      string
+	TimeoutSeconds    int
+	IntegritySecret   string
+	IntegritySecretID string
+	IntegritySecrets  map[string]string
 }
 
 func loadSupabaseConfig() (supabaseConfig, error) {
@@ -33,18 +35,20 @@ func loadSupabaseConfig() (supabaseConfig, error) {
 	}
 
 	cfg := supabaseConfig{
-		ConfigSource:    "environment",
-		URL:             firstNonEmptyEnv("appLogger_supabaseUrl", "APPLOGGER_SUPABASE_URL", "SUPABASE_URL"),
-		APIKey:          firstNonEmptyEnv("appLogger_supabaseKey", "APPLOGGER_SUPABASE_KEY", "SUPABASE_KEY"),
-		Schema:          firstNonEmptyEnv("appLogger_supabaseSchema", "APPLOGGER_SUPABASE_SCHEMA"),
-		LogsTable:       firstNonEmptyEnv("appLogger_supabaseLogTable", "APPLOGGER_SUPABASE_LOG_TABLE"),
-		MetricsTable:    firstNonEmptyEnv("appLogger_supabaseMetricTable", "APPLOGGER_SUPABASE_METRIC_TABLE"),
-		IntegritySecret: firstNonEmptyEnv("APPLOGGER_INTEGRITY_SECRET", "appLogger_integritySecret"),
-		TimeoutSeconds:  15,
+		ConfigSource:      "environment",
+		URL:               firstNonEmptyEnv("appLogger_supabaseUrl", "APPLOGGER_SUPABASE_URL", "SUPABASE_URL"),
+		APIKey:            firstNonEmptyEnv("appLogger_supabaseKey", "APPLOGGER_SUPABASE_KEY", "SUPABASE_KEY"),
+		Schema:            firstNonEmptyEnv("appLogger_supabaseSchema", "APPLOGGER_SUPABASE_SCHEMA"),
+		LogsTable:         firstNonEmptyEnv("appLogger_supabaseLogTable", "APPLOGGER_SUPABASE_LOG_TABLE"),
+		MetricsTable:      firstNonEmptyEnv("appLogger_supabaseMetricTable", "APPLOGGER_SUPABASE_METRIC_TABLE"),
+		IntegritySecret:   firstNonEmptyEnv("APPLOGGERS_INTEGRITY_SECRET", "APPLOGGER_INTEGRITY_SECRET", "appLogger_integritySecret"),
+		IntegritySecretID: firstNonEmptyEnv("APPLOGGERS_INTEGRITY_SECRET_ID", "APPLOGGER_INTEGRITY_SECRET_ID", "appLogger_integritySecretId"),
+		IntegritySecrets:  loadIntegritySecretsFromEnv(),
+		TimeoutSeconds:    15,
 	}
 
 	if cfg.Schema == "" {
-		cfg.Schema = "public"
+		cfg.Schema = "apploggers"
 	}
 	if cfg.LogsTable == "" {
 		cfg.LogsTable = "app_logs"
@@ -124,15 +128,96 @@ func loadSupabaseConfigFromLocalProperties() (supabaseConfig, error) {
 	}
 
 	cfg := supabaseConfig{
-		ConfigSource:   "local_properties",
-		URL:            supabaseURL,
-		APIKey:         apiKey,
-		Schema:         firstNonEmpty(props["appLogger.supabaseSchema"], "public"),
-		LogsTable:      firstNonEmpty(props["appLogger.supabaseLogTable"], "app_logs"),
-		MetricsTable:   firstNonEmpty(props["appLogger.supabaseMetricTable"], "app_metrics"),
-		TimeoutSeconds: 15,
+		ConfigSource: "local_properties",
+		URL:          supabaseURL,
+		APIKey:       apiKey,
+		Schema:       firstNonEmpty(props["appLogger.supabaseSchema"], "apploggers"),
+		LogsTable:    firstNonEmpty(props["appLogger.supabaseLogTable"], "app_logs"),
+		MetricsTable: firstNonEmpty(props["appLogger.supabaseMetricTable"], "app_metrics"),
+		IntegritySecret: firstNonEmpty(
+			props["APPLOGGERS_INTEGRITY_SECRET"],
+			props["APPLOGGER_INTEGRITY_SECRET"],
+			props["appLogger.integritySecret"],
+		),
+		IntegritySecretID: firstNonEmpty(
+			props["APPLOGGERS_INTEGRITY_SECRET_ID"],
+			props["APPLOGGER_INTEGRITY_SECRET_ID"],
+			props["appLogger.integritySecretId"],
+		),
+		IntegritySecrets: loadIntegritySecretsFromProperties(props),
+		TimeoutSeconds:   15,
 	}
 	return validateSupabaseConfig(cfg)
+}
+
+func loadIntegritySecretsFromEnv() map[string]string {
+	secrets := make(map[string]string)
+	for _, entry := range os.Environ() {
+		parts := strings.SplitN(entry, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if value == "" {
+			continue
+		}
+		const prefix = "APPLOGGERS_INTEGRITY_SECRET_"
+		if strings.HasPrefix(key, prefix) && key != "APPLOGGERS_INTEGRITY_SECRET_ID" {
+			id := strings.TrimSpace(strings.TrimPrefix(key, prefix))
+			if id != "" {
+				secrets[id] = value
+			}
+		}
+	}
+	return secrets
+}
+
+func loadIntegritySecretsFromProperties(props map[string]string) map[string]string {
+	secrets := make(map[string]string)
+	for key, value := range props {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		const prefix = "APPLOGGERS_INTEGRITY_SECRET_"
+		if strings.HasPrefix(key, prefix) && key != "APPLOGGERS_INTEGRITY_SECRET_ID" {
+			id := strings.TrimSpace(strings.TrimPrefix(key, prefix))
+			if id != "" {
+				secrets[id] = value
+			}
+		}
+	}
+	return secrets
+}
+
+func normalizeIntegritySecrets(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return map[string]string{}
+	}
+	normalized := make(map[string]string, len(values))
+	for key, value := range values {
+		trimmedKey := strings.TrimSpace(key)
+		trimmedValue := strings.TrimSpace(value)
+		if trimmedKey != "" && trimmedValue != "" {
+			normalized[trimmedKey] = trimmedValue
+		}
+	}
+	return normalized
+}
+
+func (c supabaseConfig) integritySecretForKey(keyID string) string {
+	trimmedKey := strings.TrimSpace(keyID)
+	if trimmedKey != "" {
+		if secret := strings.TrimSpace(c.IntegritySecrets[trimmedKey]); secret != "" {
+			return secret
+		}
+		if trimmedKey == strings.TrimSpace(c.IntegritySecretID) {
+			return strings.TrimSpace(c.IntegritySecret)
+		}
+		return ""
+	}
+	return strings.TrimSpace(c.IntegritySecret)
 }
 
 // parsePropertiesFile parses a Java .properties-style file (key=value lines, # comments).

@@ -29,6 +29,11 @@ Use this skill when the user needs:
 10. `extra` values accept `Map<String, Any>` — Int, Long, Double, Boolean are preserved as native JSON primitives in Supabase JSONB, enabling typed queries.
 11. For operations that need duration measurement, recommend `OperationTrace` via `AppLoggerSDK.startTrace(name, vararg attributes)` — it emits `trace.<name>` metric with `duration_ms` automatically on `end()` or an ERROR event on `endWithError(error)`.
 12. For bandwidth-sensitive production apps, recommend `dailyDataLimitMb(n)` in `AppLoggerConfig.Builder()` — the SDK sheds non-critical events when the daily byte limit is reached; ERROR and CRITICAL are never shed.
+13. Recommend a fixed domain tag registry such as `BOOT`, `AUTH`, `API`, `GRPC`, `FILTER`, `SYSTEM`, `CRASH` instead of ad-hoc per-class strings.
+14. Do not put PII or stable identifiers like JWTs, emails, or raw user IDs in message text.
+15. Prefer stable, grep-friendly production messages over decorative emojis or highly variable prose.
+16. For anomalies, prefer structured dimensions such as `anomalyType`, `reason`, `status`, or `platform` in addition to the message.
+17. For long-lived services, include lifecycle metrics like startup latency or uptime.
 
 ## Workflow
 
@@ -37,6 +42,14 @@ Use this skill when the user needs:
 3. Define tag conventions.
 4. Define metrics and units.
 5. Provide rollout plan with minimal initial scope.
+
+## Real-world design pattern to emulate
+
+1. Assign tags by functional domain, not by file name.
+2. Pair important warnings/errors with a count or latency metric when operators will need trend visibility.
+3. Use BOOT logs for startup, AUTH for token validation, API/GRPC for server surfaces, FILTER or PLAYER for domain engines, and CRASH for uncaught exceptions.
+4. Reserve CRITICAL logs for true fatal or service-threatening conditions.
+5. Model dimensions like `reason`, `status`, `platform`, `action`, and `anomalyType` so downstream filters do not depend on parsing prose.
 
 ## References bundled with this skill
 

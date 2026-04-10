@@ -22,6 +22,7 @@ Examples:
 2. Keep secrets out of logs and commits.
 3. Always configure via `~/.apploggers/cli.json` — never instruir al usuario a exportar variables de entorno para URL o key.
 4. Validate command execution after configuration.
+5. Prefer `schema=apploggers`; only use `public` for legacy environments that have not applied migration 017.
 
 ---
 
@@ -58,7 +59,8 @@ Config resolution order (source: `loadSupabaseConfig()` in `supabase.go`):
       "workspace_roots": ["/path/to/workspace"],
       "supabase": {
         "url": "https://YOUR_PROJECT.supabase.co",
-        "api_key": "eyJhbGci..."
+        "api_key": "eyJhbGci...",
+        "schema": "apploggers"
       }
     }
   ]
@@ -108,7 +110,8 @@ Fix: set `api_key_env` to the variable name (e.g. `"APPLOGGER_SUPABASE_KEY"`).
       "workspace_roots": ["/workspace/klinema"],
       "supabase": {
         "url": "https://klinema.supabase.co",
-        "api_key": "eyJhbGci..."
+        "api_key": "eyJhbGci...",
+        "schema": "apploggers"
       }
     },
     {
@@ -117,7 +120,8 @@ Fix: set `api_key_env` to the variable name (e.g. `"APPLOGGER_SUPABASE_KEY"`).
       "workspace_roots": ["/workspace/klinematv"],
       "supabase": {
         "url": "https://klinematv.supabase.co",
-        "api_key": "eyJhbGci..."
+        "api_key": "eyJhbGci...",
+        "schema": "apploggers"
       }
     }
   ]
@@ -136,12 +140,12 @@ Project selection precedence:
 
 ## Optional `cli.json` fields (omit to use defaults)
 
-- `schema`: PostgreSQL schema. Default: `public`
+- `schema`: PostgreSQL schema. Default: `apploggers`
 - `logs_table`: Logs table name. Default: `app_logs`
 - `metrics_table`: Metrics table name. Default: `app_metrics`
 - `timeout_seconds`: HTTP timeout (1-120). Default: `15`
 
-Only set these if your Supabase migrations used non-default names.
+Only set these if your Supabase migrations used non-default names. `public` remains a legacy compatibility path.
 
 ---
 
@@ -164,7 +168,11 @@ All query filters are CLI flags — they are NOT configured in `cli.json`. The j
 | `--from` / `--to` | `created_at` (top-level) | gte / lte | RFC3339 |
 | `--sdk-version` | `sdk_version` (top-level) | exact | e.g. `0.2.0` |
 | `--anomaly-type` | `anomaly_type` (top-level) | exact | e.g. `slow_response`, `memory_leak` |
-| `--package` | `extra->>package_name` (JSONB) | exact | e.g. `com.company.billing` |
+| `--package` | `app_package` (top-level) | exact | e.g. `com.company.billing` |
+| `--source-scope` | `source_scope` (top-level) | exact | e.g. `PlayerScreen.VideoControls` |
+| `--source-prefix` | `source_scope` (top-level) | prefix | jerarquía corporativa; excluyente con `--source-scope` |
+| `--source-file` | `source_file` (top-level) | exact | forensics / caller capture |
+| `--source-method` | `source_method` (top-level) | exact | forensics / caller capture |
 | `--error-code` | `extra->>error_code` (JSONB) | exact | e.g. `E-42`, `AUTH_FAILED` |
 | `--extra-key / --extra-value` | `extra->>KEY` (JSONB) | exact | Ad-hoc filter on any extra field. Both flags required together. |
 | `--fingerprint` | `device_fingerprint` (top-level) | exact | SHA-256 pseudonymized device ID |
@@ -181,6 +189,11 @@ All query filters are CLI flags — they are NOT configured in `cli.json`. The j
 | `--session-id` | `session_id` (top-level) | exact UUID | |
 | `--device-id` | `device_id` (top-level) | exact | |
 | `--sdk-version` | `sdk_version` (top-level) | exact | e.g. `0.2.0` |
+| `--package` | `app_package` (top-level) | exact | e.g. `com.company.billing` |
+| `--source-scope` | `source_scope` (top-level) | exact | e.g. `Startup.Sync` |
+| `--source-prefix` | `source_scope` (top-level) | prefix | jerarquía corporativa; excluyente con `--source-scope` |
+| `--source-file` | `source_file` (top-level) | exact | forensics / caller capture |
+| `--source-method` | `source_method` (top-level) | exact | forensics / caller capture |
 | `--from` / `--to` | `created_at` (top-level) | gte / lte | RFC3339 |
 | `--offset` | — | — | Pagination offset (0-based) |
 | `--order` | `created_at` | `desc` or `asc` | Default: `desc` |

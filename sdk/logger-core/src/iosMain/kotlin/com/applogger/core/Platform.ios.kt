@@ -67,3 +67,5 @@ actual fun sha256Hex(input: String): String {
         byte.toInt().and(BYTE_MASK).toString(HEX_RADIX).padStart(HEX_BYTE_WIDTH, '0')
     }
 }
+
+actual fun captureCallerInfo(): CallerInfo? = null

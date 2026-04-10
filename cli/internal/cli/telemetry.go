@@ -11,33 +11,37 @@ import (
 
 // telemetryFlags holds all filter/pagination state shared across telemetry subcommands.
 type telemetryFlags struct {
-	source      string
-	aggregate   string
-	from        string
-	to          string
-	severity    string
-	minSeverity string
-	environment string
-	session     string
-	deviceID    string
-	fingerprint string
-	userID      string
-	pkg         string
-	errorCode   string
-	contains    string
-	tag         string
-	name        string
-	anomalyType string
-	traceID     string
-	variant     string
-	batchID     string
-	extraKey    string
-	extraValue  string
-	sdkVersion  string
-	throwable   bool
-	limit       int
-	offset      int
-	order       string
+	source       string
+	aggregate    string
+	from         string
+	to           string
+	severity     string
+	minSeverity  string
+	environment  string
+	session      string
+	deviceID     string
+	fingerprint  string
+	userID       string
+	pkg          string
+	sourceScope  string
+	sourcePrefix string
+	sourceFile   string
+	sourceMethod string
+	errorCode    string
+	contains     string
+	tag          string
+	name         string
+	anomalyType  string
+	traceID      string
+	variant      string
+	batchID      string
+	extraKey     string
+	extraValue   string
+	sdkVersion   string
+	throwable    bool
+	limit        int
+	offset       int
+	order        string
 }
 
 // addTelemetryFlags registers all shared telemetry filter flags on a command.
@@ -54,7 +58,11 @@ func addTelemetryFlags(cmd *cobra.Command, f *telemetryFlags) {
 	cmd.Flags().StringVar(&f.deviceID, "device-id", "", "Device identifier filter")
 	cmd.Flags().StringVar(&f.fingerprint, "fingerprint", "", "Device fingerprint filter — SHA-256 pseudonymized device ID (logs only, queries extra JSONB)")
 	cmd.Flags().StringVar(&f.userID, "user-id", "", "Anonymous user identifier filter (logs only)")
-	cmd.Flags().StringVar(&f.pkg, "package", "", "Package/module filter from extra.package_name (logs only)")
+	cmd.Flags().StringVar(&f.pkg, "package", "", "Application package filter from top-level app_package (logs and metrics)")
+	cmd.Flags().StringVar(&f.sourceScope, "source-scope", "", "Exact hierarchical source filter from top-level source_scope (logs and metrics)")
+	cmd.Flags().StringVar(&f.sourcePrefix, "source-prefix", "", "Hierarchical source prefix filter from top-level source_scope (logs and metrics)")
+	cmd.Flags().StringVar(&f.sourceFile, "source-file", "", "Exact source file filter from top-level source_file (logs and metrics)")
+	cmd.Flags().StringVar(&f.sourceMethod, "source-method", "", "Exact source method filter from top-level source_method (logs and metrics)")
 	cmd.Flags().StringVar(&f.errorCode, "error-code", "", "Error code filter from extra.error_code (logs only)")
 	cmd.Flags().StringVar(&f.contains, "contains", "", "Message substring filter (logs only)")
 	cmd.Flags().StringVar(&f.tag, "tag", "", "Tag filter (logs only)")
@@ -151,6 +159,10 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 		}
 	}
 
+	if strings.TrimSpace(f.sourceScope) != "" && strings.TrimSpace(f.sourcePrefix) != "" {
+		return telemetryQueryRequest{}, newUsageError("--source-scope and --source-prefix are mutually exclusive")
+	}
+
 	// Aggregate source constraints
 	switch aggregate {
 	case "severity", "tag":
@@ -175,7 +187,6 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 			return telemetryQueryRequest{}, newUsageError("--user-id is only valid when --source=logs")
 		}
 		if strings.TrimSpace(f.pkg) != "" {
-			return telemetryQueryRequest{}, newUsageError("--package is only valid when --source=logs")
 		}
 		if strings.TrimSpace(f.errorCode) != "" {
 			return telemetryQueryRequest{}, newUsageError("--error-code is only valid when --source=logs")
@@ -214,33 +225,37 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 	}
 
 	return telemetryQueryRequest{
-		Source:      source,
-		Aggregate:   aggregate,
-		From:        f.from,
-		To:          f.to,
-		Severity:    severity,
-		MinSeverity: minSeverity,
-		Environment: strings.TrimSpace(f.environment),
-		SessionID:   strings.TrimSpace(f.session),
-		DeviceID:    strings.TrimSpace(f.deviceID),
-		Fingerprint: strings.TrimSpace(f.fingerprint),
-		UserID:      strings.TrimSpace(f.userID),
-		Package:     strings.TrimSpace(f.pkg),
-		ErrorCode:   strings.TrimSpace(f.errorCode),
-		Contains:    strings.TrimSpace(f.contains),
-		Tag:         strings.TrimSpace(f.tag),
-		Name:        strings.TrimSpace(f.name),
-		AnomalyType: strings.TrimSpace(f.anomalyType),
-		TraceID:     strings.TrimSpace(f.traceID),
-		Variant:     strings.TrimSpace(f.variant),
-		BatchID:     strings.TrimSpace(f.batchID),
-		ExtraKey:    strings.TrimSpace(f.extraKey),
-		ExtraValue:  strings.TrimSpace(f.extraValue),
-		SDKVersion:  strings.TrimSpace(f.sdkVersion),
-		Throwable:   f.throwable,
-		Limit:       f.limit,
-		Offset:      f.offset,
-		Order:       order,
+		Source:       source,
+		Aggregate:    aggregate,
+		From:         f.from,
+		To:           f.to,
+		Severity:     severity,
+		MinSeverity:  minSeverity,
+		Environment:  strings.TrimSpace(f.environment),
+		SessionID:    strings.TrimSpace(f.session),
+		DeviceID:     strings.TrimSpace(f.deviceID),
+		Fingerprint:  strings.TrimSpace(f.fingerprint),
+		UserID:       strings.TrimSpace(f.userID),
+		Package:      strings.TrimSpace(f.pkg),
+		SourceScope:  strings.TrimSpace(f.sourceScope),
+		SourcePrefix: strings.TrimSpace(f.sourcePrefix),
+		SourceFile:   strings.TrimSpace(f.sourceFile),
+		SourceMethod: strings.TrimSpace(f.sourceMethod),
+		ErrorCode:    strings.TrimSpace(f.errorCode),
+		Contains:     strings.TrimSpace(f.contains),
+		Tag:          strings.TrimSpace(f.tag),
+		Name:         strings.TrimSpace(f.name),
+		AnomalyType:  strings.TrimSpace(f.anomalyType),
+		TraceID:      strings.TrimSpace(f.traceID),
+		Variant:      strings.TrimSpace(f.variant),
+		BatchID:      strings.TrimSpace(f.batchID),
+		ExtraKey:     strings.TrimSpace(f.extraKey),
+		ExtraValue:   strings.TrimSpace(f.extraValue),
+		SDKVersion:   strings.TrimSpace(f.sdkVersion),
+		Throwable:    f.throwable,
+		Limit:        f.limit,
+		Offset:       f.offset,
+		Order:        order,
 	}, nil
 }
 

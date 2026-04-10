@@ -112,7 +112,7 @@ apploggers telemetry query \
 {
   "ok": false,
   "error": "invalid --aggregate value \"INVALID_MODE\" ...",
-  "error_kind": "usage_error",
+#   "version": "0.2.1",
   "exit_code": 2
 }
 ```
@@ -291,7 +291,7 @@ apploggers health --deep --output json
 # {
 #   "ok": true,
 #   "status": "ready",
-#   "version": "0.2.0",
+#   "version": "0.2.1",
 #   "project": "my-app",
 #   "deep": {
 #     "supabase_reachable": true,
@@ -319,6 +319,10 @@ apploggers telemetry query \
   --user-id UUID \
   --contains TEXT \
   --package PACKAGE_NAME \
+  --source-scope SCOPE \
+  --source-prefix PREFIX \
+  --source-file FILE \
+  --source-method METHOD \
   --error-code CODE \
   --anomaly-type TYPE \
   --extra-key KEY --extra-value VALUE \             # JSONB ad-hoc filter
@@ -604,6 +608,10 @@ apploggers health --output json
 apploggers health --deep --output json
 ```
 
+### 7. Prefer `schema=apploggers` in `cli.json`
+
+`apploggers` is the operational schema preferred by current releases. It does not require a new key; it uses the same `service_role` key after migration 017 and later steps are applied.
+
 ---
 
 ## Integration Examples
@@ -701,10 +709,12 @@ es.addEventListener('error', (e) => {
 
 | CLI Version | Contract Version | Go | Status |
 |---|---|---|---|
-| 0.2.0 | 2.0.0 | 1.24+ | Current |
+| 0.2.1 | 2.0.0 | 1.24+ | Current |
 | 0.1.x | 1.0.0 | 1.24+ | Deprecated |
 
 Always use the latest stable release. Check [GitHub Releases](https://github.com/zuccadev-labs/appLoggers/releases).
+
+Repository fallback when an agent must inspect the checked-out repo instead of GitHub: use `cli/VERSION` for CLI and `sdk/gradle.properties` for SDK.
 
 ---
 

@@ -117,21 +117,85 @@ internal class BatchProcessor(
                 return@withLock
             }
 
-            val packet = integrityManager?.takeIf { it.isEnabled }?.prepareBatch(batch)
-            val eventsToSend = packet?.events ?: batch
+            val (metrics, logs) = batch.partition { it.level == LogLevel.METRIC }
+            val logPacket = integrityManager
+                ?.takeIf { it.isEnabled }
+                ?.takeIf { logs.isNotEmpty() }
+                ?.prepareBatch(logs, BatchKind.LOGS)
+            val metricPacket = integrityManager
+                ?.takeIf { it.isEnabled }
+                ?.takeIf { metrics.isNotEmpty() }
+                ?.prepareBatch(metrics, BatchKind.METRICS)
+            val logsToSend = logPacket?.events ?: logs
+            val metricsToSend = metricPacket?.events ?: metrics
 
-            val result = runCatching { transport.send(eventsToSend) }
-                .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
-
-            when (result) {
-                is TransportResult.Success -> {
-                    consecutiveFailures = 0
-                    lastSuccessfulFlushTimestamp = currentTimeMillis()
-                    dataBudget.recordBytesSent(estimateBatchBytes(eventsToSend))
-                    packet?.let { scope.launch { storeBatchManifest(it) } }
+            if (logsToSend.isNotEmpty()) {
+                val firstLog = logsToSend.first()
+                val logResult = runCatching {
+                    when {
+                        logPacket != null && transport is AtomicBatchCapable -> transport.sendBatchWithManifest(
+                            kind = logPacket.kind,
+                            events = logsToSend,
+                            hash = logPacket.hash,
+                            eventCount = logsToSend.size,
+                            environment = firstLog.environment,
+                            sdkVersion = firstLog.sdkVersion,
+                            keyId = logPacket.keyId
+                        )
+                        else -> transport.send(logsToSend)
+                    }
+                }.getOrElse {
+                    TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it)
                 }
-                is TransportResult.Failure -> handleFailure(eventsToSend, result)
+
+                when (logResult) {
+                    is TransportResult.Success -> {
+                        dataBudget.recordBytesSent(estimateBatchBytes(logsToSend))
+                        if (logPacket != null && transport !is AtomicBatchCapable) {
+                            scope.launch { storeBatchManifest(logPacket) }
+                        }
+                    }
+                    is TransportResult.Failure -> {
+                        handleFailure(logs, logResult)
+                        return@withLock
+                    }
+                }
             }
+
+            if (metricsToSend.isNotEmpty()) {
+                val firstMetric = metricsToSend.first()
+                val metricResult = runCatching {
+                    when {
+                        metricPacket != null && transport is AtomicBatchCapable -> transport.sendBatchWithManifest(
+                            kind = metricPacket.kind,
+                            events = metricsToSend,
+                            hash = metricPacket.hash,
+                            eventCount = metricsToSend.size,
+                            environment = firstMetric.environment,
+                            sdkVersion = firstMetric.sdkVersion,
+                            keyId = metricPacket.keyId
+                        )
+                        else -> transport.send(metricsToSend)
+                    }
+                }
+                    .getOrElse { TransportResult.Failure(it.message ?: "unknown", retryable = true, cause = it) }
+
+                when (metricResult) {
+                    is TransportResult.Success -> {
+                        dataBudget.recordBytesSent(estimateBatchBytes(metricsToSend))
+                        if (metricPacket != null && transport !is AtomicBatchCapable) {
+                            scope.launch { storeBatchManifest(metricPacket) }
+                        }
+                    }
+                    is TransportResult.Failure -> {
+                        handleFailure(metrics, metricResult)
+                        return@withLock
+                    }
+                }
+            }
+
+            consecutiveFailures = 0
+            lastSuccessfulFlushTimestamp = currentTimeMillis()
         }
     }
 
@@ -148,11 +212,13 @@ internal class BatchProcessor(
         runCatching {
             val firstEvent = packet.events.firstOrNull()
             (transport as? BatchManifestCapable)?.storeBatchManifest(
+                kind = packet.kind,
                 batchId = packet.batchId,
                 hash = packet.hash,
                 eventCount = packet.events.size,
                 environment = firstEvent?.environment ?: "",
-                sdkVersion = firstEvent?.sdkVersion ?: ""
+                sdkVersion = firstEvent?.sdkVersion ?: "",
+                keyId = packet.keyId
             )
         }
     }

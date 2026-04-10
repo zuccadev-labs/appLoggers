@@ -1,5 +1,6 @@
 package com.example.sample
 
+import com.example.applogger.sample.BuildConfig
 import com.applogger.core.AppLoggerConfig
 import com.applogger.transport.supabase.SupabaseTransport
 
@@ -21,29 +22,34 @@ import com.applogger.transport.supabase.SupabaseTransport
  * ```kotlin
  * .endpoint(BuildConfig.LOGGER_URL)
  * .apiKey(BuildConfig.LOGGER_KEY)
+ * .integritySecret(BuildConfig.LOGGER_INTEGRITY_SECRET)
+ * .integritySecretId(BuildConfig.LOGGER_INTEGRITY_SECRET_ID)
  * .debugMode(BuildConfig.DEBUG)
  * ```
  * Y en build.gradle.kts:
  * ```kotlin
  * buildConfigField("String", "LOGGER_URL", "\"${localProperties["APPLOGGER_URL"]}\"")
  * buildConfigField("String", "LOGGER_KEY", "\"${localProperties["APPLOGGER_ANON_KEY"]}\"")
+ * buildConfigField("String", "LOGGER_INTEGRITY_SECRET", "\"${localProperties["APPLOGGERS_INTEGRITY_SECRET"]}\"")
+ * buildConfigField("String", "LOGGER_INTEGRITY_SECRET_ID", "\"${localProperties["APPLOGGERS_INTEGRITY_SECRET_ID"]}\"")
  * ```
  */
 object SampleApplication {
 
-    // Reemplazar con BuildConfig.LOGGER_URL en una app real
-    private const val SAMPLE_URL = ""
-    // Reemplazar con BuildConfig.LOGGER_KEY en una app real
-    private const val SAMPLE_KEY = ""
-    // Reemplazar con BuildConfig.DEBUG en una app real
-    private const val SAMPLE_DEBUG = false
+    private val sampleUrl get() = BuildConfig.LOGGER_URL
+    private val sampleKey get() = BuildConfig.LOGGER_KEY
+    private val sampleDebug get() = BuildConfig.LOGGER_DEBUG
+    private val integritySecret get() = BuildConfig.LOGGER_INTEGRITY_SECRET
+    private val integritySecretId get() = BuildConfig.LOGGER_INTEGRITY_SECRET_ID
 
     fun buildConfig(): AppLoggerConfig {
         return AppLoggerConfig.Builder()
-            .endpoint(SAMPLE_URL)
-            .apiKey(SAMPLE_KEY)
-            .debugMode(SAMPLE_DEBUG)
-            .environment(if (SAMPLE_DEBUG) "development" else "production")
+            .endpoint(sampleUrl)
+            .apiKey(sampleKey)
+            .integritySecret(integritySecret)
+            .integritySecretId(integritySecretId)
+            .debugMode(sampleDebug)
+            .environment(if (sampleDebug) "development" else "production")
             .batchSize(20)
             .flushIntervalSeconds(30)
             .build()
@@ -51,8 +57,8 @@ object SampleApplication {
 
     fun buildTransport(): SupabaseTransport {
         return SupabaseTransport(
-            endpoint = SAMPLE_URL,
-            apiKey = SAMPLE_KEY
+            endpoint = sampleUrl,
+            apiKey = sampleKey
         )
     }
 
@@ -60,8 +66,10 @@ object SampleApplication {
     // Si quieres forzar configuración de bajo recurso:
     fun buildTVConfig(): AppLoggerConfig {
         return AppLoggerConfig.Builder()
-            .endpoint(SAMPLE_URL)
-            .apiKey(SAMPLE_KEY)
+            .endpoint(sampleUrl)
+            .apiKey(sampleKey)
+            .integritySecret(integritySecret)
+            .integritySecretId(integritySecretId)
             .debugMode(false)
             .environment("production")
             .batchSize(5)

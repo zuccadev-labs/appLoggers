@@ -15,33 +15,37 @@ import (
 
 // telemetryQueryRequest holds all filter and pagination parameters for a telemetry query.
 type telemetryQueryRequest struct {
-	Source      string `json:"source" toon:"source"`
-	Aggregate   string `json:"aggregate,omitempty" toon:"aggregate,omitempty"`
-	From        string `json:"from,omitempty" toon:"from,omitempty"`
-	To          string `json:"to,omitempty" toon:"to,omitempty"`
-	Severity    string `json:"severity,omitempty" toon:"severity,omitempty"`
-	MinSeverity string `json:"min_severity,omitempty" toon:"min_severity,omitempty"`
-	Environment string `json:"environment,omitempty" toon:"environment,omitempty"`
-	SessionID   string `json:"session_id,omitempty" toon:"session_id,omitempty"`
-	DeviceID    string `json:"device_id,omitempty" toon:"device_id,omitempty"`
-	Fingerprint string `json:"fingerprint,omitempty" toon:"fingerprint,omitempty"`
-	UserID      string `json:"user_id,omitempty" toon:"user_id,omitempty"`
-	Package     string `json:"package,omitempty" toon:"package,omitempty"`
-	ErrorCode   string `json:"error_code,omitempty" toon:"error_code,omitempty"`
-	Contains    string `json:"contains,omitempty" toon:"contains,omitempty"`
-	Tag         string `json:"tag,omitempty" toon:"tag,omitempty"`
-	Name        string `json:"name,omitempty" toon:"name,omitempty"`
-	AnomalyType string `json:"anomaly_type,omitempty" toon:"anomaly_type,omitempty"`
-	TraceID     string `json:"trace_id,omitempty" toon:"trace_id,omitempty"`
-	Variant     string `json:"variant,omitempty" toon:"variant,omitempty"`
-	BatchID     string `json:"batch_id,omitempty" toon:"batch_id,omitempty"`
-	ExtraKey    string `json:"extra_key,omitempty" toon:"extra_key,omitempty"`
-	ExtraValue  string `json:"extra_value,omitempty" toon:"extra_value,omitempty"`
-	SDKVersion  string `json:"sdk_version,omitempty" toon:"sdk_version,omitempty"`
-	Throwable   bool   `json:"throwable,omitempty" toon:"throwable,omitempty"`
-	Limit       int    `json:"limit" toon:"limit"`
-	Offset      int    `json:"offset,omitempty" toon:"offset,omitempty"`
-	Order       string `json:"order,omitempty" toon:"order,omitempty"`
+	Source       string `json:"source" toon:"source"`
+	Aggregate    string `json:"aggregate,omitempty" toon:"aggregate,omitempty"`
+	From         string `json:"from,omitempty" toon:"from,omitempty"`
+	To           string `json:"to,omitempty" toon:"to,omitempty"`
+	Severity     string `json:"severity,omitempty" toon:"severity,omitempty"`
+	MinSeverity  string `json:"min_severity,omitempty" toon:"min_severity,omitempty"`
+	Environment  string `json:"environment,omitempty" toon:"environment,omitempty"`
+	SessionID    string `json:"session_id,omitempty" toon:"session_id,omitempty"`
+	DeviceID     string `json:"device_id,omitempty" toon:"device_id,omitempty"`
+	Fingerprint  string `json:"fingerprint,omitempty" toon:"fingerprint,omitempty"`
+	UserID       string `json:"user_id,omitempty" toon:"user_id,omitempty"`
+	Package      string `json:"package,omitempty" toon:"package,omitempty"`
+	SourceScope  string `json:"source_scope,omitempty" toon:"source_scope,omitempty"`
+	SourcePrefix string `json:"source_prefix,omitempty" toon:"source_prefix,omitempty"`
+	SourceFile   string `json:"source_file,omitempty" toon:"source_file,omitempty"`
+	SourceMethod string `json:"source_method,omitempty" toon:"source_method,omitempty"`
+	ErrorCode    string `json:"error_code,omitempty" toon:"error_code,omitempty"`
+	Contains     string `json:"contains,omitempty" toon:"contains,omitempty"`
+	Tag          string `json:"tag,omitempty" toon:"tag,omitempty"`
+	Name         string `json:"name,omitempty" toon:"name,omitempty"`
+	AnomalyType  string `json:"anomaly_type,omitempty" toon:"anomaly_type,omitempty"`
+	TraceID      string `json:"trace_id,omitempty" toon:"trace_id,omitempty"`
+	Variant      string `json:"variant,omitempty" toon:"variant,omitempty"`
+	BatchID      string `json:"batch_id,omitempty" toon:"batch_id,omitempty"`
+	ExtraKey     string `json:"extra_key,omitempty" toon:"extra_key,omitempty"`
+	ExtraValue   string `json:"extra_value,omitempty" toon:"extra_value,omitempty"`
+	SDKVersion   string `json:"sdk_version,omitempty" toon:"sdk_version,omitempty"`
+	Throwable    bool   `json:"throwable,omitempty" toon:"throwable,omitempty"`
+	Limit        int    `json:"limit" toon:"limit"`
+	Offset       int    `json:"offset,omitempty" toon:"offset,omitempty"`
+	Order        string `json:"order,omitempty" toon:"order,omitempty"`
 }
 
 // telemetryQueryResponse is the full response envelope returned to callers.
@@ -83,14 +87,14 @@ func severityAtOrAbove(minLevel string) []string {
 }
 
 // logsSelectColumns are all columns returned for app_logs queries.
-const logsSelectColumns = "id,created_at,level,tag,message,session_id,device_id,user_id,environment,sdk_version,extra,anomaly_type"
+const logsSelectColumns = "id,created_at,level,tag,message,session_id,device_id,user_id,environment,sdk_version,app_package,source_scope,source_file,source_method,extra,anomaly_type"
 
 // logsSelectColumnsWithThrowable includes throwable_info for debugging.
-const logsSelectColumnsWithThrowable = "id,created_at,level,tag,message,session_id,device_id,user_id,environment,sdk_version,extra,anomaly_type,throwable_type,throwable_msg,stack_trace"
+const logsSelectColumnsWithThrowable = "id,created_at,level,tag,message,session_id,device_id,user_id,environment,sdk_version,app_package,source_scope,source_file,source_method,extra,anomaly_type,throwable_type,throwable_msg,stack_trace"
 
 // metricsSelectColumns are all columns returned for app_metrics queries.
 // NOTE: the SDK serializes metric tags as "tags" (SupabaseMetricEntry.tags field).
-const metricsSelectColumns = "id,created_at,name,value,unit,tags,device_id,session_id,environment,sdk_version"
+const metricsSelectColumns = "id,created_at,name,value,unit,tags,device_id,session_id,environment,sdk_version,app_package,source_scope,source_file,source_method"
 
 // supabaseHTTPClient returns an *http.Client with the configured timeout.
 // Called once per command invocation — the returned client is reused across
@@ -214,14 +218,26 @@ func doQuery(ctx context.Context, cfg supabaseConfig, req telemetryQueryRequest,
 	if req.SDKVersion != "" {
 		query.Set("sdk_version", "eq."+req.SDKVersion)
 	}
+	if req.Package != "" {
+		query.Set("app_package", "eq."+req.Package)
+	}
+	if req.SourceScope != "" {
+		query.Set("source_scope", "eq."+req.SourceScope)
+	}
+	if req.SourcePrefix != "" {
+		query.Set("source_scope", "like."+req.SourcePrefix+"%")
+	}
+	if req.SourceFile != "" {
+		query.Set("source_file", "eq."+req.SourceFile)
+	}
+	if req.SourceMethod != "" {
+		query.Set("source_method", "eq."+req.SourceMethod)
+	}
 
 	// Logs-only filters
 	if req.Source == "logs" {
 		if req.UserID != "" {
 			query.Set("user_id", "eq."+req.UserID)
-		}
-		if req.Package != "" {
-			query.Set("extra->>package_name", "eq."+req.Package)
 		}
 		if req.ErrorCode != "" {
 			query.Set("extra->>error_code", "eq."+req.ErrorCode)

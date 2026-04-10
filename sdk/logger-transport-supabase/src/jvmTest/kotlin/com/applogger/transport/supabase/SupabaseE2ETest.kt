@@ -40,6 +40,7 @@ class SupabaseE2ETest {
             ?: (System.getenv("APPLOGGER_SUPABASE_URL") ?: "")
         private val anonKey = System.getenv("APPLOGGER_SUPABASE_ANON_KEY") ?: ""
         private val serviceKey = System.getenv("APPLOGGER_SUPABASE_SERVICE_KEY") ?: ""
+        private val schema = System.getenv("APPLOGGER_SUPABASE_SCHEMA")?.ifBlank { "public" } ?: "public"
 
         private val testSessionId = java.util.UUID.randomUUID().toString()
 
@@ -57,7 +58,8 @@ class SupabaseE2ETest {
         fun setup() {
             transport = SupabaseTransport(
                 endpoint = url,
-                apiKey = anonKey
+                apiKey = anonKey,
+                schema = schema
             )
         }
 
@@ -71,10 +73,14 @@ class SupabaseE2ETest {
                     client.delete("${url.trimEnd('/')}/rest/v1/app_logs?session_id=eq.${testSessionId}") {
                         header("apikey", serviceKey)
                         header("Authorization", "Bearer $serviceKey")
+                        header("Content-Profile", schema)
+                        header("Accept-Profile", schema)
                     }
                     client.delete("${url.trimEnd('/')}/rest/v1/app_metrics?session_id=eq.${testSessionId}") {
                         header("apikey", serviceKey)
                         header("Authorization", "Bearer $serviceKey")
+                        header("Content-Profile", schema)
+                        header("Accept-Profile", schema)
                     }
                     client.close()
                 }
@@ -193,6 +199,7 @@ class SupabaseE2ETest {
             header("apikey", serviceKey)
             header("Authorization", "Bearer $serviceKey")
             header("Accept", "application/json")
+            header("Accept-Profile", schema)
         }
 
         assertEquals(HttpStatusCode.OK, response.status, "Failed to read logs back")
@@ -240,6 +247,7 @@ class SupabaseE2ETest {
             header("apikey", serviceKey)
             header("Authorization", "Bearer $serviceKey")
             header("Accept", "application/json")
+            header("Accept-Profile", schema)
         }
 
         assertEquals(HttpStatusCode.OK, response.status)

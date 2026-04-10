@@ -18,6 +18,16 @@ sdk.dir=C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
 APPLOGGER_URL=https://TU-PROYECTO.supabase.co
 APPLOGGER_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
+# ── Verificabilidad / Audit Trail ───────────────────────────────────────────
+# Secreto compartido usado para firmar batches y verificarlos con el CLI.
+# Debe ser el mismo valor en la app instrumentada y en el entorno que ejecuta `apploggers verify`.
+# Alias compatibles: APPLOGGERS_INTEGRITY_SECRET (preferido) y APPLOGGER_INTEGRITY_SECRET.
+APPLOGGERS_INTEGRITY_SECRET=CAMBIAR_POR_UN_SECRETO_LARGO_Y_ALEATORIO
+# Identificador lógico de la clave activa. Se persiste como key_id en log_batches y metric_batches.
+APPLOGGERS_INTEGRITY_SECRET_ID=10042026
+# Claves históricas opcionales para verificación multi-rotación desde el CLI.
+# APPLOGGERS_INTEGRITY_SECRET_10042026=CAMBIAR_POR_UN_SECRETO_LARGO_Y_ALEATORIO
+
 # ── Modo Debug ──────────────────────────────────────────────────────────────
 # true  -> logs en Logcat + envio al backend (desarrollo)
 # false -> solo envio al backend, sin output local (produccion)

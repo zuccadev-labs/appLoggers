@@ -69,13 +69,24 @@ fun AppLogger.logC(tag: String, message: String, throwable: Throwable? = null, e
 fun Any.logTag(): String =
     this::class.simpleName?.take(100) ?: "Anonymous"
 
+/** Returns a hierarchical scope for the receiver when reflection can resolve it. */
+fun Any.logScope(): String =
+    this::class.qualifiedName?.take(255)
+        ?: this::class.simpleName?.take(100)
+        ?: "Anonymous"
+
+private fun mergeSourceScope(extra: Map<String, Any>?, sourceScope: String): Map<String, Any> = buildMap {
+    extra?.forEach { (key, value) -> put(key, value) }
+    if (!containsKey("source_scope")) put("source_scope", sourceScope)
+}
+
 /** Logs a debug message, inferring the tag from the receiver's class name. */
 fun Any.logD(logger: AppLogger, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-    logger.debug(logTag(), message, throwable, extra)
+    logger.debug(logTag(), message, throwable, mergeSourceScope(extra, logScope()))
 
 /** Logs an info message, inferring the tag from the receiver's class name. */
 fun Any.logI(logger: AppLogger, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-    logger.info(logTag(), message, throwable, extra)
+    logger.info(logTag(), message, throwable, mergeSourceScope(extra, logScope()))
 
 /** Logs a warning, inferring the tag from the receiver's class name. */
 fun Any.logW(
@@ -84,15 +95,15 @@ fun Any.logW(
     throwable: Throwable? = null,
     anomalyType: String? = null,
     extra: Map<String, Any>? = null
-) = logger.warn(logTag(), message, throwable, anomalyType, extra)
+) = logger.warn(logTag(), message, throwable, anomalyType, mergeSourceScope(extra, logScope()))
 
 /** Logs an error, inferring the tag from the receiver's class name. */
 fun Any.logE(logger: AppLogger, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-    logger.error(logTag(), message, throwable, extra)
+    logger.error(logTag(), message, throwable, mergeSourceScope(extra, logScope()))
 
 /** Logs a critical event, inferring the tag from the receiver's class name. */
 fun Any.logC(logger: AppLogger, message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-    logger.critical(logTag(), message, throwable, extra)
+    logger.critical(logTag(), message, throwable, mergeSourceScope(extra, logScope()))
 
 // ─── Metric shorthands ────────────────────────────────────────────────────────
 
@@ -126,10 +137,12 @@ fun Any.logM(
     unit: String = "count",
     tags: Map<String, String>? = null
 ) {
-    val sourceTag = logTag() // capture before entering buildMap lambda
+    val sourceTag = logTag()
+    val sourceScope = logScope()
     val enriched = buildMap {
         tags?.forEach { (k, v) -> put(k, v) }
         if (!containsKey("source")) put("source", sourceTag)
+        if (!containsKey("source_scope")) put("source_scope", sourceScope)
     }
     logger.metric(name, value, unit, enriched)
 }
@@ -175,25 +188,32 @@ inline fun <reified T : Any> loggerTag(): String =
  */
 class TaggedLogger internal constructor(
     private val delegate: AppLogger,
-    val tag: String
+    val tag: String,
+    private val sourceScope: String = tag
 ) {
     fun d(message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-        delegate.debug(tag, message, throwable, extra)
+        delegate.debug(tag, message, throwable, mergeSourceScope(extra, sourceScope))
 
     fun i(message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-        delegate.info(tag, message, throwable, extra)
+        delegate.info(tag, message, throwable, mergeSourceScope(extra, sourceScope))
 
     fun w(message: String, throwable: Throwable? = null, anomalyType: String? = null, extra: Map<String, Any>? = null) =
-        delegate.warn(tag, message, throwable, anomalyType, extra)
+        delegate.warn(tag, message, throwable, anomalyType, mergeSourceScope(extra, sourceScope))
 
     fun e(message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-        delegate.error(tag, message, throwable, extra)
+        delegate.error(tag, message, throwable, mergeSourceScope(extra, sourceScope))
 
     fun c(message: String, throwable: Throwable? = null, extra: Map<String, Any>? = null) =
-        delegate.critical(tag, message, throwable, extra)
+        delegate.critical(tag, message, throwable, mergeSourceScope(extra, sourceScope))
 
-    fun metric(name: String, value: Double, unit: String = "count", tags: Map<String, String>? = null) =
-        delegate.metric(name, value, unit, tags)
+    fun metric(name: String, value: Double, unit: String = "count", tags: Map<String, String>? = null) {
+        val enriched = buildMap {
+            tags?.forEach { (key, value) -> put(key, value) }
+            if (!containsKey("source")) put("source", tag)
+            if (!containsKey("source_scope")) put("source_scope", sourceScope)
+        }
+        delegate.metric(name, value, unit, enriched)
+    }
 
     fun flush() = delegate.flush()
 }
@@ -218,9 +238,7 @@ fun AppLogger.withTag(tag: String): TaggedLogger = TaggedLogger(this, tag)
  * }
  * ```
  */
-fun AppLogger.withTag(receiver: Any): TaggedLogger = TaggedLogger(this, receiver.logTag())
-
-// ─── Timed metric block ───────────────────────────────────────────────────────
+fun AppLogger.withTag(receiver: Any): TaggedLogger = TaggedLogger(this, receiver.logTag(), receiver.logScope())
 
 /**
  * Measures the wall-clock execution time of [block] and records it as a metric.
