@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ## [Unreleased]
 
+### Changed
+- Supabase: el schema operativo `apploggers` ahora también expone `purge_old_logs(...)` y el job de `pg_cron` debe ejecutarlo por la ruta operacional preferida, sin duplicar tablas fuera de `public`.
+
 ### Planned
 - `logger-transport-firebase` module — transport to Firebase Realtime Database
 - Support for `logger-transport-grpc` — direct delivery via gRPC to a custom server

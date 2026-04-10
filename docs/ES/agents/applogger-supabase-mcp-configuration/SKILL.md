@@ -58,6 +58,8 @@ Primary use cases:
 16. `apploggers` is the preferred operational schema after migration 017; `public` remains a legacy compatibility path.
 17. `app_package`, `source_scope`, `source_file` y `source_method` existen como columnas top-level en `app_logs` y `app_metrics` (migration 021).
 18. No new key is required for `apploggers`; the same anon/service_role model applies once the schema is exposed correctly.
+19. La limpieza/retención también debe estar expuesta por `apploggers` después de migration 022: `apploggers.purge_old_logs(...)` debe existir y el job de `pg_cron` debe invocarlo por el schema operativo preferido.
+20. Como `apploggers` expone vistas sobre tablas canónicas en `public`, purgar vía `apploggers.purge_old_logs(...)` limpia el mismo dataset visible desde ambos schemas; no se deben crear tablas duplicadas solo para retención.
 
 ## Diagnóstico de columnas críticas
 
@@ -87,6 +89,37 @@ ORDER BY column_name;
 
 Si falta alguna columna, identificar la migración responsable y aplicarla con `mcp_supabase_apply_migration`.
 
+## Diagnóstico de schema operativo y cleanup
+
+Antes de declarar `apploggers` listo al 100%, ejecutar estas verificaciones via `mcp_supabase_execute_sql`:
+
+```sql
+-- Verificar que apploggers expone vistas operativas, no tablas duplicadas
+SELECT table_schema, table_name, table_type
+FROM information_schema.tables
+WHERE table_schema IN ('public', 'apploggers')
+  AND table_name IN ('app_logs','app_metrics','log_batches','metric_batches','device_remote_config','beta_tester_devices')
+ORDER BY table_schema, table_name;
+
+-- Verificar que la limpieza existe también en apploggers
+SELECT routine_schema, routine_name, routine_type
+FROM information_schema.routines
+WHERE routine_schema IN ('public', 'apploggers')
+  AND routine_name = 'purge_old_logs'
+ORDER BY routine_schema;
+
+-- Verificar que pg_cron usa la ruta operativa preferida
+SELECT jobid, jobname, schedule, command, active
+FROM cron.job
+WHERE jobname = 'purge-old-logs-every-3-days';
+```
+
+Resultado esperado:
+
+1. `public` contiene tablas base y `apploggers` contiene vistas operativas.
+2. Existen `public.purge_old_logs(...)` y `apploggers.purge_old_logs(...)`.
+3. El job `purge-old-logs-every-3-days` ejecuta `select apploggers.purge_old_logs(3);`.
+
 ## Gaps outside MCP
 
 1. service_role key provisioning/rotation.
@@ -104,3 +137,4 @@ Si falta alguna columna, identificar la migración responsable y aplicarla con `
 2. Report detected drift and normalization actions.
 3. Report residual risks and non-MCP follow-ups.
 4. Include a final go/no-go readiness verdict.
+5. Explicar explícitamente si `apploggers` limpia datos por wrapper sobre `public` o si hay tablas físicas separadas.
