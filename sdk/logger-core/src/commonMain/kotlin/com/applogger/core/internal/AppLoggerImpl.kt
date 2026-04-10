@@ -303,7 +303,12 @@ internal class AppLoggerImpl(
                 metricUnit = unit,
                 metricTags = enrichedTags,
                 appPackage = appPackage,
-                sourceScope = resolveSourceScope(tag = "METRIC", extra = null, tags = enrichedTags, callerInfo = callerInfo),
+                sourceScope = resolveSourceScope(
+                    tag = "METRIC",
+                    extra = null,
+                    tags = enrichedTags,
+                    callerInfo = callerInfo
+                ),
                 sourceFile = resolveSourceFile(extra = null, tags = enrichedTags, callerInfo = callerInfo),
                 sourceMethod = resolveSourceMethod(extra = null, tags = enrichedTags, callerInfo = callerInfo)
             )

@@ -26,7 +26,7 @@ actual fun hmacSha256Hex(secret: String, data: String): String {
 }
 
 actual fun captureCallerInfo(): CallerInfo? {
-    val frame = Throwable().stackTrace.firstOrNull(::isApplicationFrame) ?: return null
+    val frame = Throwable("caller capture").stackTrace.firstOrNull(::isApplicationFrame) ?: return null
     return CallerInfo(
         sourceScope = frame.className.substringBefore('$'),
         sourceFile = frame.fileName,

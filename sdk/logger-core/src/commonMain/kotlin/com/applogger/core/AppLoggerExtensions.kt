@@ -30,6 +30,9 @@ package com.applogger.core
  * @see AppLogger for the full low-level API.
  */
 
+private const val MAX_LOG_TAG_LENGTH = 100
+private const val MAX_LOG_SCOPE_LENGTH = 255
+
 // ─── Convenience methods  on AppLogger (no tag inference) ─────────────────────
 
 /** Logs a debug message. Shorthand for [AppLogger.debug]. */
@@ -67,12 +70,12 @@ fun AppLogger.logC(tag: String, message: String, throwable: Throwable? = null, e
  * characters are truncated (SDK limit).
  */
 fun Any.logTag(): String =
-    this::class.simpleName?.take(100) ?: "Anonymous"
+    this::class.simpleName?.take(MAX_LOG_TAG_LENGTH) ?: "Anonymous"
 
 /** Returns a hierarchical scope for the receiver when reflection can resolve it. */
 fun Any.logScope(): String =
-    this::class.qualifiedName?.take(255)
-        ?: this::class.simpleName?.take(100)
+    this::class.qualifiedName?.take(MAX_LOG_SCOPE_LENGTH)
+        ?: this::class.simpleName?.take(MAX_LOG_TAG_LENGTH)
         ?: "Anonymous"
 
 private fun mergeSourceScope(extra: Map<String, Any>?, sourceScope: String): Map<String, Any> = buildMap {

@@ -235,8 +235,13 @@ class SupabaseTransport(
         keyId: String
     ): TransportResult {
         val payload = when (kind) {
-            BatchKind.LOGS -> events.map { json.encodeToJsonElement(SupabaseLogEntry.serializer(), it.toSupabaseLog()) }
-            BatchKind.METRICS -> events.map { json.encodeToJsonElement(SupabaseMetricEntry.serializer(), it.toSupabaseMetric()) }
+            BatchKind.LOGS -> events.map {
+                json.encodeToJsonElement(SupabaseLogEntry.serializer(), it.toSupabaseLog())
+            }
+
+            BatchKind.METRICS -> events.map {
+                json.encodeToJsonElement(SupabaseMetricEntry.serializer(), it.toSupabaseMetric())
+            }
         }
         val manifest = buildJsonObject {
             put("batch_id", JsonPrimitive(events.firstOrNull()?.batchId ?: ""))

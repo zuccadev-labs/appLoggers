@@ -186,8 +186,6 @@ func (f *telemetryFlags) buildRequest() (telemetryQueryRequest, error) {
 		if strings.TrimSpace(f.userID) != "" {
 			return telemetryQueryRequest{}, newUsageError("--user-id is only valid when --source=logs")
 		}
-		if strings.TrimSpace(f.pkg) != "" {
-		}
 		if strings.TrimSpace(f.errorCode) != "" {
 			return telemetryQueryRequest{}, newUsageError("--error-code is only valid when --source=logs")
 		}
