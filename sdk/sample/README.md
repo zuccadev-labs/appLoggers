@@ -20,6 +20,18 @@ sample/
 2. Configura tus credenciales en `local.properties`
 3. Ejecuta los ejemplos
 
+### Variables esperadas en `local.properties`
+
+```properties
+APPLOGGER_URL=https://tu-proyecto.supabase.co
+APPLOGGER_ANON_KEY=eyJhbGci...
+APPLOGGER_DEBUG=true
+APPLOGGERS_INTEGRITY_SECRET=secreto-largo-y-aleatorio
+APPLOGGERS_INTEGRITY_SECRET_ID=10042026
+```
+
+`APPLOGGERS_INTEGRITY_SECRET` y `APPLOGGERS_INTEGRITY_SECRET_ID` se inyectan en `BuildConfig.LOGGER_INTEGRITY_SECRET` y `BuildConfig.LOGGER_INTEGRITY_SECRET_ID`, y luego se pasan a `AppLoggerConfig.Builder.integritySecret(...)` e `integritySecretId(...)` en [sdk/sample/src/main/kotlin/com/example/sample/SampleApplication.kt](sdk/sample/src/main/kotlin/com/example/sample/SampleApplication.kt).
+
 ## Nota
 
 Este módulo es solo de referencia, pero sí forma parte de la validación del CI del SDK mediante `:sample:testDebugUnitTest`.

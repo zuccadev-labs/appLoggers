@@ -228,6 +228,100 @@ class BatchProcessorTest {
         proc.shutdown()
     }
 
+    @Test
+    fun `integrity-enabled logs use atomic batch transport and skip legacy manifest write`() = runTest {
+        val atomicTransport = AtomicTransport()
+        val config = AppLoggerConfig.Builder()
+            .debugMode(true)
+            .batchSize(5)
+            .flushIntervalSeconds(300)
+            .integritySecret("top-secret")
+            .build()
+        val proc = BatchProcessor(
+            buffer = buffer,
+            transport = atomicTransport,
+            formatter = formatter,
+            config = config,
+            integrityManager = BatchIntegrityManager("top-secret", "10042026")
+        )
+
+        buffer.push(buildEvent())
+        buffer.push(buildEvent())
+
+        proc.sendBatch()
+
+        assertEquals(1, atomicTransport.atomicSendCallCount)
+        assertEquals(0, atomicTransport.sendCallCount)
+        assertEquals(2, atomicTransport.atomicEvents.size)
+        assertTrue(atomicTransport.atomicEvents.all { it.batchId != null })
+        assertEquals(listOf(BatchKind.LOGS), atomicTransport.atomicKinds)
+        proc.shutdown()
+    }
+
+    @Test
+    fun `metrics use a separate atomic integrity flow`() = runTest {
+        val atomicTransport = AtomicTransport()
+        val config = AppLoggerConfig.Builder()
+            .debugMode(true)
+            .batchSize(5)
+            .flushIntervalSeconds(300)
+            .integritySecret("top-secret")
+            .integritySecretId("10042026")
+            .build()
+        val proc = BatchProcessor(
+            buffer = buffer,
+            transport = atomicTransport,
+            formatter = formatter,
+            config = config,
+            integrityManager = BatchIntegrityManager("top-secret", "10042026")
+        )
+
+        buffer.push(buildEvent())
+        buffer.push(buildEvent(level = LogLevel.METRIC))
+
+        proc.sendBatch()
+
+        assertEquals(2, atomicTransport.atomicSendCallCount)
+        assertEquals(0, atomicTransport.sendCallCount)
+        assertEquals(1, atomicTransport.atomicEvents.size)
+        assertEquals(1, atomicTransport.atomicMetricEvents.size)
+        assertNotNull(atomicTransport.atomicMetricEvents.single().batchId)
+        assertEquals(listOf(BatchKind.LOGS, BatchKind.METRICS), atomicTransport.atomicKinds)
+        proc.shutdown()
+    }
+
+    @Test
+    fun `atomic log failure requeues original logs without synthetic batch id`() = runTest {
+        val atomicTransport = AtomicTransport().apply {
+            atomicShouldSucceed = false
+            retryable = true
+        }
+        val config = AppLoggerConfig.Builder()
+            .debugMode(true)
+            .batchSize(5)
+            .flushIntervalSeconds(300)
+            .integritySecret("top-secret")
+            .build()
+        val proc = BatchProcessor(
+            buffer = buffer,
+            transport = atomicTransport,
+            formatter = formatter,
+            config = config,
+            integrityManager = BatchIntegrityManager("top-secret", "10042026")
+        )
+
+        val original = buildEvent()
+        buffer.push(original)
+
+        proc.sendBatch()
+
+        assertEquals(1, buffer.size())
+        val requeued = buffer.drain().single()
+        assertEquals(original.id, requeued.id)
+        assertNull(requeued.batchId)
+        proc.shutdown()
+    }
+
     /**
      * Transport with full control for testing various scenarios.
      */
@@ -252,5 +346,46 @@ class BatchProcessorTest {
         }
 
         override fun isAvailable(): Boolean = available
+    }
+
+    private class AtomicTransport : LogTransport, AtomicBatchCapable {
+        var atomicShouldSucceed = true
+        var retryable = false
+        var sendCallCount = 0
+        var atomicSendCallCount = 0
+        val standardEvents = mutableListOf<LogEvent>()
+        val atomicEvents = mutableListOf<LogEvent>()
+        val atomicMetricEvents = mutableListOf<LogEvent>()
+        val atomicKinds = mutableListOf<BatchKind>()
+
+        override suspend fun send(events: List<LogEvent>): TransportResult {
+            sendCallCount++
+            standardEvents.addAll(events)
+            return TransportResult.Success
+        }
+
+        override suspend fun sendBatchWithManifest(
+            kind: BatchKind,
+            events: List<LogEvent>,
+            hash: String,
+            eventCount: Int,
+            environment: String,
+            sdkVersion: String,
+            keyId: String
+        ): TransportResult {
+            atomicSendCallCount++
+            atomicKinds += kind
+            return if (atomicShouldSucceed) {
+                when (kind) {
+                    BatchKind.LOGS -> atomicEvents.addAll(events)
+                    BatchKind.METRICS -> atomicMetricEvents.addAll(events)
+                }
+                TransportResult.Success
+            } else {
+                TransportResult.Failure("Atomic failure", retryable = retryable)
+            }
+        }
+
+        override fun isAvailable(): Boolean = true
     }
 }

@@ -40,6 +40,11 @@ import kotlinx.serialization.json.JsonElement
  * @property metricUnit Metric unit when level == METRIC.
  * @property metricTags Metric contextual tags when level == METRIC. Auto-enriched with
  *                      platform, app_version, device_model by the SDK.
+ * @property appPackage Application identifier (for example `com.methosmedia.klinema`).
+ * @property sourceScope Stable hierarchical origin for filtering (for example
+ *                       `com.company.feature.PlayerViewModel`).
+ * @property sourceFile Optional file name captured by forensic caller capture.
+ * @property sourceMethod Optional method/function captured by forensic caller capture.
  */
 @Serializable
 data class LogEvent(
@@ -61,6 +66,10 @@ data class LogEvent(
     val metricValue: Double? = null,
     val metricUnit: String? = null,
     val metricTags: Map<String, String>? = null,
+    val appPackage: String? = null,
+    val sourceScope: String? = null,
+    val sourceFile: String? = null,
+    val sourceMethod: String? = null,
     // Distributed tracing — optionally propagated across devices (mobile → TV gRPC flows).
     // Set via AppLoggerSDK.setTraceId(id). Appears as trace_id column in Supabase.
     val traceId: String? = null,

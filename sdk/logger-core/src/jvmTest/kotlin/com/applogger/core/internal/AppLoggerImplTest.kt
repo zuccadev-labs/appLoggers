@@ -171,6 +171,7 @@ class AppLoggerImplTest {
     @Test
     fun `metric events include metric metadata`() = runBlocking {
         logger = createLogger(buildConfig(debugMode = false))
+        logger.addGlobalExtra("app_package", "com.company.sample")
         logger.metric("screen_load_time", 1234.0, "ms", tags = mapOf("screen" to "Home"))
         delay(200)
         processor.sendBatch()
@@ -181,8 +182,43 @@ class AppLoggerImplTest {
         assertEquals(1234.0, event.metricValue)
         assertEquals("ms", event.metricUnit)
         assertEquals("Home", event.metricTags?.get("screen"))
+        assertEquals("com.company.sample", event.appPackage)
+        assertEquals("METRIC", event.sourceScope)
         // extra should be null — metric data lives in typed fields
         assertNull(event.extra)
+    }
+
+    @Test
+    fun `logs promote app package and source scope to top level`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+        logger.addGlobalExtra("app_package", "com.company.sample")
+        logger.info("PLAYER", "Playback started", extra = mapOf("source_scope" to "com.company.player.PlayerScreen"))
+        delay(200)
+        processor.sendBatch()
+
+        val event = fakeTransport.sentEvents.single()
+        assertEquals("com.company.sample", event.appPackage)
+        assertEquals("com.company.player.PlayerScreen", event.sourceScope)
+    }
+
+    @Test
+    fun `caller capture populates forensic source fields when enabled`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false).copy(captureCallerInfo = true))
+
+        emitCallerCapturedLog()
+        delay(200)
+        processor.sendBatch()
+
+        val event = fakeTransport.sentEvents.single()
+        val hasCapturedScope = !event.sourceScope.isNullOrBlank() && event.sourceScope != "CALLER"
+        val hasCapturedFile = !event.sourceFile.isNullOrBlank()
+        val hasCapturedMethod = !event.sourceMethod.isNullOrBlank()
+
+        assertTrue(hasCapturedScope || hasCapturedFile || hasCapturedMethod)
+    }
+
+    private fun emitCallerCapturedLog() {
+        logger.info("CALLER", "capture me")
     }
 
     @Test
@@ -295,6 +331,30 @@ class AppLoggerImplTest {
         processor.sendBatch()
 
         assertEquals(defaultDeviceId, fakeTransport.sentEvents[2].deviceId)
+    }
+
+    @Test
+    fun `setTraceId propagates to subsequent log events`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+
+        logger.setTraceId("trace-123")
+        logger.info("TAG", "with trace")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals("trace-123", fakeTransport.sentEvents.single().traceId)
+    }
+
+    @Test
+    fun `setSessionVariant propagates to subsequent log events`() = runBlocking {
+        logger = createLogger(buildConfig(debugMode = false))
+
+        logger.setSessionVariant("experiment-a")
+        logger.info("TAG", "with variant")
+        delay(200)
+        processor.sendBatch()
+
+        assertEquals("experiment-a", fakeTransport.sentEvents.single().variant)
     }
 
     // ── Throwable propagation on non-critical levels ───────────────────────────

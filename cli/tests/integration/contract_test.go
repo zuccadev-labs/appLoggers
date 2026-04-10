@@ -467,8 +467,12 @@ func TestTelemetryQueryAdvancedLogFiltersJSON(t *testing.T) {
 			http.Error(w, "unexpected path", http.StatusNotFound)
 			return
 		}
-		if r.URL.Query().Get("extra->>package_name") != "eq.com.company.billing" {
+		if r.URL.Query().Get("app_package") != "eq.com.company.billing" {
 			http.Error(w, "unexpected package filter", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("source_scope") != "like.com.company.billing.%" {
+			http.Error(w, "unexpected source prefix filter", http.StatusBadRequest)
 			return
 		}
 		if r.URL.Query().Get("extra->>error_code") != "eq.E-42" {
@@ -481,7 +485,7 @@ func TestTelemetryQueryAdvancedLogFiltersJSON(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[
-			{"id":"1","created_at":"2026-03-01T00:00:00Z","level":"ERROR","tag":"billing","message":"timeout on payment","extra":{"package_name":"com.company.billing","error_code":"E-42"}}
+			{"id":"1","created_at":"2026-03-01T00:00:00Z","level":"ERROR","tag":"billing","message":"timeout on payment","app_package":"com.company.billing","source_scope":"com.company.billing.PaymentService","extra":{"app_package":"com.company.billing","error_code":"E-42"}}
 		]`))
 	}))
 	defer mockSupabase.Close()
@@ -492,6 +496,7 @@ func TestTelemetryQueryAdvancedLogFiltersJSON(t *testing.T) {
 		"query",
 		"--source", "logs",
 		"--package", "com.company.billing",
+		"--source-prefix", "com.company.billing.",
 		"--error-code", "E-42",
 		"--contains", "timeout",
 		"--limit", "10",
@@ -509,6 +514,9 @@ func TestTelemetryQueryAdvancedLogFiltersJSON(t *testing.T) {
 	if !strings.Contains(text, "\"package\": \"com.company.billing\"") {
 		t.Fatalf("expected package echo in request block, output=%s", text)
 	}
+	if !strings.Contains(text, "\"source_prefix\": \"com.company.billing.\"") {
+		t.Fatalf("expected source_prefix echo in request block, output=%s", text)
+	}
 	if !strings.Contains(text, "\"error_code\": \"E-42\"") {
 		t.Fatalf("expected error_code echo in request block, output=%s", text)
 	}
@@ -517,18 +525,51 @@ func TestTelemetryQueryAdvancedLogFiltersJSON(t *testing.T) {
 	}
 }
 
-func TestTelemetryQueryPackageInvalidForMetrics(t *testing.T) {
+func TestTelemetryQueryMetricsPackageAndSourceFiltersJSON(t *testing.T) {
 	binary := buildCLI(t)
-	cmd := exec.Command(binary, "telemetry", "query", "--source", "metrics", "--package", "pkg.demo", "--output", "json")
+	mockSupabase := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/v1/app_metrics" {
+			http.Error(w, "unexpected path", http.StatusNotFound)
+			return
+		}
+		if r.URL.Query().Get("app_package") != "eq.com.company.billing" {
+			http.Error(w, "unexpected app_package filter", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("source_scope") != "eq.com.company.billing.RenderLoop" {
+			http.Error(w, "unexpected source_scope filter", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"id":"1","created_at":"2026-03-01T00:00:00Z","name":"frame_time_ms","value":16.6,"unit":"ms","app_package":"com.company.billing","source_scope":"com.company.billing.RenderLoop"}
+		]`))
+	}))
+	defer mockSupabase.Close()
+
+	cmd := exec.Command(
+		binary,
+		"telemetry",
+		"query",
+		"--source", "metrics",
+		"--package", "com.company.billing",
+		"--source-scope", "com.company.billing.RenderLoop",
+		"--name", "frame_time_ms",
+		"--output", "json",
+	)
+	cmd.Env = append(cmd.Env,
+		"appLogger_supabaseUrl="+mockSupabase.URL,
+		"appLogger_supabaseKey=test-key",
+	)
 	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatal("expected usage error for --package with metrics source")
+	if err != nil {
+		t.Fatalf("telemetry metrics package/source query failed: %v, output=%s", err, string(out))
 	}
-	if cmd.ProcessState.ExitCode() != 2 {
-		t.Fatalf("expected exit code 2, got %d", cmd.ProcessState.ExitCode())
+	if !strings.Contains(string(out), "\"package\": \"com.company.billing\"") {
+		t.Fatalf("expected package echo in response, output=%s", string(out))
 	}
-	if !strings.Contains(string(out), "\"error_kind\": \"usage_error\"") {
-		t.Fatalf("expected usage error envelope, output=%s", string(out))
+	if !strings.Contains(string(out), "\"source_scope\": \"com.company.billing.RenderLoop\"") {
+		t.Fatalf("expected source_scope echo in response, output=%s", string(out))
 	}
 }
 

@@ -18,6 +18,7 @@ Cada carpeta sigue el formato estándar de Agent Skills:
 | --- | --- | --- |
 | Guided setup | Guiar paso a paso la instalación y configuración del SDK | [applogger-guided-setup](applogger-guided-setup) |
 | Project integration | Leer una app existente, decidir puntos de integración y cablear AppLogger correctamente | [applogger-project-integration](applogger-project-integration) |
+| Existing integration audit | Auditar una integración existente de AppLogger, detectar gaps y dejar una ruta segura de upgrade | [applogger-existing-integration-audit](applogger-existing-integration-audit) |
 | Runtime troubleshooting | Diagnosticar por qué no llegan eventos o falla el transporte | [applogger-runtime-troubleshooting](applogger-runtime-troubleshooting) |
 | Production hardening | Endurecer seguridad, privacidad y parametros para release | [applogger-production-hardening](applogger-production-hardening) |
 | Instrumentation design | Definir estrategia de eventos, tags y metricas de alto valor | [applogger-instrumentation-design](applogger-instrumentation-design) |
@@ -57,6 +58,14 @@ Usa este skill cuando la persona quiera que el agente analice la app e integre A
 1. "Lee la app e integra el SDK"
 2. "Analiza el proyecto y dime dónde inicializar el logger"
 3. "Revisa mi arquitectura y agrega AppLogger de forma segura"
+
+### Existing integration audit
+
+Usa este skill cuando AppLogger ya existe en el proyecto pero hay que revisarlo y llevarlo a estándar, por ejemplo:
+
+1. "Audita mi integración actual de AppLogger"
+2. "Lee este proyecto y dime qué está bien y qué hay que corregir"
+3. "Actualiza una integración existente sin romperla"
 
 ### Runtime troubleshooting
 

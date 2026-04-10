@@ -14,6 +14,9 @@ Use this skill when integration seems complete and needs objective validation.
 1. Validate on real execution path, not only static inspection.
 2. Include both functional and operational checks.
 3. Verify local configuration handling policy compliance.
+4. Confirm the app initializes AppLogger before the first meaningful runtime surfaces begin logging.
+5. Confirm at least one startup log, one domain log, and one health snapshot are observable.
+6. For service-oriented apps, confirm shutdown flush behavior on a controlled stop path.
 
 ## Workflow
 
@@ -22,6 +25,15 @@ Use this skill when integration seems complete and needs objective validation.
 3. Validate backend event arrival.
 4. Collect QA evidence.
 5. Decide go/no-go with explicit acceptance gates.
+
+## Minimum acceptance pattern for existing Android integrations
+
+1. Initialization occurs in `Application` or an equivalent single bootstrap point.
+2. Tag usage is centralized and stable.
+3. Startup emits a BOOT or equivalent initialization event.
+4. One operational metric reaches the backend with typed dimensions.
+5. If auth exists, post-auth identity correlation works without leaking the identifier in log messages.
+6. Controlled shutdown emits final health and drains buffered telemetry.
 
 ## References bundled with this skill
 

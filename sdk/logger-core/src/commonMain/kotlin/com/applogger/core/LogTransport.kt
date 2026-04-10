@@ -31,6 +31,11 @@ interface LogTransport {
     fun isAvailable(): Boolean
 }
 
+enum class BatchKind {
+    LOGS,
+    METRICS
+}
+
 /**
  * Optional interface for transports that support batch manifest storage.
  * Implement alongside [LogTransport] to enable batch integrity verification via the CLI.
@@ -41,12 +46,36 @@ interface BatchManifestCapable {
      * Called after a batch is successfully sent.
      */
     suspend fun storeBatchManifest(
+        kind: BatchKind,
         batchId: String,
         hash: String,
         eventCount: Int,
         environment: String = "",
-        sdkVersion: String = ""
+        sdkVersion: String = "",
+        keyId: String = ""
     )
+}
+
+/**
+ * Optional interface for transports that can persist log events and their batch manifest
+ * atomically in a single remote transaction.
+ */
+interface AtomicBatchCapable {
+    /**
+     * Sends log events and their manifest atomically.
+     *
+     * Implementations must ensure the log rows and manifest are committed together,
+     * or not committed at all.
+     */
+    suspend fun sendBatchWithManifest(
+        kind: BatchKind,
+        events: List<LogEvent>,
+        hash: String,
+        eventCount: Int,
+        environment: String = "",
+        sdkVersion: String = "",
+        keyId: String = ""
+    ): TransportResult
 }
 
 /**

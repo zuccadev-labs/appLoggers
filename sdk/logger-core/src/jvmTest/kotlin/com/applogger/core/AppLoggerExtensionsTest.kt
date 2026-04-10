@@ -131,6 +131,7 @@ class AppLoggerExtensionsTest {
         val e = RuntimeException("any-info-error")
         this.logI(spy, "info via any", throwable = e)
         assertEquals("AppLoggerExtensionsTest", spy.calls[0].tag)
+        assertEquals("com.applogger.core.AppLoggerExtensionsTest", spy.calls[0].extra?.get("source_scope"))
         assertEquals(e, spy.calls[0].throwable)
     }
 
@@ -210,6 +211,7 @@ class AppLoggerExtensionsTest {
             assertEquals("ms", it.unit)
             assertEquals("60fps", it.tags?.get("frame"))
             assertEquals("AppLoggerExtensionsTest", it.tags?.get("source"))
+            assertEquals("com.applogger.core.AppLoggerExtensionsTest", it.tags?.get("source_scope"))
         }
     }
 
@@ -258,6 +260,7 @@ class AppLoggerExtensionsTest {
         val log = spy.withTag(this)
         log.d("debug msg")
         assertEquals("AppLoggerExtensionsTest", spy.calls[0].tag)
+        assertEquals("com.applogger.core.AppLoggerExtensionsTest", spy.calls[0].extra?.get("source_scope"))
     }
 
     @Test

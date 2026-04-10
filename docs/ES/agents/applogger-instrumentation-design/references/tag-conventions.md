@@ -61,6 +61,20 @@ class PlayerController(private val logger: AppLogger) {
 }
 ```
 
+> **Caso especial — objetos anónimos y lambdas**: `logTag()` usa `this::class.simpleName`. Para objetos anónimos o lambdas, `simpleName` es `null` y el tag resultante es `"Anonymous"`. Evita usar `Any.logD/I/W/E/C` directamente en lambdas o `object : Interface {}` — pasa el tag explícitamente en esos casos.
+
+```kotlin
+// ❌ Objeto anónimo — tag será "Anonymous"
+val handler = object : ResponseHandler {
+    override fun onSuccess() = this.logI(logger, "done")  // tag = "Anonymous"
+}
+
+// ✅ Pasar tag explícito en objetos anónimos
+val handler = object : ResponseHandler {
+    override fun onSuccess() = logger.logI("NETWORK", "done")
+}
+```
+
 ### 4. `AppLogger.withTag()` — TaggedLogger con tag fijo
 
 Elimina la repetición del tag en clases que siempre loguean bajo el mismo dominio:

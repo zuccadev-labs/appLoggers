@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS app_logs (
     session_id      TEXT            NOT NULL,
     device_id       TEXT            NOT NULL DEFAULT '',
     user_id         TEXT            NULL,
+    app_package     TEXT            NULL,
+    source_scope    TEXT            NULL,
+    source_file     TEXT            NULL,
+    source_method   TEXT            NULL,
     extra           JSONB           NULL
 );
 
@@ -27,6 +31,8 @@ CREATE INDEX IF NOT EXISTS idx_app_logs_level       ON app_logs (level);
 CREATE INDEX IF NOT EXISTS idx_app_logs_session_id  ON app_logs (session_id);
 CREATE INDEX IF NOT EXISTS idx_app_logs_device_id   ON app_logs (device_id);
 CREATE INDEX IF NOT EXISTS idx_app_logs_tag         ON app_logs (tag);
+CREATE INDEX IF NOT EXISTS idx_app_logs_app_package ON app_logs (app_package);
+CREATE INDEX IF NOT EXISTS idx_app_logs_source_scope ON app_logs (source_scope);
 
 COMMENT ON TABLE  app_logs              IS 'Eventos de telemetría técnica generados por el SDK AppLogger. Los eventos METRIC van a app_metrics, nunca a esta tabla.';
 COMMENT ON COLUMN app_logs.level        IS 'Severidad del evento. METRIC excluido — esos eventos van a app_metrics.';
@@ -35,4 +41,8 @@ COMMENT ON COLUMN app_logs.api_level    IS 'Nivel API normalizado. Android usa B
 COMMENT ON COLUMN app_logs.device_id    IS 'Identificador del dispositivo. String opaco generado por el SDK (no necesariamente UUID)';
 COMMENT ON COLUMN app_logs.user_id      IS 'UUID anónimo. NULL por defecto. Solo se popula con consentimiento explícito del usuario final';
 COMMENT ON COLUMN app_logs.stack_trace  IS 'Array de líneas del stack trace. TV: máx 5 líneas. Mobile: máx 50 líneas';
-COMMENT ON COLUMN app_logs.extra        IS 'Metadatos adicionales en JSONB. Campos conocidos: package_name, error_code. NOTA: anomaly_type fue promovido a columna top-level en migración 007 — ya no vive en extra.';
+COMMENT ON COLUMN app_logs.app_package  IS 'Identidad estable de la app que emitió el evento (ej: com.methosmedia.klinema).';
+COMMENT ON COLUMN app_logs.source_scope IS 'Origen jerárquico estable del evento para filtros corporativos (ej: com.company.feature.PlayerViewModel).';
+COMMENT ON COLUMN app_logs.source_file  IS 'Archivo fuente opcional capturado por modo forense de caller capture.';
+COMMENT ON COLUMN app_logs.source_method IS 'Método o función opcional capturado por modo forense de caller capture.';
+COMMENT ON COLUMN app_logs.extra        IS 'Metadatos adicionales en JSONB. Campos conocidos: app_package, source_scope, error_code. NOTA: anomaly_type fue promovido a columna top-level en migración 007 — ya no vive en extra.';

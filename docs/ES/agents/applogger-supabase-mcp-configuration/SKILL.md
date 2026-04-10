@@ -24,12 +24,13 @@ Primary use cases:
 4. Keep SDK/CLI key model explicit:
    - SDK writes with anon key.
    - CLI reads with service_role key.
+5. Use `mcp_supabase_apply_migration` for DDL migrations; reserve `mcp_supabase_execute_sql` for verification queries and tightly scoped DML.
 
 ## Workflow
 
 1. Read migration files under `docs/ES/migraciones`.
 2. Inspect remote migration state via MCP.
-3. Apply missing migrations in order.
+3. Apply missing migrations in order with `mcp_supabase_apply_migration`.
 4. If conflicts exist (existing policy/index), switch to idempotent migration strategy.
 5. Validate final state:
    - migrations list
@@ -39,22 +40,59 @@ Primary use cases:
 
 ## Expected backend contract
 
-1. `app_logs` and `app_metrics` tables exist.
-2. `log_batches` table exists (batch integrity manifests).
-3. `device_remote_config` table exists (remote debug control per device).
-4. `beta_tester_devices` table exists (auto-correlation of tester emails).
+1. `app_logs` and `app_metrics` tables exist with all columns from migrations 001–021.
+2. `log_batches` table exists (batch integrity manifests) — migration 011.
+3. `device_remote_config` table exists (remote debug control per device) — migration 013.
+4. `beta_tester_devices` table exists (auto-correlation of tester emails) — migration 014.
 5. RLS enabled in all tables.
 6. anon can insert via `sdk_insert_*` policies.
 7. anon can SELECT `device_remote_config` (enabled rows only).
 8. service_role can read/write via `monitor_read_*` / `service_all` policies.
 9. `authenticated_read_*` global policies are absent by default.
 10. Trigger `trg_correlate_beta_tester` on `app_logs` auto-fills beta tester email.
+11. `environment` column exists in `app_logs` (migration 007) and `app_metrics` (migration 008) — **si falta, todos los eventos llegan con environment = NULL en Supabase pese a que el SDK envía el valor correctamente**.
+12. `device_id` column exists in `app_logs` (migration 001) y `app_metrics` (migration 002).
+13. `batch_id` column exists in `app_logs` (migration 011).
+14. `timestamp BIGINT` column exists in `app_logs` (migration 015) — requerido para verificación HMAC.
+15. `log_batches` es vacío por diseño cuando `integritySecret` no está configurado en el SDK — no es un error de migración.
+16. `apploggers` is the preferred operational schema after migration 017; `public` remains a legacy compatibility path.
+17. `app_package`, `source_scope`, `source_file` y `source_method` existen como columnas top-level en `app_logs` y `app_metrics` (migration 021).
+18. No new key is required for `apploggers`; the same anon/service_role model applies once the schema is exposed correctly.
+
+## Diagnóstico de columnas críticas
+
+Antes de declarar el backend listo, ejecutar estas queries via `mcp_supabase_execute_sql` para confirmar columnas:
+
+```sql
+-- Verificar columnas clave en app_logs
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'app_logs'
+  AND column_name IN ('environment','anomaly_type','device_id','batch_id','timestamp','variant','trace_id','app_package','source_scope','source_file','source_method')
+ORDER BY column_name;
+
+-- Verificar columnas clave en app_metrics
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'app_metrics'
+  AND column_name IN ('environment','device_id','user_id','app_package','source_scope','source_file','source_method')
+ORDER BY column_name;
+
+-- Verificar columnas de log_batches
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'log_batches'
+ORDER BY column_name;
+```
+
+Si falta alguna columna, identificar la migración responsable y aplicarla con `mcp_supabase_apply_migration`.
 
 ## Gaps outside MCP
 
 1. service_role key provisioning/rotation.
 2. CI/OS secret injection.
 3. local.properties edits in end-user workstation.
+4. `integritySecret` provisioning — debe generarse con `apploggers init --generate-integrity-secret` y nunca estar hardcodeado en el APK.
 
 ## References bundled with this skill
 

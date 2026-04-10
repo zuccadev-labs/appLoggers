@@ -16,6 +16,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [SDK 0.2.0-alpha.10 + CLI 0.2.1] — 2026-04-10
+
+### Added
+
+- SDK + schema: `app_package`, `source_scope`, `source_file` y `source_method` promovidos a campos top-level para logs y métricas.
+- SDK: caller capture forense opcional vía `captureCallerInfo`.
+- CLI: filtros jerárquicos `--source-scope`, `--source-prefix`, `--source-file`, `--source-method` y filtrado top-level por `--package`.
+- Migración 021: backfill e índices para identidad de app y jerarquía de origen.
+
+### Changed
+
+- El schema operativo por defecto del CLI pasa a `apploggers`; `public` queda como compatibilidad legacy.
+- Metadata de release alineada entre SDK Gradle, podspec, comentario de Swift Package, CLI version y plugin metadata.
+- Skills y documentación ahora indican cómo resolver la versión concreta antes de actualizar un proyecto consumidor.
+- La guía de Supabase MCP ahora usa `mcp_supabase_apply_migration` para DDL y deja `mcp_supabase_execute_sql` para diagnósticos y DML puntual.
+
+### Fixed
+
+- Drift documental en orden de migraciones, schema operativo recomendado y contrato de observabilidad top-level.
+- Drift de skills para upgrades de consumidores y preparación de esquemas operativos.
+
+---
+
 ## [SDK 0.2.0-alpha.9 + CLI 0.1.5] — 2026-03-24
 
 ### Added — SDK
@@ -329,7 +352,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ### Security
 - **Installer baseline hardening preserved**: checksum verification remains mandatory while introducing config bootstrap behavior.
-
 
 ---
 

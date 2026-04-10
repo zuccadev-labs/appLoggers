@@ -97,7 +97,7 @@ class AppLoggerIos private constructor() : AppLogger {
         }
         val formatter = JsonLogFormatter(prettyPrint = resolvedConfig.isDebugMode)
         val integrityManager = if (resolvedConfig.integritySecret.isNotBlank())
-            BatchIntegrityManager(resolvedConfig.integritySecret) else null
+            BatchIntegrityManager(resolvedConfig.integritySecret, resolvedConfig.integritySecretId) else null
 
         val dataBudget = if (resolvedConfig.dailyDataLimitMb > 0) {
             DataBudgetManager(

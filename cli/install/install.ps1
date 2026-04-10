@@ -101,7 +101,7 @@ function Write-ExampleConfig {
       "supabase": {
         "url": "https://your-project.supabase.co",
         "api_key_env": "APPLOGGER_SUPABASE_KEY",
-        "schema": "public",
+                "schema": "apploggers",
         "logs_table": "app_logs",
         "metrics_table": "app_metrics",
         "timeout_seconds": 15

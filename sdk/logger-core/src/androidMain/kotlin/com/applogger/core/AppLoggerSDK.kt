@@ -120,7 +120,7 @@ object AppLoggerSDK : AppLogger {
             DataBudgetManager(resolvedConfig.dailyDataLimitMb * BYTES_PER_MB, budgetPersistence, networkTypeProvider)
         else DataBudgetManager(DataBudgetManager.DISABLED)
         val integrityManager = if (resolvedConfig.integritySecret.isNotBlank())
-            BatchIntegrityManager(resolvedConfig.integritySecret) else null
+            BatchIntegrityManager(resolvedConfig.integritySecret, resolvedConfig.integritySecretId) else null
         val processor = BatchProcessor(
             buffer = buffer,
             transport = transport ?: NoOpTransport(),

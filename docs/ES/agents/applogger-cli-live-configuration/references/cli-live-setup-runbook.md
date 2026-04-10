@@ -44,7 +44,8 @@ Configuración mínima:
       "workspace_roots": ["/path/to/workspace"],
       "supabase": {
         "url": "https://YOUR_PROJECT.supabase.co",
-        "api_key": "eyJhbGci..."
+        "api_key": "eyJhbGci...",
+        "schema": "apploggers"
       }
     }
   ]
@@ -55,6 +56,8 @@ Obtener las credenciales desde Supabase Dashboard → Project Settings → API:
 
 - **Project URL** → campo `url`
 - **service_role key** → campo `api_key`
+
+Usar `schema: "apploggers"` como default operativo. `public` queda solo para instalaciones legacy sin migración 017.
 
 > No versionar este archivo. Contiene el `service_role key`.
 

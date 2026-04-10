@@ -74,7 +74,7 @@ The CLI reads Supabase configuration from environment variables:
 
 - `appLogger_supabaseUrl` (required)
 - `appLogger_supabaseKey` (required, service_role key for CLI reads)
-- `appLogger_supabaseSchema` (optional, default `public`)
+- `appLogger_supabaseSchema` (optional, default `apploggers`; use `public` only for legacy installs without migration 017)
 - `appLogger_supabaseLogTable` (optional, default `app_logs`)
 - `appLogger_supabaseMetricTable` (optional, default `app_metrics`)
 - `appLogger_supabaseTimeoutSeconds` (optional, default `15`)
@@ -123,7 +123,7 @@ Recommended JSON structure:
       "supabase": {
         "url": "https://klinema.supabase.co",
         "api_key_env": "APPLOGGER_KLINEMA_SUPABASE_KEY",
-        "schema": "public",
+        "schema": "apploggers",
         "logs_table": "app_logs",
         "metrics_table": "app_metrics",
         "timeout_seconds": 15
@@ -147,6 +147,7 @@ Recommended JSON structure:
 Operational guidance:
 
 - Keep `service_role` secrets outside the JSON file whenever possible by using `api_key_env`.
+- Prefer `schema: "apploggers"` for operational reads; `public` is now a legacy compatibility path.
 - Let Wails own the project registry and spawn the CLI with the same config model.
 - SSE should transport resolved project context (`project`, `config_source`) rather than raw secrets.
 - When only one project is configured, the CLI auto-selects it to keep local workflows simple.
@@ -302,7 +303,10 @@ apploggers telemetry tail --environment production --min-severity error
 - `--session-id` now accepts any identifier string supported by your table schema.
 - `--device-id` works for both `logs` and `metrics` sources.
 - `--user-id` is available for `logs` source and maps to anonymized user identifiers.
-- `--package` maps to `extra.package_name` for module/package-level segmentation in logs.
+- `--package` maps to top-level `app_package` for app-level segmentation in logs and metrics.
+- `--source-scope` maps to top-level `source_scope` for exact hierarchical filtering.
+- `--source-prefix` applies a hierarchical prefix match over top-level `source_scope`.
+- `--source-file` and `--source-method` query optional forensic caller-capture columns when enabled in the SDK.
 - `--error-code` maps to `extra.error_code` for operational error grouping.
 - `--contains` applies `ilike` filtering over `message` for fast development triage.
 - `--fingerprint` filters by SHA-256 pseudonymized device fingerprint via PostgREST JSONB: `extra->>device_fingerprint=eq.VALUE`. Logs only.

@@ -53,7 +53,7 @@ Ver [INSTALLATION.md](./INSTALLATION.md) para instalación manual, compilación 
 
 ## Configuración
 
-### `~/.apploggers/cli.json` — fuente 
+### `~/.apploggers/cli.json` — fuente
 
 El CLI crea `~/.apploggers/cli.json` automáticamente en el primer run con un template completo. Este archivo es la única fuente de configuración para uso local, agentes IA y SSE. No hay nada más que configurar.
 
@@ -149,14 +149,14 @@ El archivo `cli.json` configura **la conexión al proyecto Supabase** — no los
 | `supabase.url` | ✅ | URL del proyecto Supabase (`https://xxxx.supabase.co`) |
 | `supabase.api_key` | ✅* | Valor directo del `service_role` key. No versionar. |
 | `supabase.api_key_env` | ✅* | Nombre de la variable de entorno UPPERCASE que contiene el `service_role` key |
-| `supabase.schema` | ❌ | Esquema PostgreSQL. Default: `public` |
+| `supabase.schema` | ❌ | Esquema PostgreSQL. Default: `apploggers` (`public` solo para instalaciones legacy sin migración 017) |
 | `supabase.logs_table` | ❌ | Nombre de la tabla de logs. Default: `app_logs` |
 | `supabase.metrics_table` | ❌ | Nombre de la tabla de métricas. Default: `app_metrics` |
 | `supabase.timeout_seconds` | ❌ | Timeout HTTP en segundos (1-120). Default: `15` |
 
 `*` Al menos uno de `api_key` o `api_key_env` debe resolver a un valor no vacío.
 
-`schema`, `logs_table` y `metrics_table` solo se especifican si las migraciones usaron nombres distintos a los defaults. En la mayoría de los casos se omiten.
+`schema`, `logs_table` y `metrics_table` solo se especifican si las migraciones usaron nombres distintos a los defaults. En la mayoría de los casos se omiten; desde la migración 017 el camino operativo preferido es `apploggers`.
 
 ---
 
@@ -291,13 +291,16 @@ Antes de filtrar, es importante entender la estructura real de las tablas.
 | `device_id` | TEXT | Identificador del dispositivo (string opaco generado por el SDK) |
 | `user_id` | TEXT | Identificador anónimo del usuario (NULL por defecto, solo con consentimiento) |
 | `sdk_version` | VARCHAR | Versión del SDK que generó el evento |
+| `app_package` | TEXT | Identidad estable de la app que emitió el evento |
+| `source_scope` | TEXT | Origen jerárquico estable del evento |
+| `source_file` | TEXT | Archivo fuente opcional capturado por modo forense |
+| `source_method` | TEXT | Método o función opcional capturado por modo forense |
 | `extra` | JSONB | Campos adicionales de contexto (ver abajo) |
 
 **`app_logs.extra`** — campos JSONB accesibles via filtros:
 
 | Campo en `extra` | Flag del CLI | Descripción |
 |---|---|---|
-| `extra.package_name` | `--package` | Paquete o módulo que generó el evento (ej: `com.company.billing`) |
 | `extra.error_code` | `--error-code` | Código de error de negocio (ej: `E-42`, `AUTH_FAILED`) |
 | `extra.anomaly_type` | `--anomaly-type` | Tipo de anomalía detectada (ej: `slow_response`, `memory_leak`) |
 
@@ -313,6 +316,10 @@ Antes de filtrar, es importante entender la estructura real de las tablas.
 | `tags` | JSONB | Contexto de la métrica: `platform`, `app_version`, `device_model`, `screen_name` |
 | `device_id` | TEXT | Identificador del dispositivo |
 | `session_id` | TEXT | Identificador de sesión |
+| `app_package` | TEXT | Identidad estable de la app que emitió la métrica |
+| `source_scope` | TEXT | Origen jerárquico estable de la métrica |
+| `source_file` | TEXT | Archivo fuente opcional capturado por modo forense |
+| `source_method` | TEXT | Método o función opcional capturado por modo forense |
 | `sdk_version` | VARCHAR | Versión del SDK |
 
 ---
@@ -350,6 +357,10 @@ apploggers telemetry query \
   [--session-id UUID] \
   [--device-id ID] \
   [--user-id UUID] \
+  [--source-scope SCOPE] \
+  [--source-prefix PREFIX] \
+  [--source-file FILE] \
+  [--source-method METHOD] \
   [--contains TEXT] \
   [--package PACKAGE_NAME] \
   [--error-code CODE] \
@@ -372,8 +383,12 @@ apploggers telemetry query \
 | `--session-id` | ambas | `session_id = valor` | UUID | — |
 | `--device-id` | ambas | `device_id = valor` | UUID o string | — |
 | `--user-id` | logs | `user_id = valor` | UUID | — |
+| `--source-scope` | ambas | `source_scope = valor` | scope jerárquico exacto | — |
+| `--source-prefix` | ambas | `source_scope LIKE valor%` | prefijo jerárquico | — |
+| `--source-file` | ambas | `source_file = valor` | archivo fuente | — |
+| `--source-method` | ambas | `source_method = valor` | método o función | — |
 | `--contains` | logs | `message ilike *valor*` | texto libre (substring) | — |
-| `--package` | logs | `extra->>package_name = valor` | nombre de paquete | — |
+| `--package` | ambas | `app_package = valor` | nombre de paquete/app | — |
 | `--error-code` | logs | `extra->>error_code = valor` | código de error | — |
 | `--anomaly-type` | logs | `extra->>anomaly_type = valor` | tipo de anomalía | — |
 | `--name` | metrics | `name = valor` | nombre de métrica | — |

@@ -75,6 +75,46 @@ private fun mergeExtra(
     }
 }
 
+private fun Map<String, JsonElement>?.stringValue(key: String): String? =
+    (this?.get(key) as? JsonPrimitive)?.content?.trim()?.ifBlank { null }
+
+private fun Map<String, String>?.tagValue(key: String): String? =
+    this?.get(key)?.trim()?.ifBlank { null }
+
+private fun resolveSourceScope(
+    tag: String,
+    extra: Map<String, JsonElement>?,
+    tags: Map<String, String>?,
+    callerInfo: CallerInfo?
+): String? {
+    return extra.stringValue("source_scope")
+        ?: extra.stringValue("source")
+        ?: tags.tagValue("source_scope")
+        ?: tags.tagValue("source")
+        ?: callerInfo?.sourceScope?.trim()?.ifBlank { null }
+        ?: tag.trim().ifBlank { null }
+}
+
+private fun resolveSourceFile(
+    extra: Map<String, JsonElement>?,
+    tags: Map<String, String>?,
+    callerInfo: CallerInfo?
+): String? {
+    return extra.stringValue("source_file")
+    ?: tags.tagValue("source_file")
+        ?: callerInfo?.sourceFile?.trim()?.ifBlank { null }
+}
+
+private fun resolveSourceMethod(
+    extra: Map<String, JsonElement>?,
+    tags: Map<String, String>?,
+    callerInfo: CallerInfo?
+): String? {
+    return extra.stringValue("source_method")
+    ?: tags.tagValue("source_method")
+        ?: callerInfo?.sourceMethod?.trim()?.ifBlank { null }
+}
+
 /**
  * Removes user_prop_* keys from globalExtra when consent is below MARKETING.
  * Top-level to avoid counting against AppLoggerImpl's TooManyFunctions limit.
@@ -235,6 +275,10 @@ internal class AppLoggerImpl(
                 platformLog("AppLogger/METRIC", "[METRIC] $name=$value $unit")
             }
 
+            val callerInfo = if (config.captureCallerInfo) captureCallerInfo() else null
+            val filteredGlobalExtra = filterGlobalExtraForConsent(globalExtra, consentProvider)
+            val appPackage = tags.tagValue("app_package") ?: filteredGlobalExtra.stringValue("app_package")
+
             val enrichedTags = buildMap {
                 tags?.forEach { (k, v) -> put(k, v) }
                 put("platform", deviceInfo.platform)
@@ -257,7 +301,16 @@ internal class AppLoggerImpl(
                 metricName = name,
                 metricValue = value,
                 metricUnit = unit,
-                metricTags = enrichedTags
+                metricTags = enrichedTags,
+                appPackage = appPackage,
+                sourceScope = resolveSourceScope(
+                    tag = "METRIC",
+                    extra = null,
+                    tags = enrichedTags,
+                    callerInfo = callerInfo
+                ),
+                sourceFile = resolveSourceFile(extra = null, tags = enrichedTags, callerInfo = callerInfo),
+                sourceMethod = resolveSourceMethod(extra = null, tags = enrichedTags, callerInfo = callerInfo)
             )
 
             if (consentFilter != null && !consentFilter.passes(event)) return
@@ -355,7 +408,8 @@ internal class AppLoggerImpl(
             }
             val effectiveExtra = injectAnomalyType(level, throwable, extra)
             val resolvedExtra  = mergeExtra(effectiveExtra, filterGlobalExtraForConsent(globalExtra, consentProvider))
-            var event = buildLogEvent(level, tag, message, throwable, resolvedExtra)
+            val callerInfo = if (config.captureCallerInfo) captureCallerInfo() else null
+            var event = buildLogEvent(level, tag, message, throwable, resolvedExtra, callerInfo)
             if (consentFilter != null && !consentFilter.passes(event)) return
             if (!filter.passes(event)) return
             if (level == LogLevel.ERROR || level == LogLevel.CRITICAL) {
@@ -376,7 +430,8 @@ internal class AppLoggerImpl(
         tag: String,
         message: String,
         throwable: Throwable?,
-        resolvedExtra: Map<String, JsonElement>?
+        resolvedExtra: Map<String, JsonElement>?,
+        callerInfo: CallerInfo?
     ): LogEvent {
         val isStrict = consentProvider?.invoke() == ConsentLevel.STRICT && config.dataMinimizationEnabled
         val effectiveUserId = if (isStrict) null else userId
@@ -394,6 +449,10 @@ internal class AppLoggerImpl(
             userId = effectiveUserId,
             environment = config.environment,
             extra = resolvedExtra,
+            appPackage = resolvedExtra.stringValue("app_package"),
+            sourceScope = resolveSourceScope(tag, resolvedExtra, null, callerInfo),
+            sourceFile = resolveSourceFile(resolvedExtra, null, callerInfo),
+            sourceMethod = resolveSourceMethod(resolvedExtra, null, callerInfo),
             traceId = traceId,
             variant = sessionVariant
         )

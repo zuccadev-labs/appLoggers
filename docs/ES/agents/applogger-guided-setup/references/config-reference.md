@@ -87,7 +87,23 @@ AppLoggerConfig.Builder()
 
 | Método | Tipo | Default | Rango | Notas |
 |---|---|---|---|---|
-| `deduplicationWindowMs(ms: Long)` | Long | `10_000` | 0–∞ | Ventana de deduplicación en ms. Eventos idénticos dentro de la ventana se descartan (solo se envía 1). `0` = desactivado. Útil para evitar flood de errores repetidos. |
+| `deduplicationWindowMs(ms: Long)` | Long | `10_000` | 0–∞ | Ventana de deduplicación en ms. `0` = desactivado. Activo por defecto (10 s). |
+
+**Comportamiento exacto de la deduplicación:**
+
+- Solo aplica a eventos **WARN, ERROR, CRITICAL** que tienen **throwable** adjunto. INFO, DEBUG, METRIC y eventos sin throwable pasan siempre sin deduplicar.
+- **Clave de dedup**: `level | tag | message (primeros 200 chars) | throwable type`. Dos eventos son idénticos cuando estos cuatro campos coinciden.
+- **Primera ocurrencia** → pasa inmediatamente, inicia ventana.
+- **Duplicados dentro de la ventana** → suprimidos, contador interno incrementado.
+- **Cuando llega un evento diferente tras expirar la ventana** → el SDK emite el primer evento enriquecido con `occurrence_count = N` (total de ocurrencias de la ventana).
+- **En flush/shutdown** → `drainAggregated()` emite cualquier evento pendiente con `occurrence_count`.
+- `occurrence_count` solo aparece en el evento emitido si hubo 2+ duplicados. Si solo hubo 1, el evento sale sin ese campo.
+
+```kotlin
+// Si el mismo error ocurre 50 veces en 10 segundos:
+// → Solo se envía 1 evento con occurrence_count = 50
+// → En lugar de 50 filas en Supabase
+```
 
 ---
 
@@ -149,10 +165,30 @@ config.validate().forEach { issue ->
 ```
 
 `validate()` detecta:
-- Endpoint no HTTPS en producción
-- `isDebugMode=true` con `environment="production"` (combinación inválida)
-- Endpoint o apiKey vacíos
-- Parámetros fuera de rango
+- Endpoint vacío o no HTTPS en producción
+- Endpoint con formato inválido (no empieza con `http://` ni `https://`)
+- `apiKey` vacío
+- `apiKey` que no empieza con `"eyJ"` (no parece un JWT de Supabase)
+- `environment` vacío (eventos sin etiqueta de entorno)
+- `isDebugMode=true` con `environment="production"` (no debe estar en producción)
+- `batchSize >= 50` con `flushIntervalSeconds <= 10` (posibles bursts de red)
+- `batchSize == 1` (deshabilita batching — cada evento es un request HTTP)
+
+---
+
+## Auto-ajuste en dispositivos de bajos recursos (Android TV / low-RAM)
+
+En Android, el SDK detecta automáticamente dispositivos de bajos recursos (Android TV, baja RAM) y sobreescribe la config con valores más conservadores:
+
+| Parámetro | Valor auto-ajustado | Por qué |
+|---|---|---|
+| `batchSize` | `min(config, 5)` | Reducir presión de red |
+| `flushIntervalSeconds` | `max(config, 60)` | Espaciar flushes |
+| `maxStackTraceLines` | `min(config, 5)` | Reducir tamaño de payload |
+| `flushOnlyWhenIdle` | `true` | Ahorro de batería en TV |
+| `breadcrumbCapacity` | `min(config, 5)` | Reducir uso de memoria |
+
+Esto ocurre automáticamente — no hay que configurarlo. Si el comportamiento en TV difiere del esperado, es probable que el auto-ajuste esté activo. No se puede desactivar vía config.
 
 ---
 
