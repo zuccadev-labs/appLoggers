@@ -9,8 +9,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 ## [Unreleased]
 
 ### Changed
+- GitHub Actions: los workflows fuerzan Node 24 para acciones JavaScript y el pipeline de seguridad usa `github/codeql-action@v4` para eliminar drift de plataforma antes de la deprecacion de Node 20 y CodeQL v3.
+- Releases: los pipelines de SDK y CLI ahora extraen solo la seccion correspondiente desde este changelog, evitando notas mezcladas entre tags `v*` del SDK y `apploggers-v*` del CLI.
+
+---
+
+## [SDK 0.2.0-alpha.11] — 2026-04-11
+
+### Changed
 - Supabase: el schema operativo `apploggers` concentra cleanup y mantenimiento; `pg_cron` debe ejecutar `apploggers.purge_old_logs(...)` y `apploggers.expire_beta_tester_mappings()` por la ruta fisica real.
 - Supabase: `apploggers` pasa a ser el schema fisico operativo de AppLoggers; las tablas, funciones, triggers y vistas operativas dejan de depender de `public` tras la migracion 023.
+- SDK: `logger-transport-supabase` fija `apploggers` como schema por defecto y la release `v0.2.0-alpha.11` queda separada de la linea de versionado del CLI, que permanece en `0.2.1`.
 
 ### Fixed
 - Supabase: nueva migracion 024 endurece grants SQL, revoca `EXECUTE` amplio sobre funciones de `apploggers` y deja solo las RPC necesarias para el SDK bajo minimo privilegio.
