@@ -22,9 +22,63 @@ Principios de acceso:
 - CLI ops → consulta telemetría con `service_role key`.
 - RLS → `anon` inserta, `service_role` lee.
 
+## Resumen operativo sin confusiones
+
+No existe una "clave RLS" separada en AppLoggers.
+
+- RLS se define con migraciones SQL, grants y policies.
+- El SDK sigue usando la `anon key` de Supabase para escribir.
+- El CLI sigue usando la `service_role key` de Supabase para leer y auditar.
+- La `integritySecret` es otra cosa: sirve para HMAC de batches, no para permisos RLS.
+
+## Proceso completo paso a paso
+
+1. Entrar a Supabase Dashboard y abrir el proyecto correcto.
+2. Dentro del proyecto, abrir `Integrations > Data API > Settings`.
+3. En esa pantalla revisar `Exposed schemas`.
+4. Quitar `public` de `Exposed schemas` si el proyecto ya esta migrado a `apploggers`.
+5. Quitar `public` de `Extra search path` para no dejarlo como ruta operativa por defecto.
+6. Agregar `apploggers` a `Exposed schemas` y guardar.
+7. No usar `Account > Access Tokens` para este flujo: esos tokens son de cuenta personal para management/API y no reemplazan `anon` ni `service_role` del proyecto.
+8. Para obtener las credenciales del proyecto, usar el boton `Connect` del proyecto o entrar a la pantalla de `API Keys` del proyecto.
+9. Copiar `Project URL` y `anon key` para el SDK movil.
+10. Copiar `service_role key` solo para backend/CLI.
+11. Abrir `SQL Editor` en Supabase Dashboard.
+12. Ejecutar las migraciones de este repositorio en orden, desde `001_create_app_logs.sql` hasta `026_apploggers_custom_rls_logs_metrics.sql`.
+13. Confirmar que las migraciones 023, 024 y 026 quedaron aplicadas, porque son las que dejan `apploggers` como schema fisico operativo, endurecen grants y fuerzan RLS custom.
+14. Verificar por SQL que `apploggers.app_logs` y `apploggers.app_metrics` existen, tienen RLS activo y tienen las policies `sdk_insert_*` y `monitor_read_*`.
+15. Configurar la app movil con `Project URL` + `anon key` + `integritySecret` si se quiere verificabilidad HMAC.
+16. Configurar el CLI con `Project URL` + `service_role key` + `schema = apploggers`.
+17. Ejecutar validaciones operativas: `health`, consultas de logs/metrics y `verify`.
+18. Si alguna query devuelve 403 o `PGRST106`, revisar otra vez `Exposed schemas`, grants y policies antes de tocar keys.
+
 ---
 
 ## Paso 1 — Aplicar migraciones en Supabase
+
+Recorrido exacto en Dashboard:
+
+1. Entrar a `Supabase Dashboard`.
+2. En la barra superior o en la lista de proyectos, hacer clic en el proyecto donde vive AppLoggers.
+3. En el menu lateral izquierdo del proyecto, hacer clic en `Integrations`.
+4. Dentro de `Integrations`, hacer clic en `Data API`.
+5. Abrir la pestaña `Settings` de `Data API`.
+6. Buscar el bloque `Exposed schemas`.
+7. Abrir el selector de schemas expuestos.
+8. Confirmar que `apploggers` este seleccionado.
+9. Si `public` sigue seleccionado y el entorno ya quedo migrado a `apploggers`, quitar `public` de `Exposed schemas`.
+10. Buscar el bloque `Extra search path`.
+11. Si `public` aparece ahi, quitarlo para que no siga siendo el path operativo por defecto.
+12. Dejar solo los schemas necesarios para el proyecto. Si `extensions` aparece, no tocarlo salvo que tengas una razon operativa valida.
+13. Hacer clic en `Save`.
+14. Ir al menu lateral del proyecto y abrir `SQL Editor`.
+15. Crear una query nueva o abrir una pestaña de SQL vacia.
+16. Ejecutar cada archivo SQL de este repositorio en el orden listado abajo.
+17. Ejecutar primero las migraciones base y avanzar secuencialmente hasta `026_apploggers_custom_rls_logs_metrics.sql`.
+18. No saltar `023`, `024` ni `026`, porque son las que dejan el schema `apploggers` operativo y endurecido.
+19. Cuando termines, volver a `Integrations > Data API > Settings`.
+20. Confirmar otra vez que `apploggers` sigue expuesto.
+21. Confirmar que `public` ya no queda como schema operativo por defecto para AppLoggers.
 
 Orden recomendado:
 
@@ -44,11 +98,16 @@ Orden recomendado:
 14. `014_beta_tester_correlation.sql`
 15. `015_add_client_timestamp.sql` — agrega `timestamp` cliente para HMAC reproducible
 16. `016_add_metrics_user_id.sql`
-17. `017_apploggers_schema.sql` — expone el esquema `apploggers` para operaciones CLI/service_role
+17. `017_apploggers_schema.sql` — introduce el schema `apploggers` para operaciones CLI/service_role
 18. `018_atomic_log_batch_ingest.sql` — agrega ingestión atómica, FK de `batch_id` y corrige `app_logs` para no aceptar `METRIC`
 19. `019_metric_batch_integrity_and_key_versioning.sql` — agrega `metric_batches` y `key_id` para rotación de secretos
 20. `020_security_advisor_hardening.sql` — endurece views, helper functions y policies según advisors de Supabase
 21. `021_app_identity_source_columns.sql` — promueve `app_package`, `source_scope`, `source_file` y `source_method` a columnas top-level
+22. `022_apploggers_cleanup_wrapper.sql` — normaliza cleanup/cron por `apploggers`
+23. `023_apploggers_physical_schema.sql` — mueve tablas, funciones, triggers y vistas operativas a `apploggers`
+24. `024_apploggers_hardening.sql` — endurece grants, `EXECUTE` expuesto y jobs de mantenimiento en `apploggers`
+25. `025_drop_unused_indexes.sql` — elimina indices sin uso que no respaldan filtros ni jobs activos
+26. `026_apploggers_custom_rls_logs_metrics.sql` — fuerza RLS en `app_logs` y `app_metrics`, y define policies custom de INSERT (`anon`) y SELECT (`service_role`)
 
 Checklist post-migración:
 
@@ -58,8 +117,16 @@ Checklist post-migración:
 - RLS habilitado en ambas tablas.
 - Policies `sdk_insert_*` y `monitor_read_*` activas.
 - No existen policies `authenticated_read_*` globales.
-- Existen relaciones `apploggers.app_logs`, `apploggers.app_metrics`, `apploggers.log_batches` y `apploggers.metric_batches`.
+- Existen tablas base `apploggers.app_logs`, `apploggers.app_metrics`, `apploggers.log_batches` y `apploggers.metric_batches`.
 - `app_logs` y `app_metrics` exponen `app_package`, `source_scope`, `source_file` y `source_method` como columnas top-level.
+- No quedan tablas, funciones ni triggers operativos de AppLoggers en `public`.
+- `anon` conserva solo los permisos operativos minimos: INSERT en logs/metrics/batches, SELECT en `device_remote_config`, SELECT/INSERT/UPDATE en `beta_tester_devices`.
+- `authenticated` no conserva grants operativos sobre tablas ni `EXECUTE` sobre funciones de `apploggers`.
+- Solo las RPC `ingest_log_batch` e `ingest_metric_batch` quedan expuestas a `anon`; `purge_old_logs` y `expire_beta_tester_mappings` quedan expuestas a `service_role`.
+- Existen jobs `purge-old-logs-every-3-days` y `expire-beta-tester-mappings-weekly` apuntando a funciones de `apploggers`.
+- `app_logs` y `app_metrics` tienen `FORCE ROW LEVEL SECURITY` habilitado.
+- Policies activas en `apploggers.app_logs`: `sdk_insert_logs`, `monitor_read_logs`.
+- Policies activas en `apploggers.app_metrics`: `sdk_insert_metrics`, `monitor_read_metrics`.
 
 ---
 
@@ -67,10 +134,27 @@ Checklist post-migración:
 
 Desde Supabase Dashboard:
 
-1. Project Settings → API.
-2. Copiar:
-   - **Project URL** (ej: `https://xxxx.supabase.co`)
-   - **service_role key** (solo backend/ops — nunca exponer en cliente)
+1. No usar `Account > Access Tokens`: esos tokens son de la cuenta del usuario y no sustituyen las keys del proyecto para AppLoggers.
+2. Si ya creaste un `Access Token` como en la pantalla de `Account > Access Tokens`, no cambia el proceso operativo descrito en esta guia.
+3. Ese token sirve para autenticarte contra herramientas de cuenta, Management API o flujos del ecosistema Supabase que autentican al usuario operador.
+4. Ese token no reemplaza la `anon key` o publishable key del proyecto para el SDK.
+5. Ese token no reemplaza la `service_role key` del proyecto para el CLI de AppLoggers.
+6. Ese token no reemplaza los grants ni las policies RLS del schema `apploggers`.
+7. Para AppLoggers, el acceso operativo sigue dependiendo del proyecto y no de tu cuenta personal de Supabase.
+8. Volver a la vista principal del proyecto.
+9. Hacer clic en el boton `Connect` del proyecto.
+10. En ese modal o panel, ubicar el `Project URL`.
+11. Copiar el `Project URL`.
+12. Ubicar la key publica del proyecto: `anon key` o publishable key equivalente.
+13. Copiar esa key publica para usarla en el SDK movil.
+14. Si el panel `Connect` no muestra claramente todas las keys necesarias, abrir la pantalla de `API Keys` del proyecto.
+15. En `API Keys`, localizar la `service_role key` del proyecto.
+16. Copiar la `service_role key`.
+17. Confirmar otra vez que el proyecto expone `apploggers` dentro de `Integrations > Data API > Settings`.
+18. En tu maquina, abrir o crear `~/.apploggers/cli.json`.
+19. Cargar `url`, `api_key` y `schema = apploggers`.
+20. Usar `Project URL` + `anon key` en la app.
+21. Usar `Project URL` + `service_role key` en el CLI.
 
 El CLI crea `~/.apploggers/cli.json` automáticamente en el primer run. Editar ese archivo con las credenciales obtenidas:
 
@@ -102,6 +186,70 @@ macOS   : /Users/<usuario>/.apploggers/cli.json
 
 > No versionar este archivo. Contiene el `service_role key`.
 
+## Paso 2.1 — Crear y configurar la key de integridad (HMAC)
+
+Primero, separa correctamente los conceptos:
+
+- RLS no usa una key nueva.
+- RLS queda resuelto por las migraciones, grants y policies sobre `apploggers`.
+- `anon key` sigue siendo la key del SDK para INSERT.
+- `service_role key` sigue siendo la key del CLI para lectura/operacion.
+- La unica "key nueva" opcional en este flujo es la `integritySecret`, usada para HMAC de batches.
+
+Esta key es independiente de `anon key` y `service_role key`.
+
+- No reemplaza ninguna key de Supabase.
+- Se usa solo para firmar y verificar batches de logs/metricas.
+- Debe ser secreta, larga y aleatoria.
+
+Origen de esta key:
+
+- No la genera Supabase.
+- No la genera hoy el CLI de `apploggers`.
+- La genera tu equipo con un generador criptograficamente seguro y luego la distribuye por secretos de CI/CD o `local.properties` no versionado.
+
+Generar key nueva con un CSPRNG real:
+
+```bash
+# Linux / macOS (OpenSSL)
+openssl rand -hex 32
+```
+
+```powershell
+# Windows PowerShell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[Convert]::ToHexString($bytes).ToLower()
+```
+
+Configurar en la app (sin versionar):
+
+```properties
+APPLOGGERS_INTEGRITY_SECRET=secreto-largo-y-aleatorio
+APPLOGGERS_INTEGRITY_SECRET_ID=10042026
+```
+
+Mapear a `BuildConfig` y al SDK:
+
+```kotlin
+AppLoggerConfig.Builder()
+  .integritySecret(BuildConfig.LOGGER_INTEGRITY_SECRET)
+  .integritySecretId(BuildConfig.LOGGER_INTEGRITY_SECRET_ID)
+```
+
+Configurar en el CLI para verificaciones:
+
+```bash
+APPLOGGERS_INTEGRITY_SECRET=secreto-largo-y-aleatorio
+APPLOGGERS_INTEGRITY_SECRET_10042026=secreto-largo-y-aleatorio
+```
+
+Regla de seguridad:
+
+- Nunca usar la `anon key` de Supabase como `integritySecret`.
+- Nunca commitear `APPLOGGERS_INTEGRITY_SECRET` en el repositorio.
+- Tratar esta key como secreto de aplicacion, no como credencial de Supabase.
+
 ### Alternativa: `api_key_env` para no almacenar el key en el archivo
 
 Si se prefiere no tener el key en el archivo, usar `api_key_env` con el nombre de la variable de entorno UPPERCASE. La URL siempre va en el json — no existe variable de entorno para la URL en este path:
@@ -114,7 +262,9 @@ Si se prefiere no tener el key en el archivo, usar `api_key_env` con el nombre d
 }
 ```
 
-`schema` es opcional. El valor recomendado y preferido es `apploggers`. Usa `public` solo para instalaciones legacy que todavía no aplicaron la migración 017.
+`schema` es opcional. El valor soportado y recomendado es `apploggers`.
+
+Despues de las migraciones 023 y 024, `public` deja de ser un path operativo soportado para AppLoggers.
 
 No se necesita una key nueva para usar `apploggers`.
 
@@ -201,6 +351,35 @@ Se considera OK cuando:
 - Query de metrics por `--name` funciona.
 - `verify` retorna batches `OK` cuando el SDK está emitiendo `batch_id` y `batch_hash`.
 
+Verificacion SQL de hardening recomendada:
+
+```sql
+select grantee, table_name, string_agg(privilege_type, ', ' order by privilege_type) as privileges
+from information_schema.role_table_grants
+where table_schema = 'apploggers'
+  and grantee in ('anon', 'authenticated', 'service_role')
+group by grantee, table_name
+order by grantee, table_name;
+
+select grantee, routine_name, privilege_type
+from information_schema.routine_privileges
+where routine_schema = 'apploggers'
+  and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')
+order by grantee, routine_name, privilege_type;
+
+select jobname, schedule, command, active
+from cron.job
+where jobname in ('purge-old-logs-every-3-days', 'expire-beta-tester-mappings-weekly')
+order by jobname;
+```
+
+Resultado esperado:
+
+- `authenticated` no aparece con grants operativos sobre tablas ni con `EXECUTE` en routines de `apploggers`.
+- `anon` solo aparece con los grants minimos descritos arriba.
+- `PUBLIC` no conserva `EXECUTE` sobre routines de `apploggers`.
+- Ambos jobs de mantenimiento existen y apuntan a `apploggers`.
+
 ## Paso 4.1 — Verificabilidad (Audit Trail)
 
 El flujo de integridad de AppLoggers tiene 3 piezas:
@@ -275,16 +454,16 @@ Consultas útiles en staging:
 ```sql
 select count(*) as total_logs,
      count(batch_id) as logs_with_batch_id
-from public.app_logs
+from apploggers.app_logs
 where created_at >= now() - interval '30 minutes';
 
 select count(*) as total_manifests
-from public.log_batches
+from apploggers.log_batches
 where created_at >= now() - interval '30 minutes';
 
 select count(*) as total_metric_manifests,
   count(*) filter (where key_id is not null) as metric_manifests_with_key
-from public.metric_batches
+from apploggers.metric_batches
 where created_at >= now() - interval '30 minutes';
 ```
 
@@ -328,8 +507,9 @@ Causas probables:
 
 1. Se usó `anon/publishable key` en lugar de `service_role key`.
 2. RLS/policies no aplicadas en el entorno.
-3. Se configuró `schema=apploggers` sin aplicar la migración 017.
-4. El schema `apploggers` no está expuesto al rol operativo o el entorno quedó a mitad de migración.
+3. No se aplicó la migración 023 que convierte `apploggers` en schema físico operativo.
+4. No se aplicó la migración 024 que normaliza grants, routines expuestas y jobs de mantenimiento.
+5. El schema `apploggers` no está expuesto al rol operativo o el entorno quedó a mitad de migración.
 
 ### Uso correcto de Supabase MCP para migraciones
 
@@ -340,7 +520,7 @@ Flujo recomendado:
 1. `mcp_supabase_list_migrations` para identificar el último paso aplicado.
 2. Leer el siguiente archivo SQL en `docs/ES/migraciones/`.
 3. `mcp_supabase_apply_migration` con nombre snake_case y el SQL completo del archivo.
-4. Repetir en orden hasta llegar a 021.
+4. Repetir en orden hasta llegar a 024.
 5. `mcp_supabase_list_tables` y `mcp_supabase_get_advisors` para validar el estado final.
 
 Reserva `mcp_supabase_execute_sql` para verificaciones puntuales, backfills DML controlados y queries diagnósticas.
@@ -349,11 +529,11 @@ Acciones:
 
 1. Verificar que `api_key` en `cli.json` contiene el `service_role key`.
 2. Validar migraciones 004 y 006 aplicadas.
-3. Si se usa `schema`, validar `GRANT USAGE ON SCHEMA apploggers TO service_role;`.
+3. Validar `GRANT USAGE ON SCHEMA apploggers TO service_role;`, que las tablas operativas existan en `apploggers` y que la migracion 024 haya revocado grants amplios a `authenticated` y `PUBLIC`.
 
 ### Error de tabla no encontrada
 
-Causa probable: migraciones 001/002 no aplicadas o `schema=apploggers` sin la migración 017.
+Causa probable: migraciones base no aplicadas o `schema=apploggers` sin las migraciones 023/024.
 
 Acción: aplicar migraciones pendientes y volver a ejecutar query.
 

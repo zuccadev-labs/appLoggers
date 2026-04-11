@@ -7,11 +7,17 @@ set -euo pipefail
 
 SUPABASE_URL="${1:?Error: falta SUPABASE_URL como primer argumento}"
 SERVICE_KEY="${2:?Error: falta SERVICE_ROLE_KEY como segundo argumento}"
-REST_URL="${SUPABASE_URL}/rest/v1/rpc"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MIGRATIONS_DIR="${SCRIPT_DIR}/../../docs/ES/migraciones"
+
+if ! compgen -G "${MIGRATIONS_DIR}/*.sql" > /dev/null; then
+    echo "No se encontraron migraciones SQL en: ${MIGRATIONS_DIR}" >&2
+    exit 1
+fi
 
 echo "🔧 Aplicando migraciones a: ${SUPABASE_URL}"
 
-for migration in migrations/*.sql; do
+for migration in "${MIGRATIONS_DIR}"/*.sql; do
     echo "  ▸ Ejecutando: $(basename "$migration")"
     
     SQL_CONTENT=$(cat "$migration")

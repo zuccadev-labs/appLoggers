@@ -1,7 +1,7 @@
 ---
 name: applogger-cli-agent-operator
 description: 'Operate the AppLoggers CLI as a deterministic interface for AI agents and automation. Use this when an agent must query CLI metadata, capabilities, health, and telemetry output in machine-readable form.'
-argument-hint: 'Describe what automation or agent task should be executed through applogger-cli and which output contract is required.'
+argument-hint: 'Describe what automation or agent task should be executed through apploggers and which output contract is required.'
 user-invocable: true
 ---
 
@@ -22,7 +22,7 @@ Use this skill when a Copilot agent or automation needs to interact with AppLogg
 
 ## Installation Bootstrap
 
-If `applogger-cli` is not yet available, install it using the host-native one-line bootstrap:
+If `apploggers` is not yet available, install it using the host-native one-line bootstrap:
 
 1. Linux:
    - `curl -fsSL https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/install.sh | bash`
@@ -33,31 +33,31 @@ If `applogger-cli` is not yet available, install it using the host-native one-li
 
 Bootstrap rules:
 
-1. Verify install by running `applogger-cli version --output json`.
+1. Verify install by running `apploggers version --output json`.
 2. If `PATH` changed during installation, start a new shell or invoke the installed binary by absolute path once.
-3. To pin a specific version, set `APPLOGGER_CLI_VERSION=applogger-cli-vX.Y.Z` before invoking the installer.
+3. To pin a specific version, set `APPLOGGERS_VERSION=apploggers-vX.Y.Z` before invoking the installer.
 4. On macOS/Linux, the bash installer enforces SHA-256 verification for release assets and fails if neither `sha256sum` nor `shasum` is available.
 
 ## Standard Command Set
 
 0. Installation verification:
-   - `applogger-cli version --output json`
+   - `apploggers version --output json`
 1. Metadata discovery:
-   - `applogger-cli --syncbin-metadata --output json`
+   - `apploggers --syncbin-metadata --output json`
 2. Version/build discovery:
-   - `applogger-cli version --output json`
+   - `apploggers version --output json`
 3. Capability discovery:
-   - `applogger-cli capabilities --output agent`
+   - `apploggers capabilities --output agent`
 4. Agent contract discovery:
-   - `applogger-cli agent schema --output agent`
+   - `apploggers agent schema --output agent`
 5. Runtime readiness probe:
-   - `applogger-cli health --output agent`
+   - `apploggers health --output agent`
 6. Telemetry query endpoint:
-   - `applogger-cli telemetry query --output agent`
+   - `apploggers telemetry query --output agent`
 7. Dedicated compact orchestration response:
-   - `applogger-cli telemetry agent-response --source logs --aggregate severity --preview-limit 5`
+   - `apploggers telemetry agent-response --source logs --aggregate severity --preview-limit 5`
 8. Warning anomaly inspection:
-   - `applogger-cli telemetry query --source logs --severity warn --anomaly-type slow_response --output json`
+   - `apploggers telemetry query --source logs --severity warn --anomaly-type slow_response --output json`
 
 ## Supabase Environment Setup
 

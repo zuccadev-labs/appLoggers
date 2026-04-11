@@ -22,7 +22,7 @@ Examples:
 2. Keep secrets out of logs and commits.
 3. Always configure via `~/.apploggers/cli.json` — never instruir al usuario a exportar variables de entorno para URL o key.
 4. Validate command execution after configuration.
-5. Prefer `schema=apploggers`; only use `public` for legacy environments that have not applied migration 017.
+5. Prefer `schema=apploggers`; after migrations 023/024, `public` is not an operational path for AppLoggers.
 
 ---
 
@@ -145,7 +145,7 @@ Project selection precedence:
 - `metrics_table`: Metrics table name. Default: `app_metrics`
 - `timeout_seconds`: HTTP timeout (1-120). Default: `15`
 
-Only set these if your Supabase migrations used non-default names. `public` remains a legacy compatibility path.
+Only set these if your Supabase migrations used non-default names. After migrations 023/024, the supported operational schema is `apploggers`.
 
 ---
 

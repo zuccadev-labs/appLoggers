@@ -300,7 +300,7 @@ Luego abrí `local.properties` y completá los valores:
 sdk.dir=C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
 
 # ── Supabase (backend de logs) ──────────────────────────────────────────
-# Obtener de: https://supabase.com/dashboard → Settings → API
+# Obtener desde el proyecto Supabase con `Connect` o `API Keys`
 APPLOGGER_URL=https://TU-PROYECTO.supabase.co
 APPLOGGER_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
@@ -313,8 +313,8 @@ APPLOGGER_DEBUG=true
 | Variable | Obligatoria | Dónde obtenerla |
 |---|:---:|---|
 | `sdk.dir` | ✅ | Android Studio lo autocompleta, o ver `ANDROID_HOME` |
-| `APPLOGGER_URL` | ✅ | [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API → Project URL |
-| `APPLOGGER_ANON_KEY` | ✅ | Supabase Dashboard → Settings → API → `anon` `public` key |
+| `APPLOGGER_URL` | ✅ | [Supabase Dashboard](https://supabase.com/dashboard) → Proyecto → `Connect` o `API Keys` → `Project URL` |
+| `APPLOGGER_ANON_KEY` | ✅ | Supabase Dashboard → Proyecto → `Connect` o `API Keys` → `anon` / publishable key |
 | `APPLOGGER_DEBUG` | ❌ | `true` para desarrollo, `false` para producción (default: `false`) |
 
 > ⚠️ **`local.properties` está en `.gitignore`** — nunca se sube al repositorio.  
@@ -542,6 +542,8 @@ AppLoggerIos.shared.flush()
 1. Creá un proyecto en [supabase.com](https://supabase.com)
 2. Ejecutá las migraciones SQL en orden desde el **SQL Editor**:
 
+    Antes de ejecutar la app o el CLI, entrá también a `Integrations > Data API > Settings`, exponé `apploggers` y, si el entorno ya quedó migrado al schema físico nuevo, quitá `public` de `Exposed schemas` y de `Extra search path`.
+
 | Orden | Archivo | Descripción |
 |:---:|---|---|
 | 1 | `docs/ES/migraciones/001_create_app_logs.sql` | Tabla principal de logs |
@@ -560,8 +562,19 @@ AppLoggerIos.shared.flush()
 | 14 | `docs/ES/migraciones/014_beta_tester_correlation.sql` | Tabla `beta_testers` y correlación de eventos |
 | 15 | `docs/ES/migraciones/015_add_client_timestamp.sql` | Columna timestamp BIGINT en `app_logs` |
 | 16 | `docs/ES/migraciones/016_add_metrics_user_id.sql` | Columna `user_id` en `app_metrics` |
+| 17 | `docs/ES/migraciones/017_apploggers_schema.sql` | Introduce el schema `apploggers` para operaciones CLI/service_role |
+| 18 | `docs/ES/migraciones/018_atomic_log_batch_ingest.sql` | Ingestión atómica de logs y manifiestos |
+| 19 | `docs/ES/migraciones/019_metric_batch_integrity_and_key_versioning.sql` | Integridad de métricas y rotación por `key_id` |
+| 20 | `docs/ES/migraciones/020_security_advisor_hardening.sql` | Endurecimiento según Security Advisor |
+| 21 | `docs/ES/migraciones/021_app_identity_source_columns.sql` | Identidad de app y fuente como columnas top-level |
+| 22 | `docs/ES/migraciones/022_apploggers_cleanup_wrapper.sql` | Normaliza cleanup y cron por `apploggers` |
+| 23 | `docs/ES/migraciones/023_apploggers_physical_schema.sql` | Convierte `apploggers` en schema físico operativo |
+| 24 | `docs/ES/migraciones/024_apploggers_hardening.sql` | Endurece grants, routines expuestas y jobs operativos |
+| 25 | `docs/ES/migraciones/025_drop_unused_indexes.sql` | Elimina índices sin uso operacional |
+| 26 | `docs/ES/migraciones/026_apploggers_custom_rls_logs_metrics.sql` | RLS personalizado y `FORCE ROW LEVEL SECURITY` |
 
-3. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`
+3. Copiá la **URL del proyecto** y la **anon key** a tu `local.properties`.
+4. Si vas a operar el CLI, configurá además `~/.apploggers/cli.json` con el `service_role key` y `schema = apploggers`.
 
 ---
 
@@ -600,7 +613,6 @@ Para que el pipeline funcione al 100%, configurá estos secrets en **GitHub → 
 | `CODECOV_TOKEN` | Job `test` (opcional) | [codecov.io](https://codecov.io) → Settings → Token |
 
 > Los nombres de secrets en GitHub deben ser **UPPERCASE** por convención. El workflow los inyecta como variables de entorno con el mismo nombre.
-
 > Si los secrets de Supabase no están configurados, los jobs `lint`, `test` y `security` pasan normalmente — solo `e2e` fallará.
 
 ---
@@ -764,6 +776,18 @@ Cuando el SDK esté estable, se publicará a Maven Central para distribución si
 | [012 - Enterprise indexes](docs/ES/migraciones/012_enterprise_indexes_views.sql) | Índices y vistas empresariales |
 | [013 - Device remote config](docs/ES/migraciones/013_device_remote_config.sql) | Tablas `device_remote_config` y `device_fingerprints` |
 | [014 - Beta tester correlation](docs/ES/migraciones/014_beta_tester_correlation.sql) | Tabla `beta_testers` y correlación |
+| [015 - Client timestamp](docs/ES/migraciones/015_add_client_timestamp.sql) | Timestamp cliente para HMAC reproducible |
+| [016 - Metrics user id](docs/ES/migraciones/016_add_metrics_user_id.sql) | Columna `user_id` en `app_metrics` |
+| [017 - Schema apploggers](docs/ES/migraciones/017_apploggers_schema.sql) | Introduce `apploggers` para operaciones CLI/service_role |
+| [018 - Atomic log batch ingest](docs/ES/migraciones/018_atomic_log_batch_ingest.sql) | Ingestión atómica de logs |
+| [019 - Metric batch integrity](docs/ES/migraciones/019_metric_batch_integrity_and_key_versioning.sql) | Integridad de métricas y `key_id` |
+| [020 - Security advisor hardening](docs/ES/migraciones/020_security_advisor_hardening.sql) | Endurecimiento por advisors |
+| [021 - App identity source columns](docs/ES/migraciones/021_app_identity_source_columns.sql) | App/source como columnas top-level |
+| [022 - Cleanup wrapper](docs/ES/migraciones/022_apploggers_cleanup_wrapper.sql) | Normaliza cleanup/cron en `apploggers` |
+| [023 - Physical schema](docs/ES/migraciones/023_apploggers_physical_schema.sql) | `apploggers` pasa a ser schema físico operativo |
+| [024 - Hardening](docs/ES/migraciones/024_apploggers_hardening.sql) | Grants mínimos y jobs operativos |
+| [025 - Drop unused indexes](docs/ES/migraciones/025_drop_unused_indexes.sql) | Limpieza de índices no usados |
+| [026 - Custom RLS logs metrics](docs/ES/migraciones/026_apploggers_custom_rls_logs_metrics.sql) | RLS custom y `FORCE ROW LEVEL SECURITY` |
 
 ### 📋 Procesos
 

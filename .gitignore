@@ -44,3 +44,8 @@ Pods/
 
 # Investigation docs (internal only)
 docs-investigation/
+
+# Local AI / editor tooling
+.VSCodeCounter/
+.claude/
+.mcp.json

@@ -25,7 +25,7 @@
 
 21. `device_id` aparece vacío en Supabase (`app_logs`) — **es diferente a `device_fingerprint`**. El `device_id` top-level es un UUID v5 generado por el SDK desde los metadatos del dispositivo; **nunca es vacío**. Si la columna muestra vacío, verificar que migration 001 fue aplicada y que el SDK estaba inicializado al emitir el primer evento. Si el problema es `extra->>'device_fingerprint'` vacío (string `""`), eso es normal en emuladores donde `ANDROID_ID = null` — no afecta `device_id`.
 
-22. `log_batches` siempre vacío — requiere `.integritySecret(secret)` en el builder. Por defecto está desactivado (`integritySecret = ""`). Sin esta clave, el SDK nunca escribe en `log_batches`. Generar secret con `apploggers init --generate-integrity-secret`.
+22. `log_batches` siempre vacío — requiere `.integritySecret(secret)` en el builder. Por defecto está desactivado (`integritySecret = ""`). Sin esta clave, el SDK nunca escribe en `log_batches`. Generar el secreto con un CSPRNG real, por ejemplo `openssl rand -hex 32`, PowerShell o el gestor de secretos del pipeline.
 
 23. `environment` de un batch en `log_batches` es NULL — `SupabaseTransport.storeBatchManifest` omite `environment` si está en blanco. Como `AppLoggerConfig.Builder.environment()` tiene default `"production"` y rechaza strings vacíos (`ifBlank { "production" }`), esto solo ocurre si migration 011 no fue aplicada (la columna no existe) o si se pasó explícitamente un environment inválido.
 
