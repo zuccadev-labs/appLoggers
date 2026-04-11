@@ -26,7 +26,7 @@ Use this skill when the integration already works and needs production quality:
 9. Device fingerprint is pseudonymized via SHA-256 — never expose raw `ANDROID_ID` in logs.
 10. Remote config: verify `remoteConfigIntervalSeconds` is between 30–3600. Default polling disabled unless endpoint configured.
 11. Beta tester mode: `APPLOGGER_BETA_TESTER=true` is boolean only. Email captured at runtime from developer's auth flow — never hardcode emails in config.
-12. Beta tester data auto-expires after 90 days (GDPR Art. 5.1.e). Verify `expire_beta_tester_mappings()` is scheduled in production.
+12. Beta tester data auto-expires after 90 days (GDPR Art. 5.1.e). Verify `expire-beta-tester-mappings-weekly` is scheduled in production and points to `apploggers.expire_beta_tester_mappings()`.
 13. DataBudgetManager: for bandwidth-sensitive apps, set `dailyDataLimitMb(n)` in `AppLoggerConfig.Builder()`. Default is `0` (disabled). On WiFi, effective limit doubles automatically (wifiMultiplier = 2×). ERROR and CRITICAL events are never shed regardless of budget state.
 14. Avoid duplicating AppLogger URL/key in packaged asset files if the same values are already mapped via secure build configuration.
 15. For headless/service apps, review shutdown paths and ensure there is an intentional `flush()` before process teardown.

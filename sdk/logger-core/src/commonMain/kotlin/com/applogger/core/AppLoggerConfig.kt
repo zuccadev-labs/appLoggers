@@ -105,10 +105,11 @@ data class AppLoggerConfig(
      * Secret key for batch integrity HMAC-SHA256 hashing.
      * When blank (default), integrity hashing is disabled.
      *
-     * IMPORTANT: Do NOT use the Supabase anon key. Generate a dedicated secret via
-     * `apploggers init --generate-integrity-secret` and store it outside the APK
-     * (e.g., in CI/CD secrets, loaded at build time as a BuildConfig field from a
-     * local.properties key that is never committed to git).
+    * IMPORTANT: Do NOT use the Supabase anon key. Generate a dedicated secret with a
+    * cryptographically secure random generator (for example OpenSSL, PowerShell, or
+    * your CI/CD secret manager) and store it outside the APK (e.g., in CI/CD secrets,
+    * loaded at build time as a BuildConfig field from a local.properties key that is
+    * never committed to git).
      */
     val integritySecret: String = "",
     /**

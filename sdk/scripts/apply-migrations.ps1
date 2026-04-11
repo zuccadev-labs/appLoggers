@@ -8,12 +8,18 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$migrations = Get-ChildItem -Path "migrations\*.sql" | Sort-Object Name
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$migrationsDir = Join-Path $scriptDir "..\..\docs\ES\migraciones"
+$migrations = Get-ChildItem -Path (Join-Path $migrationsDir "*.sql") | Sort-Object Name
+
+if ($migrations.Count -eq 0) {
+    throw "No se encontraron migraciones SQL en: $migrationsDir"
+}
 
 Write-Host "`n  Aplicando $($migrations.Count) migraciones a: $Url" -ForegroundColor Cyan
 
 foreach ($migration in $migrations) {
-    Write-Host "  >> $($ migration.Name)" -NoNewline
+    Write-Host "  >> $($migration.Name)" -NoNewline
     
     $sql = Get-Content $migration.FullName -Raw
     

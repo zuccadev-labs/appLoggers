@@ -114,7 +114,7 @@ Si `extra->>'device_fingerprint'` aparece vacío string `""`:
 Por defecto, `integritySecret` es `""` (blank) → batch integrity **desactivada** → `log_batches` siempre vacío.
 
 **Para activar**:
-1. Generar un secret: `apploggers init --generate-integrity-secret`
+1. Generar un secret con un CSPRNG real, por ejemplo `openssl rand -hex 32` o un secreto administrado por CI/CD.
 2. Almacenarlo en `local.properties` como `APPLOGGER_INTEGRITY_SECRET=...` (nunca en VCS).
 3. Mapearlo a `BuildConfig` y pasarlo al builder: `.integritySecret(BuildConfig.INTEGRITY_SECRET)`.
 

@@ -64,17 +64,19 @@ irm https://raw.githubusercontent.com/zuccadev-labs/appLoggers/main/cli/install/
 Notes:
 
 - The bash installer auto-detects Linux vs macOS and `amd64` vs `arm64`.
-- The PowerShell installer installs `applogger-cli.exe` into the user profile and adds it to the user `PATH`.
-- Both installers resolve the latest `applogger-cli-v*` GitHub Release automatically.
-- To pin a specific release, set `APPLOGGER_CLI_VERSION`, for example `APPLOGGER_CLI_VERSION=applogger-cli-v0.1.0`.
+- The PowerShell installer installs `apploggers.exe` into the user profile and adds it to the user `PATH`.
+- Both installers resolve the latest `apploggers-v*` GitHub Release automatically.
+- To pin a specific release, set `APPLOGGERS_VERSION`, for example `APPLOGGERS_VERSION=apploggers-v0.2.1`.
 
-## Supabase Configuration (Environment Variables)
+## Supabase Configuration
 
-The CLI reads Supabase configuration from environment variables:
+The supported operational model is `~/.apploggers/cli.json`. Direct environment variables are a fallback path used only when the config file does not exist.
+
+Legacy fallback environment variables:
 
 - `appLogger_supabaseUrl` (required)
 - `appLogger_supabaseKey` (required, service_role key for CLI reads)
-- `appLogger_supabaseSchema` (optional, default `apploggers`; use `public` only for legacy installs without migration 017)
+- `appLogger_supabaseSchema` (optional, default `apploggers`; after migrations 023/024, `public` is not an operational path)
 - `appLogger_supabaseLogTable` (optional, default `app_logs`)
 - `appLogger_supabaseMetricTable` (optional, default `app_metrics`)
 - `appLogger_supabaseTimeoutSeconds` (optional, default `15`)
@@ -147,7 +149,7 @@ Recommended JSON structure:
 Operational guidance:
 
 - Keep `service_role` secrets outside the JSON file whenever possible by using `api_key_env`.
-- Prefer `schema: "apploggers"` for operational reads; `public` is now a legacy compatibility path.
+- Prefer `schema: "apploggers"` for operational reads; after migrations 023/024 it is the only supported operational schema.
 - Let Wails own the project registry and spawn the CLI with the same config model.
 - SSE should transport resolved project context (`project`, `config_source`) rather than raw secrets.
 - When only one project is configured, the CLI auto-selects it to keep local workflows simple.
@@ -184,47 +186,47 @@ You can resolve values before export with:
 
 ```bash
 # Version
-applogger-cli version
-applogger-cli version --output json
+apploggers version
+apploggers version --output json
 
 # Syncbin metadata
-applogger-cli --syncbin-metadata
-applogger-cli --syncbin-metadata --output json
+apploggers --syncbin-metadata
+apploggers --syncbin-metadata --output json
 
 # Capability and contract discovery
-applogger-cli capabilities --output json
-applogger-cli agent schema --output json
+apploggers capabilities --output json
+apploggers agent schema --output json
 
 # Agent-native compact output (TOON format)
-applogger-cli capabilities --output agent
-applogger-cli telemetry query --output agent
+apploggers capabilities --output agent
+apploggers telemetry query --output agent
 
 # Dedicated compact orchestration response for agents
-applogger-cli telemetry agent-response \
+apploggers telemetry agent-response \
   --source logs \
   --aggregate severity \
   --preview-limit 5
 
 # Health check for agents
-applogger-cli health --output json
+apploggers health --output json
 
 # Explicit project selection
-applogger-cli --project klinema telemetry query --source logs --severity error --output json
+apploggers --project klinema telemetry query --source logs --severity error --output json
 
 # Workspace-based autodetection via APPLOGGER_CONFIG
-APPLOGGER_CONFIG="$HOME/.apploggers/cli.json" applogger-cli telemetry query --source logs --limit 25 --output json
+APPLOGGER_CONFIG="$HOME/.apploggers/cli.json" apploggers telemetry query --source logs --limit 25 --output json
 
 # Upgrade CLI to latest published release
-applogger-cli upgrade
+apploggers upgrade
 
 # Upgrade to an explicit release tag
-applogger-cli upgrade --version applogger-cli-v0.1.1
+apploggers upgrade --version apploggers-v0.2.1
 
 # Minimal telemetry query
-applogger-cli telemetry query
+apploggers telemetry query
 
 # Telemetry contract with filters
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --from 2026-03-01T00:00:00Z \
   --to 2026-03-02T00:00:00Z \
@@ -234,14 +236,14 @@ applogger-cli telemetry query \
   --output json
 
 # Query warning anomalies stored under extra.anomaly_type
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --anomaly-type slow_response \
   --limit 25 \
   --output json
 
 # Query metrics source
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source metrics \
   --aggregate name \
   --session-id session-mobile-01 \
@@ -249,7 +251,7 @@ applogger-cli telemetry query \
   --output json
 
 # Query logs with identity filters (session/device/user)
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --session-id session-mobile-01 \
   --device-id a13b8f3b-61f8-5a11-8a9d-6fdf3f5d1f2d \
@@ -258,7 +260,7 @@ applogger-cli telemetry query \
   --output json
 
 # Query logs with package/error/message segmentation filters
-applogger-cli telemetry query \
+apploggers telemetry query \
   --source logs \
   --package com.company.billing \
   --error-code E-42 \
@@ -375,16 +377,16 @@ Syncbin plugin metadata lives in `plugin-metadata.yaml`.
 
 ## Release Distribution Contract
 
-- Published binaries come from GitHub Releases tagged as `applogger-cli-v*`.
+- Published binaries come from GitHub Releases tagged as `apploggers-v*`.
 - Source of truth for CLI base version: `cli/VERSION`.
 - Current release assets:
-  - `applogger-cli-linux-amd64`
-  - `applogger-cli-linux-arm64`
-  - `applogger-cli-darwin-amd64`
-  - `applogger-cli-darwin-arm64`
-  - `applogger-cli-windows-amd64.exe`
-  - `manifests/homebrew/applogger-cli.rb`
-  - `manifests/scoop/applogger-cli.json`
+  - `apploggers-linux-amd64`
+  - `apploggers-linux-arm64`
+  - `apploggers-darwin-amd64`
+  - `apploggers-darwin-arm64`
+  - `apploggers-windows-amd64.exe`
+  - `manifests/homebrew/apploggers.rb`
+  - `manifests/scoop/apploggers.json`
   - `manifests/winget/DevZucca.AppLoggerCLI*.yaml`
 - Each asset is accompanied by a `.sha256` checksum file.
-- Package manager manifests are generated automatically on every `applogger-cli-v*` tag release.
+- Package manager manifests are generated automatically on every `apploggers-v*` tag release.

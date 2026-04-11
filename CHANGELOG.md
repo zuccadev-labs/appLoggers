@@ -9,7 +9,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 ## [Unreleased]
 
 ### Changed
-- Supabase: el schema operativo `apploggers` ahora también expone `purge_old_logs(...)` y el job de `pg_cron` debe ejecutarlo por la ruta operacional preferida, sin duplicar tablas fuera de `public`.
+- Supabase: el schema operativo `apploggers` concentra cleanup y mantenimiento; `pg_cron` debe ejecutar `apploggers.purge_old_logs(...)` y `apploggers.expire_beta_tester_mappings()` por la ruta fisica real.
+- Supabase: `apploggers` pasa a ser el schema fisico operativo de AppLoggers; las tablas, funciones, triggers y vistas operativas dejan de depender de `public` tras la migracion 023.
+
+### Fixed
+- Supabase: nueva migracion 024 endurece grants SQL, revoca `EXECUTE` amplio sobre funciones de `apploggers` y deja solo las RPC necesarias para el SDK bajo minimo privilegio.
+- Supabase: nueva migracion 025 elimina indices sin uso que no respaldan filtros ni jobs activos (`idx_app_logs_platform`, `idx_app_metrics_tags_gin`).
+- Supabase: nueva migracion 026 aplica RLS personalizado en `apploggers.app_logs` y `apploggers.app_metrics`, activa `FORCE ROW LEVEL SECURITY` y deja policies operativas explicitas (`sdk_insert_*`, `monitor_read_*`).
+- CLI + skills + docs: `public` deja de describirse como ruta legacy soportada; el estandar operativo queda fijado en `apploggers` con verificaciones explicitas de grants, routines y jobs de mantenimiento.
+
+### Docs
+- Se agrega en `SUPABASE_CONFIGURATION.md` el paso explicito para crear y configurar la key nueva de integridad (`APPLOGGERS_INTEGRITY_SECRET` + `APPLOGGERS_INTEGRITY_SECRET_ID`) y su uso en app + CLI.
 
 ### Planned
 - `logger-transport-firebase` module — transport to Firebase Realtime Database
@@ -30,7 +40,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ### Changed
 
-- El schema operativo por defecto del CLI pasa a `apploggers`; `public` queda como compatibilidad legacy.
+- El schema operativo por defecto del CLI pasa a `apploggers`; el camino operativo soportado queda alineado con el schema fisico real.
 - Metadata de release alineada entre SDK Gradle, podspec, comentario de Swift Package, CLI version y plugin metadata.
 - Skills y documentación ahora indican cómo resolver la versión concreta antes de actualizar un proyecto consumidor.
 - La guía de Supabase MCP ahora usa `mcp_supabase_apply_migration` para DDL y deja `mcp_supabase_execute_sql` para diagnósticos y DML puntual.

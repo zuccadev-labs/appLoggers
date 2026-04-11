@@ -70,9 +70,8 @@ private const val ATOMIC_METRIC_BATCH_RPC = "ingest_metric_batch"
  *
  * @param endpoint                    Supabase project URL (e.g. `https://xyz.supabase.co`).
  * @param apiKey                      Supabase anon key.
- * @param schema                      PostgREST schema profile. Keep `public` for the default
- *                                    AppLoggers installation. Use `apploggers` only when the
- *                                    target project exposes compatible relations in that schema.
+ * @param schema                      PostgREST schema profile. `apploggers` is the default and
+ *                                    expected operational schema for AppLoggers installations.
  * @param tableName                   Target table for log events (default: `"app_logs"`).
  * @param metricsTableName            Target table for metric events (default: `"app_metrics"`).
  * @param networkAvailabilityProvider Optional lambda returning `true` when network is reachable.
@@ -86,7 +85,7 @@ private const val METRIC_BATCH_MANIFESTS_TABLE = "metric_batches"
 class SupabaseTransport(
     private val endpoint: String,
     private val apiKey: String,
-    private val schema: String = "public",
+    private val schema: String = "apploggers",
     private val tableName: String = "app_logs",
     private val metricsTableName: String = "app_metrics",
     private val networkAvailabilityProvider: (() -> Boolean)? = null,
@@ -105,7 +104,7 @@ class SupabaseTransport(
     }
 
     private val restUrl get() = "${endpoint.trimEnd('/')}/rest/v1"
-    private val schemaProfile get() = schema.trim().ifBlank { "public" }
+    private val schemaProfile get() = schema.trim().ifBlank { "apploggers" }
 
     @Suppress("TooGenericExceptionCaught")
     override suspend fun send(events: List<LogEvent>): TransportResult {

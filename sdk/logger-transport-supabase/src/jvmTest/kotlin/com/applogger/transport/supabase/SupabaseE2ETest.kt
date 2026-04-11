@@ -40,7 +40,7 @@ class SupabaseE2ETest {
             ?: (System.getenv("APPLOGGER_SUPABASE_URL") ?: "")
         private val anonKey = System.getenv("APPLOGGER_SUPABASE_ANON_KEY") ?: ""
         private val serviceKey = System.getenv("APPLOGGER_SUPABASE_SERVICE_KEY") ?: ""
-        private val schema = System.getenv("APPLOGGER_SUPABASE_SCHEMA")?.ifBlank { "public" } ?: "public"
+        private val schema = System.getenv("APPLOGGER_SUPABASE_SCHEMA")?.ifBlank { "apploggers" } ?: "apploggers"
 
         private val testSessionId = java.util.UUID.randomUUID().toString()
 

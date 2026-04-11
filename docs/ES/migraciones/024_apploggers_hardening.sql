@@ -1,0 +1,78 @@
+-- Migration: 024_apploggers_hardening.sql
+-- Descripcion: Endurece privilegios, funciones expuestas y jobs operativos
+-- del schema `apploggers` para dejar AppLoggers en minimo privilegio.
+
+CREATE SCHEMA IF NOT EXISTS apploggers;
+
+COMMENT ON SCHEMA apploggers IS
+'Schema fisico y operativo de AppLoggers. Todas las tablas, funciones y vistas operativas viven aqui a partir de la migracion 023. La migracion 024 endurece grants, funciones expuestas y jobs de mantenimiento.';
+
+REVOKE ALL ON SCHEMA apploggers FROM PUBLIC;
+REVOKE USAGE ON SCHEMA apploggers FROM authenticated;
+GRANT USAGE ON SCHEMA apploggers TO anon, service_role;
+
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA apploggers FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA apploggers FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA apploggers FROM PUBLIC, anon, authenticated, service_role;
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA apploggers TO service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA apploggers TO service_role;
+
+GRANT INSERT ON apploggers.app_logs TO anon;
+GRANT INSERT ON apploggers.app_metrics TO anon;
+GRANT INSERT ON apploggers.log_batches TO anon;
+GRANT INSERT ON apploggers.metric_batches TO anon;
+GRANT SELECT ON apploggers.device_remote_config TO anon;
+GRANT SELECT, INSERT, UPDATE ON apploggers.beta_tester_devices TO anon;
+
+GRANT EXECUTE ON FUNCTION apploggers.ingest_log_batch(JSONB, JSONB) TO anon;
+GRANT EXECUTE ON FUNCTION apploggers.ingest_metric_batch(JSONB, JSONB) TO anon;
+GRANT EXECUTE ON FUNCTION apploggers.purge_old_logs(INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION apploggers.expire_beta_tester_mappings() TO service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA apploggers REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA apploggers REVOKE ALL ON SEQUENCES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA apploggers REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA apploggers GRANT ALL ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA apploggers GRANT ALL ON SEQUENCES TO service_role;
+
+DO $$
+DECLARE
+    purge_job_id BIGINT;
+    beta_cleanup_job_id BIGINT;
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+        SELECT jobid
+        INTO purge_job_id
+        FROM cron.job
+        WHERE jobname = 'purge-old-logs-every-3-days'
+        LIMIT 1;
+
+        IF purge_job_id IS NOT NULL THEN
+            PERFORM cron.unschedule(purge_job_id);
+        END IF;
+
+        PERFORM cron.schedule(
+            'purge-old-logs-every-3-days',
+            '0 3 */3 * *',
+            'select apploggers.purge_old_logs(3);'
+        );
+
+        SELECT jobid
+        INTO beta_cleanup_job_id
+        FROM cron.job
+        WHERE jobname = 'expire-beta-tester-mappings-weekly'
+        LIMIT 1;
+
+        IF beta_cleanup_job_id IS NOT NULL THEN
+            PERFORM cron.unschedule(beta_cleanup_job_id);
+        END IF;
+
+        PERFORM cron.schedule(
+            'expire-beta-tester-mappings-weekly',
+            '0 4 * * 0',
+            'select apploggers.expire_beta_tester_mappings();'
+        );
+    END IF;
+END;
+$$;

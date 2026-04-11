@@ -149,14 +149,14 @@ El archivo `cli.json` configura **la conexión al proyecto Supabase** — no los
 | `supabase.url` | ✅ | URL del proyecto Supabase (`https://xxxx.supabase.co`) |
 | `supabase.api_key` | ✅* | Valor directo del `service_role` key. No versionar. |
 | `supabase.api_key_env` | ✅* | Nombre de la variable de entorno UPPERCASE que contiene el `service_role` key |
-| `supabase.schema` | ❌ | Esquema PostgreSQL. Default: `apploggers` (`public` solo para instalaciones legacy sin migración 017) |
+| `supabase.schema` | ❌ | Esquema PostgreSQL. Default y unico valor operativo soportado tras 023/024: `apploggers` |
 | `supabase.logs_table` | ❌ | Nombre de la tabla de logs. Default: `app_logs` |
 | `supabase.metrics_table` | ❌ | Nombre de la tabla de métricas. Default: `app_metrics` |
 | `supabase.timeout_seconds` | ❌ | Timeout HTTP en segundos (1-120). Default: `15` |
 
 `*` Al menos uno de `api_key` o `api_key_env` debe resolver a un valor no vacío.
 
-`schema`, `logs_table` y `metrics_table` solo se especifican si las migraciones usaron nombres distintos a los defaults. En la mayoría de los casos se omiten; desde la migración 017 el camino operativo preferido es `apploggers`.
+`schema`, `logs_table` y `metrics_table` solo se especifican si las migraciones usaron nombres distintos a los defaults. En la mayoría de los casos se omiten; desde las migraciones 023/024 el camino operativo, físico y endurecido es `apploggers`.
 
 ---
 
