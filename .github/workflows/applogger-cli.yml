@@ -17,6 +17,9 @@ on:
     paths:
       - 'cli/**'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   test:
     name: Test on ${{ matrix.os }}
@@ -377,12 +380,38 @@ jobs:
           EOF
 
       - name: Create Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#apploggers-v}"
+          TARGET="CLI ${VERSION}"
+
+          awk -v target="$TARGET" '
+            /^## \[/ {
+              if (capture) {
+                exit
+              }
+              if (index($0, target) > 0) {
+                capture = 1
+              }
+            }
+            capture {
+              print
+            }
+          ' CHANGELOG.md > cli-release-notes.md
+
+          if [[ ! -s cli-release-notes.md ]]; then
+            echo "No changelog section found for ${TARGET}" >&2
+            exit 1
+          fi
+
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
-          body_path: CHANGELOG.md
+          body_path: cli-release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

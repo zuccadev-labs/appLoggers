@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 defaults:
   run:
     working-directory: sdk
@@ -128,10 +131,37 @@ jobs:
           path: sdk/build/dokka/htmlMultiModule/
           retention-days: 90
 
+      - name: Prepare SDK release notes
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          TARGET="SDK ${VERSION}"
+
+          awk -v target="$TARGET" '
+            /^## \[/ {
+              if (capture) {
+                exit
+              }
+              if (index($0, target) > 0) {
+                capture = 1
+              }
+            }
+            capture {
+              print
+            }
+          ' CHANGELOG.md > sdk-release-notes.md
+
+          if [[ ! -s sdk-release-notes.md ]]; then
+            echo "No changelog section found for ${TARGET}" >&2
+            exit 1
+          fi
+
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          generateReleaseNotes: true
+          generateReleaseNotes: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
-          body_path: CHANGELOG.md
+          body_path: sdk-release-notes.md
           token: ${{ secrets.GITHUB_TOKEN }}
