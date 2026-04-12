@@ -152,29 +152,32 @@ jobs:
           APPLOGGERS_INTEGRITY_SECRET: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET }}
           APPLOGGERS_INTEGRITY_SECRET_ID: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET_ID }}
         run: |
-          cat > "$RUNNER_TEMP/apploggers-cli.json" <<EOF
-          {
-            "default_project": "CI-E2E",
-            "projects": [
-              {
-                "name": "CI-E2E",
-                "supabase": {
-                  "url": "${APPLOGGER_SUPABASE_URL}",
-                  "api_key": "${APPLOGGER_SUPABASE_SERVICE_KEY}",
-                  "schema": "apploggers",
-                  "logs_table": "app_logs",
-                  "metrics_table": "app_metrics",
-                  "timeout_seconds": 15,
-                  "integrity_secret": "${APPLOGGERS_INTEGRITY_SECRET}",
-                  "integrity_secret_id": "${APPLOGGERS_INTEGRITY_SECRET_ID}",
-                  "integrity_secrets": {
-                    "${APPLOGGERS_INTEGRITY_SECRET_ID}": "${APPLOGGERS_INTEGRITY_SECRET}"
+          jq -n \
+            --arg url "$APPLOGGER_SUPABASE_URL" \
+            --arg apiKey "$APPLOGGER_SUPABASE_SERVICE_KEY" \
+            --arg integritySecret "$APPLOGGERS_INTEGRITY_SECRET" \
+            --arg integritySecretId "$APPLOGGERS_INTEGRITY_SECRET_ID" \
+            '{
+              default_project: "CI-E2E",
+              projects: [
+                {
+                  name: "CI-E2E",
+                  supabase: {
+                    url: $url,
+                    api_key: $apiKey,
+                    schema: "apploggers",
+                    logs_table: "app_logs",
+                    metrics_table: "app_metrics",
+                    timeout_seconds: 15,
+                    integrity_secret: $integritySecret,
+                    integrity_secret_id: $integritySecretId,
+                    integrity_secrets: {
+                      ($integritySecretId): $integritySecret
+                    }
                   }
                 }
-              }
-            ]
-          }
-          EOF
+              ]
+            }' > "$RUNNER_TEMP/apploggers-cli.json"
 
       - name: Verify batch integrity (gate)
         shell: bash
