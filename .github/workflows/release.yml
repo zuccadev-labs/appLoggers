@@ -43,7 +43,7 @@ jobs:
           APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL }}
           APPLOGGER_SUPABASE_ANON_KEY: ${{ secrets.APPLOGGER_SUPABASE_ANON_KEY }}
           APPLOGGER_SUPABASE_SERVICE_KEY: ${{ secrets.APPLOGGER_SUPABASE_SERVICE_KEY }}
-        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :logger-transport-supabase:jvmTest :sample:testDebugUnitTest
+        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :logger-transport-supabase:jvmTest :example:test
 
       - name: Upload Test Reports
         if: always()

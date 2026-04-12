@@ -68,7 +68,7 @@ jobs:
       - name: Run Unit Tests
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :example:testDebugUnitTest
+        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :example:test
 
       - name: Generate Coverage Report
         env:
