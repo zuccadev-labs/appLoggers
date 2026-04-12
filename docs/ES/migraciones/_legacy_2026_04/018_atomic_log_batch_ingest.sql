@@ -1,13 +1,17 @@
 -- Migration 018: atomic log batch ingest + relational batch integrity guardrails
+-- All operations isolated within apploggers schema
 
-CREATE OR REPLACE FUNCTION public.ingest_log_batch(
+CREATE SCHEMA IF NOT EXISTS apploggers;
+SET search_path = apploggers, pg_catalog;
+
+CREATE OR REPLACE FUNCTION apploggers.ingest_log_batch(
     log_entries JSONB,
     manifest JSONB DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = apploggers
 AS $$
 DECLARE
     manifest_batch_id UUID;
@@ -24,7 +28,7 @@ BEGIN
         END IF;
     END IF;
 
-    INSERT INTO public.app_logs (
+    INSERT INTO apploggers.app_logs (
         id,
         level,
         tag,
@@ -82,7 +86,7 @@ BEGIN
     GET DIAGNOSTICS inserted_count = ROW_COUNT;
 
     IF manifest IS NOT NULL THEN
-        INSERT INTO public.log_batches (
+        INSERT INTO apploggers.log_batches (
             batch_id,
             event_count,
             batch_hash,
@@ -113,38 +117,4 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION apploggers.ingest_log_batch(
-    log_entries JSONB,
-    manifest JSONB DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-    SELECT public.ingest_log_batch(log_entries, manifest);
-$$;
-
-GRANT EXECUTE ON FUNCTION public.ingest_log_batch(JSONB, JSONB) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION apploggers.ingest_log_batch(JSONB, JSONB) TO anon, service_role;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'app_logs_batch_id_fkey'
-    ) THEN
-        ALTER TABLE public.app_logs
-            ADD CONSTRAINT app_logs_batch_id_fkey
-            FOREIGN KEY (batch_id)
-            REFERENCES public.log_batches(batch_id)
-            DEFERRABLE INITIALLY DEFERRED;
-    END IF;
-END $$;
-
-ALTER TABLE public.app_logs DROP CONSTRAINT IF EXISTS app_logs_level_check;
-
-ALTER TABLE public.app_logs
-    ADD CONSTRAINT app_logs_level_check
-    CHECK (level IN ('DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'));

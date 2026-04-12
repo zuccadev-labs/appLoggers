@@ -1,6 +1,8 @@
 package com.applogger.transport.supabase
 
+import com.applogger.core.BatchKind
 import com.applogger.core.TransportResult
+import com.applogger.core.hmacSha256Hex
 import com.applogger.core.model.DeviceInfo
 import com.applogger.core.model.LogEvent
 import com.applogger.core.model.LogLevel
@@ -13,6 +15,8 @@ import kotlinx.serialization.json.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+import java.util.UUID
+import java.util.Collections
 
 /**
  * Test E2E real contra Supabase.
@@ -41,8 +45,12 @@ class SupabaseE2ETest {
         private val anonKey = System.getenv("APPLOGGER_SUPABASE_ANON_KEY") ?: ""
         private val serviceKey = System.getenv("APPLOGGER_SUPABASE_SERVICE_KEY") ?: ""
         private val schema = System.getenv("APPLOGGER_SUPABASE_SCHEMA")?.ifBlank { "apploggers" } ?: "apploggers"
+        private val integritySecret = System.getenv("APPLOGGERS_INTEGRITY_SECRET") ?: ""
+        private val integritySecretId = System.getenv("APPLOGGERS_INTEGRITY_SECRET_ID") ?: ""
 
         private val testSessionId = java.util.UUID.randomUUID().toString()
+        private val logBatchIds = Collections.synchronizedList(mutableListOf<String>())
+        private val metricBatchIds = Collections.synchronizedList(mutableListOf<String>())
 
         private val testDeviceInfo = DeviceInfo(
             brand = "E2E-Test", model = "CI-Runner", osVersion = "test",
@@ -82,6 +90,22 @@ class SupabaseE2ETest {
                         header("Content-Profile", schema)
                         header("Accept-Profile", schema)
                     }
+                    logBatchIds.forEach { batchId ->
+                        client.delete("${url.trimEnd('/')}/rest/v1/log_batches?batch_id=eq.${batchId}") {
+                            header("apikey", serviceKey)
+                            header("Authorization", "Bearer $serviceKey")
+                            header("Content-Profile", schema)
+                            header("Accept-Profile", schema)
+                        }
+                    }
+                    metricBatchIds.forEach { batchId ->
+                        client.delete("${url.trimEnd('/')}/rest/v1/metric_batches?batch_id=eq.${batchId}") {
+                            header("apikey", serviceKey)
+                            header("Authorization", "Bearer $serviceKey")
+                            header("Content-Profile", schema)
+                            header("Accept-Profile", schema)
+                        }
+                    }
                     client.close()
                 }
             }
@@ -95,7 +119,7 @@ class SupabaseE2ETest {
         message: String = "Test event",
         extra: Map<String, JsonElement>? = null
     ) = LogEvent(
-        id = "e2e-${System.currentTimeMillis()}-${(Math.random() * 10000).toInt()}",
+        id = UUID.randomUUID().toString(),
         timestamp = System.currentTimeMillis(),
         level = level,
         tag = tag,
@@ -104,6 +128,38 @@ class SupabaseE2ETest {
         sessionId = testSessionId,
         extra = extra
     )
+
+    private data class E2EBatchPacket(
+        val batchId: String,
+        val events: List<LogEvent>,
+        val hash: String
+    )
+
+    private fun prepareIntegrityBatch(events: List<LogEvent>, kind: BatchKind): E2EBatchPacket {
+        val batchId = UUID.randomUUID().toString()
+        val tagged = events.map { it.copy(batchId = batchId) }
+        val canonical = tagged.sortedBy { it.id }.joinToString("|") { event ->
+            when (kind) {
+                BatchKind.LOGS -> "${event.id}:${event.timestamp}:${event.level.name}:${event.tag}:${event.message.take(200)}"
+                BatchKind.METRICS -> {
+                    val name = event.metricName ?: event.tag
+                    val value = canonicalMetricValue(event.metricValue ?: 0.0)
+                    val unit = event.metricUnit ?: "count"
+                    "${event.id}:${event.timestamp}:${name}:${value}:${unit}"
+                }
+            }
+        }
+        return E2EBatchPacket(batchId, tagged, hmacSha256Hex(integritySecret, canonical))
+    }
+
+    private fun canonicalMetricValue(value: Double): String {
+        val longValue = value.toLong()
+        return if (value.isFinite() && value == longValue.toDouble()) {
+            "${longValue}.0"
+        } else {
+            value.toString()
+        }
+    }
 
     // ──────────── INSERT TESTS ────────────
 
@@ -159,13 +215,12 @@ class SupabaseE2ETest {
         val event = buildLogEvent(
             level = LogLevel.METRIC,
             tag = "METRIC",
-            message = "screen_load_time=1234.0 ms",
-            extra = mapOf(
-                "metric_name" to JsonPrimitive("screen_load_time"),
-                "metric_value" to JsonPrimitive("1234.0"),
-                "metric_unit" to JsonPrimitive("ms"),
-                "screen" to JsonPrimitive("HomeScreen")
-            )
+            message = "screen_load_time=1234.0 ms"
+        ).copy(
+            metricName = "screen_load_time",
+            metricValue = 1234.0,
+            metricUnit = "ms",
+            metricTags = mapOf("screen" to "HomeScreen")
         )
         val result = transport.send(listOf(event))
         assertTrue(result is TransportResult.Success, "Metric send failed: $result")
@@ -185,6 +240,124 @@ class SupabaseE2ETest {
         )
         val result = transport.send(listOf(event))
         assertTrue(result is TransportResult.Success)
+    }
+
+    @Test
+    @Order(30)
+    fun `send atomic log batch with manifest to log_batches`() = runBlocking {
+        Assumptions.assumeTrue(serviceKey.isNotBlank(), "SERVICE_KEY needed for manifest verification")
+        Assumptions.assumeTrue(integritySecret.isNotBlank(), "APPLOGGERS_INTEGRITY_SECRET needed for manifest write")
+        Assumptions.assumeTrue(integritySecretId.isNotBlank(), "APPLOGGERS_INTEGRITY_SECRET_ID needed for manifest write")
+
+        val packet = prepareIntegrityBatch(
+            listOf(
+                buildLogEvent(LogLevel.INFO, "E2E_ATOMIC", "Atomic log event A"),
+                buildLogEvent(LogLevel.ERROR, "E2E_ATOMIC", "Atomic log event B")
+            ),
+            BatchKind.LOGS
+        )
+        logBatchIds += packet.batchId
+        val keyId = "${integritySecretId}-${packet.batchId.take(8)}"
+
+        val result = transport.sendBatchWithManifest(
+            kind = BatchKind.LOGS,
+            events = packet.events,
+            hash = packet.hash,
+            eventCount = packet.events.size,
+            environment = packet.events.first().environment,
+            sdkVersion = packet.events.first().sdkVersion,
+            keyId = keyId
+        )
+
+        assertTrue(result is TransportResult.Success, "Atomic log batch send failed: $result")
+
+        val client = HttpClient()
+        val batchResponse = client.get("${url.trimEnd('/')}/rest/v1/log_batches?batch_id=eq.${packet.batchId}") {
+            header("apikey", serviceKey)
+            header("Authorization", "Bearer $serviceKey")
+            header("Accept", "application/json")
+            header("Accept-Profile", schema)
+        }
+        assertEquals(HttpStatusCode.OK, batchResponse.status)
+        val batchRows = json.parseToJsonElement(batchResponse.bodyAsText()).jsonArray
+        assertEquals(1, batchRows.size, "Expected 1 log_batches manifest row")
+        assertEquals(2, batchRows[0].jsonObject["event_count"]?.jsonPrimitive?.int)
+        assertEquals(keyId, batchRows[0].jsonObject["key_id"]?.jsonPrimitive?.content)
+
+        val eventResponse = client.get("${url.trimEnd('/')}/rest/v1/app_logs?batch_id=eq.${packet.batchId}") {
+            header("apikey", serviceKey)
+            header("Authorization", "Bearer $serviceKey")
+            header("Accept", "application/json")
+            header("Accept-Profile", schema)
+        }
+        assertEquals(HttpStatusCode.OK, eventResponse.status)
+        val eventRows = json.parseToJsonElement(eventResponse.bodyAsText()).jsonArray
+        assertEquals(2, eventRows.size, "Expected 2 app_logs rows linked to the manifest")
+        client.close()
+    }
+
+    @Test
+    @Order(31)
+    fun `send atomic metric batch with manifest to metric_batches`() = runBlocking {
+        Assumptions.assumeTrue(serviceKey.isNotBlank(), "SERVICE_KEY needed for manifest verification")
+        Assumptions.assumeTrue(integritySecret.isNotBlank(), "APPLOGGERS_INTEGRITY_SECRET needed for manifest write")
+        Assumptions.assumeTrue(integritySecretId.isNotBlank(), "APPLOGGERS_INTEGRITY_SECRET_ID needed for manifest write")
+
+        val packet = prepareIntegrityBatch(
+            listOf(
+                buildLogEvent(LogLevel.METRIC, "frame_drop", "frame_drop=3.0 count").copy(
+                    metricName = "frame_drop",
+                    metricValue = 3.0,
+                    metricUnit = "count",
+                    metricTags = mapOf("screen" to "Player")
+                ),
+                buildLogEvent(LogLevel.METRIC, "startup_ms", "startup_ms=250.0 ms").copy(
+                    metricName = "startup_ms",
+                    metricValue = 250.0,
+                    metricUnit = "ms",
+                    metricTags = mapOf("screen" to "Splash")
+                )
+            ),
+            BatchKind.METRICS
+        )
+        metricBatchIds += packet.batchId
+        val keyId = "${integritySecretId}-${packet.batchId.take(8)}"
+
+        val result = transport.sendBatchWithManifest(
+            kind = BatchKind.METRICS,
+            events = packet.events,
+            hash = packet.hash,
+            eventCount = packet.events.size,
+            environment = packet.events.first().environment,
+            sdkVersion = packet.events.first().sdkVersion,
+            keyId = keyId
+        )
+
+        assertTrue(result is TransportResult.Success, "Atomic metric batch send failed: $result")
+
+        val client = HttpClient()
+        val batchResponse = client.get("${url.trimEnd('/')}/rest/v1/metric_batches?batch_id=eq.${packet.batchId}") {
+            header("apikey", serviceKey)
+            header("Authorization", "Bearer $serviceKey")
+            header("Accept", "application/json")
+            header("Accept-Profile", schema)
+        }
+        assertEquals(HttpStatusCode.OK, batchResponse.status)
+        val batchRows = json.parseToJsonElement(batchResponse.bodyAsText()).jsonArray
+        assertEquals(1, batchRows.size, "Expected 1 metric_batches manifest row")
+        assertEquals(2, batchRows[0].jsonObject["event_count"]?.jsonPrimitive?.int)
+        assertEquals(keyId, batchRows[0].jsonObject["key_id"]?.jsonPrimitive?.content)
+
+        val eventResponse = client.get("${url.trimEnd('/')}/rest/v1/app_metrics?batch_id=eq.${packet.batchId}") {
+            header("apikey", serviceKey)
+            header("Authorization", "Bearer $serviceKey")
+            header("Accept", "application/json")
+            header("Accept-Profile", schema)
+        }
+        assertEquals(HttpStatusCode.OK, eventResponse.status)
+        val eventRows = json.parseToJsonElement(eventResponse.bodyAsText()).jsonArray
+        assertEquals(2, eventRows.size, "Expected 2 app_metrics rows linked to the manifest")
+        client.close()
     }
 
     // ──────────── READ-BACK VERIFICATION ────────────

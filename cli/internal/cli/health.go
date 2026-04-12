@@ -3,6 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -139,11 +144,37 @@ func probeSupabase(cfg supabaseConfig) *healthDeepResult {
 
 // probeTable performs a lightweight SELECT limit=1 against the given table.
 func probeTable(cfg supabaseConfig, table string) bool {
-	probeCfg := cfg
-	probeCfg.LogsTable = table
-	req := telemetryQueryRequest{Source: "logs", Limit: 1, Order: "desc"}
+	base, err := url.Parse(strings.TrimSpace(cfg.URL))
+	if err != nil {
+		return false
+	}
+
+	base.Path = path.Join(base.Path, "rest", "v1", table)
+	query := base.Query()
+	query.Set("select", "*")
+	query.Set("limit", "1")
+	base.RawQuery = query.Encode()
+
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout())
-	_, err := queryTelemetry(ctx, probeCfg, req)
-	cancel()
-	return err == nil
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
+	if err != nil {
+		return false
+	}
+	httpReq.Header.Set("apikey", cfg.APIKey)
+	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	httpReq.Header.Set("Accept", "application/json")
+	if cfg.Schema != "" {
+		httpReq.Header.Set("Accept-Profile", cfg.Schema)
+	}
+
+	httpResp, err := supabaseHTTPClient(cfg).Do(httpReq)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	_, _ = io.ReadAll(httpResp.Body)
+	return httpResp.StatusCode >= 200 && httpResp.StatusCode < 300
 }

@@ -20,4 +20,4 @@ rootProject.name = "appLoggers"
 include(":logger-core")
 include(":logger-transport-supabase")
 include(":logger-test")
-include(":sample")
+include(":example")

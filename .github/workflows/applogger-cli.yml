@@ -24,6 +24,7 @@ jobs:
   test:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.runners }}
+    environment: apploggers
     strategy:
       matrix:
         include:
@@ -38,10 +39,12 @@ jobs:
             go: 1.24.x
     env:
       GOFLAGS: -mod=readonly
-      appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL }}
-      appLogger_supabaseKey: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
-      APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL }}
-      APPLOGGER_SUPABASE_KEY: ${{ secrets.APPLOGGER_SUPABASE_KEY }}
+      appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL || secrets.APPLOGGER_URL }}
+      appLogger_supabaseKey: ${{ secrets.APPLOGGER_SUPABASE_KEY || secrets.APPLOGGER_SUPABASE_SERVICE_KEY }}
+      APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL || secrets.APPLOGGER_URL }}
+      APPLOGGER_SUPABASE_KEY: ${{ secrets.APPLOGGER_SUPABASE_KEY || secrets.APPLOGGER_SUPABASE_SERVICE_KEY }}
+      APPLOGGERS_INTEGRITY_SECRET: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET }}
+      APPLOGGERS_INTEGRITY_SECRET_ID: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET_ID }}
 
     steps:
       - name: Checkout code

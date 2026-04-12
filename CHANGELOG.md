@@ -9,10 +9,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 ## [Unreleased]
 
 ### Changed
-- GitHub Actions: los workflows fuerzan Node 24 para acciones JavaScript y el pipeline de seguridad usa `github/codeql-action@v4` para eliminar drift de plataforma antes de la deprecacion de Node 20 y CodeQL v3.
-- Releases: los pipelines de SDK y CLI ahora extraen solo la seccion correspondiente desde este changelog, evitando notas mezcladas entre tags `v*` del SDK y `apploggers-v*` del CLI.
+
+
+## [SDK 0.2.0-alpha.12 + CLI 0.2.2] — 2026-04-12
+
+### Added
+- SDK: nuevos tests E2E `send atomic log batch with manifest to log_batches` y `send atomic metric batch with manifest to metric_batches` — validan el flujo completo de integridad de lotes sobre el schema real.
+- Supabase: migrations canónicas 001–006 consolidadas como fuente única de verdad; `DROP SCHEMA CASCADE` + re-apply desde cero confirmado al 100%.
+
+### Changed
+- SDK: `SupabaseE2ETest` genera IDs válidos con `UUID.randomUUID()` en lugar de strings con prefijo e2e.
+- SDK: eventos métricos usan `.copy(metricName, metricValue, metricUnit)` correctamente en tests E2E.
+- SDK: `keyId` de lotes usa sufijo único por batch para respetar constraint `UNIQUE` en `log_batches` y `metric_batches`.
+- Supabase: policy `sdk_insert_metrics` reemplaza `isfinite(value)` con expresión portable `value = value AND value > '-Infinity'::float8 AND value < 'Infinity'::float8`.
+
+### Fixed
+- Migration 004: `isfinite(double precision)` no disponible en este entorno Supabase — corregido con equivalente explícito en SQL portable.
 
 ---
+
 
 ## [SDK 0.2.0-alpha.11] — 2026-04-11
 
