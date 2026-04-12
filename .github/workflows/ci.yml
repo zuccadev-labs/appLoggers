@@ -152,8 +152,10 @@ jobs:
           APPLOGGERS_INTEGRITY_SECRET: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET }}
           APPLOGGERS_INTEGRITY_SECRET_ID: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET_ID }}
         run: |
+          SANITIZED_SUPABASE_URL="$(printf '%s' "$APPLOGGER_SUPABASE_URL" | sed -e 's#\\:#:#g' -e 's#\\/#/#g')"
+
           jq -n \
-            --arg url "$APPLOGGER_SUPABASE_URL" \
+            --arg url "$SANITIZED_SUPABASE_URL" \
             --arg apiKey "$APPLOGGER_SUPABASE_SERVICE_KEY" \
             --arg integritySecret "$APPLOGGERS_INTEGRITY_SECRET" \
             --arg integritySecretId "$APPLOGGERS_INTEGRITY_SECRET_ID" \
