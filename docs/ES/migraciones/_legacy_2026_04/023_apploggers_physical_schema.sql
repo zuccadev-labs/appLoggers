@@ -1,6 +1,6 @@
 -- Migration: 023_apploggers_physical_schema.sql
 -- Descripcion: Convierte `apploggers` en el schema fisico operativo de AppLoggers
--- moviendo tablas, funciones, triggers y vistas fuera de `public`.
+-- consolidando tablas, funciones, triggers y vistas dentro de apploggers.
 
 CREATE SCHEMA IF NOT EXISTS apploggers;
 
@@ -29,114 +29,6 @@ END $$;
 DROP FUNCTION IF EXISTS apploggers.ingest_log_batch(JSONB, JSONB);
 DROP FUNCTION IF EXISTS apploggers.ingest_metric_batch(JSONB, JSONB);
 DROP FUNCTION IF EXISTS apploggers.purge_old_logs(INTEGER);
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'app_logs' AND table_type = 'BASE TABLE'
-    ) THEN
-        ALTER TABLE public.app_logs SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'app_metrics' AND table_type = 'BASE TABLE'
-    ) THEN
-        ALTER TABLE public.app_metrics SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'log_batches' AND table_type = 'BASE TABLE'
-    ) THEN
-        ALTER TABLE public.log_batches SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'metric_batches' AND table_type = 'BASE TABLE'
-    ) THEN
-        ALTER TABLE public.metric_batches SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'device_remote_config' AND table_type = 'BASE TABLE'
-    ) THEN
-        ALTER TABLE public.device_remote_config SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'beta_tester_devices' AND table_type = 'BASE TABLE'
-    ) THEN
-        ALTER TABLE public.beta_tester_devices SET SCHEMA apploggers;
-    END IF;
-END $$;
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'purge_old_logs'
-          AND pg_get_function_identity_arguments(p.oid) = 'retention_days integer'
-    ) THEN
-        ALTER FUNCTION public.purge_old_logs(INTEGER) SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'update_device_config_timestamp'
-          AND pg_get_function_identity_arguments(p.oid) = ''
-    ) THEN
-        ALTER FUNCTION public.update_device_config_timestamp() SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'correlate_beta_tester_email'
-          AND pg_get_function_identity_arguments(p.oid) = ''
-    ) THEN
-        ALTER FUNCTION public.correlate_beta_tester_email() SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'expire_beta_tester_mappings'
-          AND pg_get_function_identity_arguments(p.oid) = ''
-    ) THEN
-        ALTER FUNCTION public.expire_beta_tester_mappings() SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'ingest_log_batch'
-          AND pg_get_function_identity_arguments(p.oid) = 'log_entries jsonb, manifest jsonb'
-    ) THEN
-        ALTER FUNCTION public.ingest_log_batch(JSONB, JSONB) SET SCHEMA apploggers;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'ingest_metric_batch'
-          AND pg_get_function_identity_arguments(p.oid) = 'metric_entries jsonb, manifest jsonb'
-    ) THEN
-        ALTER FUNCTION public.ingest_metric_batch(JSONB, JSONB) SET SCHEMA apploggers;
-    END IF;
-END $$;
 
 CREATE OR REPLACE FUNCTION apploggers.purge_old_logs(retention_days INTEGER DEFAULT 30)
 RETURNS INTEGER
@@ -510,10 +402,10 @@ SELECT
 FROM apploggers.app_metrics
 GROUP BY DATE_TRUNC('hour', created_at), name, environment;
 
-DROP VIEW IF EXISTS public.session_summary;
-DROP VIEW IF EXISTS public.hourly_error_rate;
-DROP VIEW IF EXISTS public.device_health;
-DROP VIEW IF EXISTS public.hourly_metrics_summary;
+DROP VIEW IF EXISTS apploggers.session_summary;
+DROP VIEW IF EXISTS apploggers.hourly_error_rate;
+DROP VIEW IF EXISTS apploggers.device_health;
+DROP VIEW IF EXISTS apploggers.hourly_metrics_summary;
 
 ALTER TABLE apploggers.app_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apploggers.app_metrics ENABLE ROW LEVEL SECURITY;

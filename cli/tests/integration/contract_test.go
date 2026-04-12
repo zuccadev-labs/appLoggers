@@ -195,7 +195,28 @@ func TestTelemetryQueryContractJSON(t *testing.T) {
 
 func TestTelemetryQueryMissingEnvJSON(t *testing.T) {
 	binary := buildCLI(t)
-	cmd := exec.Command(binary, "telemetry", "query", "--output", "json")
+
+	// Write a config that uses api_key_env so the CLI requires the env variable.
+	cfgDir := t.TempDir()
+	cfgPath := filepath.Join(cfgDir, "cli.json")
+	cfgContent := `{
+  "projects": [
+    {
+      "name": "test",
+      "supabase": {
+        "url": "https://test.supabase.co",
+        "api_key_env": "APPLOGGER_SUPABASE_KEY_MISSING_TEST_ONLY"
+      }
+    }
+  ]
+}`
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0600); err != nil {
+		t.Fatalf("failed to write temp config: %v", err)
+	}
+
+	cmd := exec.Command(binary, "--config", cfgPath, "telemetry", "query", "--output", "json")
+	// Explicitly omit APPLOGGER_SUPABASE_KEY_MISSING_TEST_ONLY from env.
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected runtime error when env vars are missing")

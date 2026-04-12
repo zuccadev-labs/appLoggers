@@ -191,7 +191,11 @@ const exampleConfigJSON = `{
         "url": "https://your-project.supabase.co",
         "_api_key_note": "Opción A: pon el valor directo del service_role key en api_key (no versionar). Opción B: pon el NOMBRE de la variable de entorno en api_key_env y exporta esa variable.",
         "api_key": "",
-        "api_key_env": "APPLOGGER_SUPABASE_KEY"
+				"api_key_env": "APPLOGGER_SUPABASE_KEY",
+				"schema": "apploggers",
+				"logs_table": "app_logs",
+				"metrics_table": "app_metrics",
+				"timeout_seconds": 15
       }
     }
   ]

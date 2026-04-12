@@ -568,6 +568,43 @@ Estas variables controlan el comportamiento del CLI y son independientes de `cli
 
 > Las variables de entorno directas para URL y key (`APPLOGGER_SUPABASE_URL`, `APPLOGGER_SUPABASE_KEY`, etc.) están deprecadas para uso local. Solo se mantienen por compatibilidad hacia atrás y se leen únicamente cuando `~/.apploggers/cli.json` no existe. Configurar siempre a través del archivo.
 
+### Variables Supabase e integridad en CI
+
+En pipelines aparecen variables con nombres parecidos porque cubren rutas historicas distintas (SDK e2e, CLI legacy y compatibilidad).
+
+| Variable | Para que se usa |
+|---|---|
+| `APPLOGGER_SUPABASE_URL` | URL del proyecto Supabase en jobs CI/e2e |
+| `APPLOGGER_SUPABASE_ANON_KEY` | Key publica para escrituras del SDK en pruebas e2e |
+| `APPLOGGER_SUPABASE_SERVICE_KEY` | Key `service_role` para lecturas/verificacion en e2e |
+| `APPLOGGER_SUPABASE_KEY` | Alias legacy para `service_role` cuando el CLI corre solo por env vars |
+
+Regla practica:
+
+1. En local y agentes: usar `~/.apploggers/cli.json`.
+2. En CI: inyectar secrets del environment de GitHub y mapear aliases solo para compatibilidad.
+
+### Rotacion de clave de integridad
+
+`APPLOGGERS_INTEGRITY_SECRET_YYYYMMDD` es una convencion para conservar claves historicas de HMAC.
+
+Ejemplo:
+
+```properties
+# clave activa
+APPLOGGERS_INTEGRITY_SECRET=DcgMYG9YZ3Ql0OdnMAP1DF6FMVUetdKV
+APPLOGGERS_INTEGRITY_SECRET_ID=10042026
+
+# clave historica (mismo formato que key_id persistido en batches)
+APPLOGGERS_INTEGRITY_SECRET_10042026=DcgMYG9YZ3Ql0OdnMAP1DF6FMVUetdKV
+```
+
+Interpretacion de `YYYYMMDD`:
+
+1. Es el identificador de version de clave (no una fecha obligatoria del sistema).
+2. Debe coincidir exactamente con `key_id` almacenado en `log_batches` y `metric_batches`.
+3. Permite que `apploggers verify` siga validando lotes viejos despues de una rotacion.
+
 ---
 
 ## Códigos de Salida

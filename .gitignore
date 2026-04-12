@@ -17,7 +17,7 @@ Thumbs.db
 
 # Local config (contiene secrets)
 local.properties
-
+./sdk/example/local.properties
 # Kotlin
 *.class
 

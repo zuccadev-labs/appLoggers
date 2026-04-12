@@ -415,6 +415,21 @@ APPLOGGERS_INTEGRITY_SECRET_10042026=secreto-largo-y-aleatorio
 APPLOGGER_INTEGRITY_SECRET=secreto-largo-y-aleatorio
 ```
 
+Convencion recomendada para historicos:
+
+- `APPLOGGERS_INTEGRITY_SECRET_YYYYMMDD` representa una clave versionada.
+- `YYYYMMDD` es un identificador de version (normalmente fecha de activacion) y debe coincidir con el `key_id` persistido en los batches.
+- Si no coincide `key_id -> secreto`, `verify` no puede recomputar HMAC y marca `NO_SECRET` aunque los datos esten bien.
+
+Ejemplo de mapeo:
+
+```properties
+APPLOGGERS_INTEGRITY_SECRET_ID=10042026
+APPLOGGERS_INTEGRITY_SECRET=secreto_activo
+APPLOGGERS_INTEGRITY_SECRET_10042026=secreto_activo
+APPLOGGERS_INTEGRITY_SECRET_15052026=secreto_rotado
+```
+
 Dónde inyectarlo en la app:
 
 1. `local.properties` o secreto del pipeline móvil.

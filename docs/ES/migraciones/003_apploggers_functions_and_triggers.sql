@@ -1,19 +1,110 @@
--- Migration 019: versioned integrity keys + separated metric batch verification
+-- Migration 003: AppLoggers operational functions and triggers
+-- Scope: ingestion, retention, integrity, and correlation flows.
 
-ALTER TABLE public.log_batches
-    ADD COLUMN IF NOT EXISTS key_id VARCHAR(64) NULL;
+SET search_path = apploggers, pg_catalog;
 
-COMMENT ON COLUMN public.log_batches.key_id IS
-    'Logical identifier of the integrity secret used to sign this log batch.';
+CREATE OR REPLACE FUNCTION apploggers.update_device_config_timestamp()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = apploggers, pg_catalog
+AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
 
-CREATE OR REPLACE FUNCTION public.ingest_log_batch(
+CREATE OR REPLACE FUNCTION apploggers.correlate_beta_tester_email()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = apploggers, pg_catalog
+AS $$
+DECLARE
+    is_beta BOOLEAN;
+    tester_email TEXT;
+    lookup_email TEXT;
+BEGIN
+    is_beta := COALESCE(NEW.extra->>'is_beta_tester', 'false') = 'true';
+    IF NOT is_beta THEN
+        RETURN NEW;
+    END IF;
+
+    tester_email := NULLIF(NEW.extra->>'beta_tester_email', '');
+
+    IF tester_email IS NOT NULL THEN
+        INSERT INTO apploggers.beta_tester_devices (device_id, email, app_package, updated_at)
+        VALUES (
+            NEW.device_id,
+            tester_email,
+            COALESCE(NEW.app_package, NEW.extra->>'app_package'),
+            NOW()
+        )
+        ON CONFLICT (device_id) DO UPDATE
+        SET email = EXCLUDED.email,
+            app_package = EXCLUDED.app_package,
+            updated_at = NOW();
+    ELSE
+        SELECT email INTO lookup_email
+        FROM apploggers.beta_tester_devices
+        WHERE device_id = NEW.device_id;
+
+        IF lookup_email IS NOT NULL THEN
+            NEW.extra := jsonb_set(
+                COALESCE(NEW.extra, '{}'::jsonb),
+                '{beta_tester_email}',
+                to_jsonb(lookup_email)
+            );
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION apploggers.expire_beta_tester_mappings()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SET search_path = apploggers, pg_catalog
+AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM apploggers.beta_tester_devices
+    WHERE updated_at < NOW() - INTERVAL '90 days';
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION apploggers.purge_old_logs(retention_days INTEGER DEFAULT 30)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = apploggers, pg_catalog
+AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM apploggers.app_logs
+    WHERE created_at < NOW() - (retention_days || ' days')::INTERVAL;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+
+    DELETE FROM apploggers.app_metrics
+    WHERE created_at < NOW() - (retention_days || ' days')::INTERVAL;
+
+    RETURN deleted_count;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION apploggers.ingest_log_batch(
     log_entries JSONB,
     manifest JSONB DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = apploggers, pg_catalog
 AS $$
 DECLARE
     manifest_batch_id UUID;
@@ -30,27 +121,11 @@ BEGIN
         END IF;
     END IF;
 
-    INSERT INTO public.app_logs (
-        id,
-        level,
-        tag,
-        message,
-        environment,
-        throwable_type,
-        throwable_msg,
-        stack_trace,
-        device_info,
-        api_level,
-        sdk_version,
-        session_id,
-        device_id,
-        user_id,
-        extra,
-        anomaly_type,
-        trace_id,
-        variant,
-        batch_id,
-        timestamp
+    INSERT INTO apploggers.app_logs (
+        id, level, tag, message, environment, throwable_type, throwable_msg,
+        stack_trace, device_info, api_level, sdk_version, session_id, device_id,
+        user_id, extra, anomaly_type, trace_id, variant, batch_id, timestamp,
+        app_package, source_scope, source_file, source_method
     )
     SELECT
         COALESCE(NULLIF(entry->>'id', '')::UUID, gen_random_uuid()),
@@ -82,23 +157,22 @@ BEGIN
             WHEN NULLIF(entry->>'batch_id', '') IS NULL THEN NULL
             ELSE (entry->>'batch_id')::UUID
         END,
-        NULLIF(entry->>'timestamp', '')::BIGINT
+        NULLIF(entry->>'timestamp', '')::BIGINT,
+        NULLIF(entry->>'app_package', ''),
+        NULLIF(entry->>'source_scope', ''),
+        NULLIF(entry->>'source_file', ''),
+        NULLIF(entry->>'source_method', '')
     FROM jsonb_array_elements(log_entries) AS entry;
 
     GET DIAGNOSTICS inserted_count = ROW_COUNT;
 
     IF manifest IS NOT NULL THEN
-        INSERT INTO public.log_batches (
-            batch_id,
-            event_count,
-            batch_hash,
-            environment,
-            sdk_version,
-            key_id
+        INSERT INTO apploggers.log_batches (
+            batch_id, event_count, batch_hash, environment, sdk_version, key_id
         ) VALUES (
             manifest_batch_id,
             COALESCE(NULLIF(manifest->>'event_count', '')::INT, inserted_count),
-            COALESCE(manifest->>'batch_hash', ''),
+            COALESCE(NULLIF(manifest->>'batch_hash', ''), ''),
             NULLIF(manifest->>'environment', ''),
             NULLIF(manifest->>'sdk_version', ''),
             NULLIF(manifest->>'key_id', '')
@@ -114,97 +188,20 @@ BEGIN
 
     RETURN jsonb_build_object(
         'inserted_count', inserted_count,
-        'batch_id', COALESCE(manifest->>'batch_id', '')
+        'batch_id', COALESCE(manifest->>'batch_id', ''),
+        'status', 'success'
     );
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION apploggers.ingest_log_batch(
-    log_entries JSONB,
-    manifest JSONB DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-    SELECT public.ingest_log_batch(log_entries, manifest);
-$$;
-
-GRANT EXECUTE ON FUNCTION public.ingest_log_batch(JSONB, JSONB) TO anon, service_role;
-GRANT EXECUTE ON FUNCTION apploggers.ingest_log_batch(JSONB, JSONB) TO anon, service_role;
-
-CREATE TABLE IF NOT EXISTS public.metric_batches (
-    batch_id UUID PRIMARY KEY,
-    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    event_count INT NOT NULL,
-    batch_hash TEXT NOT NULL DEFAULT '',
-    environment VARCHAR(50) NULL,
-    sdk_version VARCHAR(20) NULL,
-    key_id VARCHAR(64) NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_metric_batches_sent_at ON public.metric_batches (sent_at DESC);
-
-ALTER TABLE public.metric_batches ENABLE ROW LEVEL SECURITY;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies
-        WHERE schemaname = 'public' AND tablename = 'metric_batches' AND policyname = 'metric_batch_sdk_insert'
-    ) THEN
-        CREATE POLICY metric_batch_sdk_insert ON public.metric_batches
-            FOR INSERT TO anon
-            WITH CHECK (true);
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies
-        WHERE schemaname = 'public' AND tablename = 'metric_batches' AND policyname = 'metric_batch_service_all'
-    ) THEN
-        CREATE POLICY metric_batch_service_all ON public.metric_batches
-            FOR ALL TO service_role
-            USING (true)
-            WITH CHECK (true);
-    END IF;
-END $$;
-
-ALTER TABLE public.app_metrics
-    ADD COLUMN IF NOT EXISTS timestamp BIGINT NULL,
-    ADD COLUMN IF NOT EXISTS batch_id UUID NULL;
-
-COMMENT ON COLUMN public.app_metrics.timestamp IS
-    'Client-side epoch millis used for metric batch integrity verification.';
-
-CREATE INDEX IF NOT EXISTS idx_app_metrics_batch_id
-    ON public.app_metrics (batch_id)
-    WHERE batch_id IS NOT NULL;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'app_metrics_batch_id_fkey'
-    ) THEN
-        ALTER TABLE public.app_metrics
-            ADD CONSTRAINT app_metrics_batch_id_fkey
-            FOREIGN KEY (batch_id)
-            REFERENCES public.metric_batches(batch_id)
-            DEFERRABLE INITIALLY DEFERRED;
-    END IF;
-END $$;
-
-CREATE OR REPLACE FUNCTION public.ingest_metric_batch(
+CREATE OR REPLACE FUNCTION apploggers.ingest_metric_batch(
     metric_entries JSONB,
     manifest JSONB DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = apploggers, pg_catalog
 AS $$
 DECLARE
     manifest_batch_id UUID;
@@ -221,19 +218,10 @@ BEGIN
         END IF;
     END IF;
 
-    INSERT INTO public.app_metrics (
-        id,
-        name,
-        value,
-        unit,
-        tags,
-        environment,
-        device_id,
-        session_id,
-        sdk_version,
-        user_id,
-        timestamp,
-        batch_id
+    INSERT INTO apploggers.app_metrics (
+        id, name, value, unit, tags, environment, device_id, session_id,
+        sdk_version, user_id, timestamp, batch_id, app_package, source_scope,
+        source_file, source_method
     )
     SELECT
         COALESCE(NULLIF(entry->>'id', '')::UUID, gen_random_uuid()),
@@ -253,23 +241,22 @@ BEGIN
         CASE
             WHEN NULLIF(entry->>'batch_id', '') IS NULL THEN NULL
             ELSE (entry->>'batch_id')::UUID
-        END
+        END,
+        NULLIF(entry->>'app_package', ''),
+        NULLIF(entry->>'source_scope', ''),
+        NULLIF(entry->>'source_file', ''),
+        NULLIF(entry->>'source_method', '')
     FROM jsonb_array_elements(metric_entries) AS entry;
 
     GET DIAGNOSTICS inserted_count = ROW_COUNT;
 
     IF manifest IS NOT NULL THEN
-        INSERT INTO public.metric_batches (
-            batch_id,
-            event_count,
-            batch_hash,
-            environment,
-            sdk_version,
-            key_id
+        INSERT INTO apploggers.metric_batches (
+            batch_id, event_count, batch_hash, environment, sdk_version, key_id
         ) VALUES (
             manifest_batch_id,
             COALESCE(NULLIF(manifest->>'event_count', '')::INT, inserted_count),
-            COALESCE(manifest->>'batch_hash', ''),
+            COALESCE(NULLIF(manifest->>'batch_hash', ''), ''),
             NULLIF(manifest->>'environment', ''),
             NULLIF(manifest->>'sdk_version', ''),
             NULLIF(manifest->>'key_id', '')
@@ -285,31 +272,20 @@ BEGIN
 
     RETURN jsonb_build_object(
         'inserted_count', inserted_count,
-        'batch_id', COALESCE(manifest->>'batch_id', '')
+        'batch_id', COALESCE(manifest->>'batch_id', ''),
+        'status', 'success'
     );
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION apploggers.ingest_metric_batch(
-    metric_entries JSONB,
-    manifest JSONB DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-    SELECT public.ingest_metric_batch(metric_entries, manifest);
-$$;
+DROP TRIGGER IF EXISTS trg_device_remote_config_updated ON apploggers.device_remote_config;
+CREATE TRIGGER trg_device_remote_config_updated
+    BEFORE UPDATE ON apploggers.device_remote_config
+    FOR EACH ROW
+    EXECUTE FUNCTION apploggers.update_device_config_timestamp();
 
-GRANT EXECUTE ON FUNCTION public.ingest_metric_batch(JSONB, JSONB) TO anon, service_role;
-GRANT EXECUTE ON FUNCTION apploggers.ingest_metric_batch(JSONB, JSONB) TO anon, service_role;
-
-CREATE OR REPLACE VIEW apploggers.metric_batches AS
-SELECT * FROM public.metric_batches;
-
-CREATE OR REPLACE VIEW apploggers.log_batches AS
-SELECT * FROM public.log_batches;
-
-CREATE OR REPLACE VIEW apploggers.app_metrics AS
-SELECT * FROM public.app_metrics;
+DROP TRIGGER IF EXISTS trg_correlate_beta_tester ON apploggers.app_logs;
+CREATE TRIGGER trg_correlate_beta_tester
+    BEFORE INSERT ON apploggers.app_logs
+    FOR EACH ROW
+    EXECUTE FUNCTION apploggers.correlate_beta_tester_email();

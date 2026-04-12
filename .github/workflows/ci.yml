@@ -68,7 +68,7 @@ jobs:
       - name: Run Unit Tests
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :sample:testDebugUnitTest
+        run: ./gradlew :logger-core:jvmTest :logger-test:jvmTest :example:testDebugUnitTest
 
       - name: Generate Coverage Report
         env:
@@ -104,6 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: apploggers
 
     steps:
       - uses: actions/checkout@v4
@@ -122,13 +123,79 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Capture integrity verify window start
+        shell: bash
+        run: echo "VERIFY_FROM=$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Run E2E Tests against Supabase
         env:
-          appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL }}
-          APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL }}
-          APPLOGGER_SUPABASE_ANON_KEY: ${{ secrets.APPLOGGER_SUPABASE_ANON_KEY }}
+          appLogger_supabaseUrl: ${{ secrets.APPLOGGER_SUPABASE_URL || secrets.APPLOGGER_URL }}
+          APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL || secrets.APPLOGGER_URL }}
+          APPLOGGER_SUPABASE_ANON_KEY: ${{ secrets.APPLOGGER_SUPABASE_ANON_KEY || secrets.APPLOGGER_ANON_KEY }}
           APPLOGGER_SUPABASE_SERVICE_KEY: ${{ secrets.APPLOGGER_SUPABASE_SERVICE_KEY }}
+          APPLOGGERS_INTEGRITY_SECRET: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET }}
+          APPLOGGERS_INTEGRITY_SECRET_ID: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET_ID }}
         run: ./gradlew :logger-transport-supabase:jvmTest
+
+      - name: Set up Go for integrity verify
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Build CLI config for integrity verify
+        shell: bash
+        env:
+          APPLOGGER_SUPABASE_URL: ${{ secrets.APPLOGGER_SUPABASE_URL || secrets.APPLOGGER_URL }}
+          APPLOGGER_SUPABASE_SERVICE_KEY: ${{ secrets.APPLOGGER_SUPABASE_SERVICE_KEY }}
+          APPLOGGERS_INTEGRITY_SECRET: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET }}
+          APPLOGGERS_INTEGRITY_SECRET_ID: ${{ secrets.APPLOGGERS_INTEGRITY_SECRET_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/apploggers-cli.json" <<EOF
+          {
+            "default_project": "CI-E2E",
+            "projects": [
+              {
+                "name": "CI-E2E",
+                "supabase": {
+                  "url": "${APPLOGGER_SUPABASE_URL}",
+                  "api_key": "${APPLOGGER_SUPABASE_SERVICE_KEY}",
+                  "schema": "apploggers",
+                  "logs_table": "app_logs",
+                  "metrics_table": "app_metrics",
+                  "timeout_seconds": 15,
+                  "integrity_secret": "${APPLOGGERS_INTEGRITY_SECRET}",
+                  "integrity_secret_id": "${APPLOGGERS_INTEGRITY_SECRET_ID}",
+                  "integrity_secrets": {
+                    "${APPLOGGERS_INTEGRITY_SECRET_ID}": "${APPLOGGERS_INTEGRITY_SECRET}"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+
+      - name: Verify batch integrity (gate)
+        shell: bash
+        working-directory: cli
+        run: |
+          VERIFY_TO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p ../artifacts/evidence
+          go run ./cmd/applogger-cli \
+            --config "$RUNNER_TEMP/apploggers-cli.json" \
+            --project CI-E2E \
+            verify --signal both --from "$VERIFY_FROM" --to "$VERIFY_TO" --output json \
+            | tee ../artifacts/evidence/verify-ci-e2e.json
+          jq -e '.ok == true' ../artifacts/evidence/verify-ci-e2e.json > /dev/null
+
+      - name: Upload Integrity Verify Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integrity-verify-evidence
+          path: artifacts/evidence/verify-ci-e2e.json
+          retention-days: 14
 
       - name: Upload E2E Reports
         if: always()
