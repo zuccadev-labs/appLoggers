@@ -256,3 +256,30 @@ jobs:
           gradle-project-path: sdk
           gradle-build-module: ':logger-core'
           gradle-build-configuration: 'jvmCompileClasspath'
+
+  sbom:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM (SPDX + CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: spdx-json
+          output-file: build/sbom/apploggers-sbom.spdx.json
+
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: cyclonedx-json
+          output-file: build/sbom/apploggers-sbom.cyclonedx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: build/sbom/
+          retention-days: 90
