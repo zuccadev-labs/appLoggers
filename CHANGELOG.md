@@ -9,7 +9,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 ## [Unreleased]
 
 ### Changed
+- SDK: tightens detekt thresholds to enterprise levels (LongMethod:40, TooManyFunctions:15/20, CyclomaticComplex:12, ReturnCount:3) and enables ForbiddenComment, SwallowedException rules
+- SDK: removes internal wildcard import exclusions from detekt config; regenerated baseline (29 issues)
+- SDK: enables `verifyMigrations=true` in SQLDelight config for runtime schema verification
 
+### Added
+- SDK: forensic fields (`app_package`, `source_scope`, `source_file`, `source_method`, `trace_id`, `variant`, `batch_id`) added to offline_logs SQLite schema with migration chain (001+002)
+- SDK: `SqliteOfflineStorage.persist()` and `drain()` now handle all forensic fields
+- SDK: example app reads secrets from env vars first, with BuildConfig as local-dev fallback (security hardening)
+- CLI: pins Go version to 1.24.3 in go.mod
+- CI: adds SBOM job generating SPDX and CycloneDX artifacts via anchore/sbom-action
+- SDK: adds JaCoCo coverage gate (80% line / 70% branch) with expert exclusion list (platform code, SQLDelight generated, models, config/builders, NoOp)
+- SDK: scopes coverage verification to logger-core module only
+- CI: adds coverage gate step with continue-on-error (Phase 0; will harden in Phase 1)
 
 ## [SDK 0.2.0-alpha.12 + CLI 0.2.2] — 2026-04-12
 
