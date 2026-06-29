@@ -10,6 +10,7 @@
     <ID>LongMethod:AppLoggerIos.kt$AppLoggerIos$fun initialize( config: AppLoggerConfig, transport: LogTransport? = null )</ID>
     <ID>LongMethod:AppLoggerSDK.kt$AppLoggerSDK$fun initialize( context: Context, config: AppLoggerConfig, transport: LogTransport? = null )</ID>
     <ID>LongMethod:SqliteOfflineStorage.kt$SqliteOfflineStorage$override fun drain(limit: Int): List&lt;LogEvent></ID>
+    <ID>LongMethod:SqliteOfflineStorage.kt$SqliteOfflineStorage$override fun persist(events: List&lt;LogEvent>)</ID>
     <ID>LongMethod:SupabaseTransport.kt$private fun LogEvent.toSupabaseLog(): SupabaseLogEntry</ID>
     <ID>LongParameterList:AppLoggerImpl.kt$AppLoggerImpl$( level: LogLevel, tag: String, message: String, throwable: Throwable?, resolvedExtra: Map&lt;String, JsonElement>?, callerInfo: CallerInfo? )</ID>
     <ID>LongParameterList:AppLoggerImpl.kt$AppLoggerImpl$( private val deviceInfo: DeviceInfo, private val sessionManager: SessionManager, private val filter: LogFilter, private val processor: BatchProcessor, private val config: AppLoggerConfig, private val systemSnapshotProvider: (() -> Map&lt;String, String>)? = null, private val consentProvider: (() -> ConsentLevel)? = null, private val deviceIdAnonymizer: ((String) -> String)? = null )</ID>
