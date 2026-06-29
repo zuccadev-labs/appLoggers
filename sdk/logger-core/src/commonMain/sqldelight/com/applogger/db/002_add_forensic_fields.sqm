@@ -1,0 +1,7 @@
+ALTER TABLE offline_logs ADD COLUMN app_package TEXT;
+ALTER TABLE offline_logs ADD COLUMN source_scope TEXT;
+ALTER TABLE offline_logs ADD COLUMN source_file TEXT;
+ALTER TABLE offline_logs ADD COLUMN source_method TEXT;
+ALTER TABLE offline_logs ADD COLUMN trace_id TEXT;
+ALTER TABLE offline_logs ADD COLUMN variant TEXT;
+ALTER TABLE offline_logs ADD COLUMN batch_id TEXT;

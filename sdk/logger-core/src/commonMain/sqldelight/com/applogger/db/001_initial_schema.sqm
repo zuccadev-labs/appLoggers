@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS offline_logs (
+    id TEXT NOT NULL PRIMARY KEY,
+    timestamp INTEGER NOT NULL,
+    level TEXT NOT NULL,
+    tag TEXT NOT NULL DEFAULT '',
+    message TEXT NOT NULL,
+    throwable_type TEXT,
+    throwable_msg TEXT,
+    stack_trace TEXT,
+    device_info TEXT NOT NULL DEFAULT '{}',
+    device_id TEXT NOT NULL DEFAULT '',
+    session_id TEXT NOT NULL,
+    user_id TEXT,
+    environment TEXT NOT NULL DEFAULT 'production',
+    extra TEXT,
+    sdk_version TEXT NOT NULL DEFAULT '0.0.0',
+    metric_name TEXT,
+    metric_value REAL,
+    metric_unit TEXT,
+    metric_tags TEXT,
+    created_at INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_offline_logs_created_at ON offline_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_offline_logs_level ON offline_logs(level);

@@ -142,7 +142,7 @@ sqldelight {
     databases {
         create("AppLoggerDatabase") {
             packageName.set("com.applogger.db")
-            verifyMigrations.set(false)
+            verifyMigrations.set(true)
         }
     }
 }

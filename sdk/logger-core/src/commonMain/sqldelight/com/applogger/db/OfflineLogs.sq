@@ -18,6 +18,13 @@ CREATE TABLE IF NOT EXISTS offline_logs (
     metric_value REAL,
     metric_unit TEXT,
     metric_tags TEXT,
+    app_package TEXT,
+    source_scope TEXT,
+    source_file TEXT,
+    source_method TEXT,
+    trace_id TEXT,
+    variant TEXT,
+    batch_id TEXT,
     created_at INTEGER NOT NULL DEFAULT 0
 );
 
@@ -30,9 +37,10 @@ INSERT OR REPLACE INTO offline_logs(
     throwable_type, throwable_msg, stack_trace,
     device_info, device_id, session_id, user_id, environment, extra, sdk_version,
     metric_name, metric_value, metric_unit, metric_tags,
+    app_package, source_scope, source_file, source_method, trace_id, variant, batch_id,
     created_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectOldest:
 SELECT * FROM offline_logs ORDER BY created_at ASC LIMIT ?;

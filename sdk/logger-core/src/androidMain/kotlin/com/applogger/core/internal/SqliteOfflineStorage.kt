@@ -61,6 +61,13 @@ internal class SqliteOfflineStorage(context: Context) : OfflineStorage {
                         metric_value = event.metricValue,
                         metric_unit = event.metricUnit,
                         metric_tags = event.metricTags?.let { json.encodeToString(it) },
+                        app_package = event.appPackage,
+                        source_scope = event.sourceScope,
+                        source_file = event.sourceFile,
+                        source_method = event.sourceMethod,
+                        trace_id = event.traceId,
+                        variant = event.variant,
+                        batch_id = event.batchId,
                         created_at = now
                     )
                 }
@@ -113,7 +120,14 @@ internal class SqliteOfflineStorage(context: Context) : OfflineStorage {
                         metricName = row.metric_name,
                         metricValue = row.metric_value,
                         metricUnit = row.metric_unit,
-                        metricTags = metricTags
+                        metricTags = metricTags,
+                        appPackage = row.app_package,
+                        sourceScope = row.source_scope,
+                        sourceFile = row.source_file,
+                        sourceMethod = row.source_method,
+                        traceId = row.trace_id,
+                        variant = row.variant,
+                        batchId = row.batch_id
                     )
                 } catch (_: Exception) {
                     null // Fila corrupta — descartada silenciosamente
