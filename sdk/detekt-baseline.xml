@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:AppLoggerConfig.kt$AppLoggerConfig$fun validate(): List&lt;String></ID>
+    <ID>CyclomaticComplexMethod:AppLoggerImpl.kt$AppLoggerImpl$@Suppress("ReturnCount") private fun process( level: LogLevel, tag: String, message: String, throwable: Throwable? = null, extra: Map&lt;String, Any>? = null )</ID>
+    <ID>CyclomaticComplexMethod:AppLoggerSDK.kt$AppLoggerSDK$@Suppress("TooGenericExceptionCaught") private fun parseRemoteConfigResponse(json: String): RemoteConfigOverrides?</ID>
+    <ID>LongMethod:AppLoggerImpl.kt$AppLoggerImpl$override fun metric(name: String, value: Double, unit: String, tags: Map&lt;String, String>?)</ID>
+    <ID>LongMethod:AppLoggerIos.kt$AppLoggerIos$@Suppress("TooGenericExceptionCaught") private fun fetchAndApplyRemoteConfig(config: AppLoggerConfig, impl: AppLoggerImpl)</ID>
+    <ID>LongMethod:AppLoggerIos.kt$AppLoggerIos$fun initialize( config: AppLoggerConfig, transport: LogTransport? = null )</ID>
+    <ID>LongMethod:AppLoggerSDK.kt$AppLoggerSDK$fun initialize( context: Context, config: AppLoggerConfig, transport: LogTransport? = null )</ID>
+    <ID>LongMethod:SqliteOfflineStorage.kt$SqliteOfflineStorage$override fun drain(limit: Int): List&lt;LogEvent></ID>
+    <ID>LongMethod:SupabaseTransport.kt$private fun LogEvent.toSupabaseLog(): SupabaseLogEntry</ID>
+    <ID>LongParameterList:AppLoggerImpl.kt$AppLoggerImpl$( level: LogLevel, tag: String, message: String, throwable: Throwable?, resolvedExtra: Map&lt;String, JsonElement>?, callerInfo: CallerInfo? )</ID>
+    <ID>LongParameterList:AppLoggerImpl.kt$AppLoggerImpl$( private val deviceInfo: DeviceInfo, private val sessionManager: SessionManager, private val filter: LogFilter, private val processor: BatchProcessor, private val config: AppLoggerConfig, private val systemSnapshotProvider: (() -> Map&lt;String, String>)? = null, private val consentProvider: (() -> ConsentLevel)? = null, private val deviceIdAnonymizer: ((String) -> String)? = null )</ID>
+    <ID>LongParameterList:AppLoggerIos.kt$AppLoggerIos$( config: AppLoggerConfig, impl: AppLoggerImpl, sessionManager: SessionManager, processor: BatchProcessor, transport: LogTransport, buffer: InMemoryBuffer )</ID>
+    <ID>LongParameterList:LogTransport.kt$AtomicBatchCapable$( kind: BatchKind, events: List&lt;LogEvent>, hash: String, eventCount: Int, environment: String = "", sdkVersion: String = "", keyId: String = "" )</ID>
+    <ID>LongParameterList:LogTransport.kt$BatchManifestCapable$( kind: BatchKind, batchId: String, hash: String, eventCount: Int, environment: String = "", sdkVersion: String = "", keyId: String = "" )</ID>
+    <ID>ReturnCount:AppLoggerSDK.kt$AppLoggerSDK$fun refreshRemoteConfig()</ID>
+    <ID>ReturnCount:LogFilter.kt$TagFilter$override fun passes(event: LogEvent): Boolean</ID>
+    <ID>TooManyFunctions:AppLogger.kt$AppLogger</ID>
+    <ID>TooManyFunctions:AppLoggerExtensions.kt$com.applogger.core.AppLoggerExtensions.kt</ID>
+    <ID>TooManyFunctions:BatchProcessor.kt$BatchProcessor</ID>
+    <ID>WildcardImport:AppLoggerImpl.kt$import com.applogger.core.*</ID>
+    <ID>WildcardImport:AppLoggerImpl.kt$import com.applogger.core.model.*</ID>
+    <ID>WildcardImport:AppLoggerIos.kt$import com.applogger.core.internal.*</ID>
+    <ID>WildcardImport:AppLoggerSDK.kt$import com.applogger.core.internal.*</ID>
+    <ID>WildcardImport:BatchProcessor.kt$import com.applogger.core.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -8,16 +8,16 @@ config:
 
 complexity:
   LongMethod:
-    threshold: 60
+    threshold: 40
   LongParameterList:
-    functionThreshold: 8
-    constructorThreshold: 10
+    functionThreshold: 6
+    constructorThreshold: 8
   CyclomaticComplexMethod:
-    threshold: 15
+    threshold: 12
   TooManyFunctions:
-    thresholdInFiles: 25
-    thresholdInClasses: 20
-    thresholdInInterfaces: 15
+    thresholdInFiles: 20
+    thresholdInClasses: 15
+    thresholdInInterfaces: 10
 
 style:
   MagicNumber:
@@ -50,9 +50,6 @@ style:
     active: true
     excludeImports:
       - 'kotlinx.coroutines.*'
-      - 'com.applogger.core.internal.*'
-      - 'com.applogger.core.*'
-      - 'com.applogger.core.model.*'
       - 'io.ktor.client.*'
       - 'io.ktor.client.plugins.contentnegotiation.*'
       - 'io.ktor.client.request.*'
@@ -60,10 +57,10 @@ style:
       - 'io.ktor.http.*'
       - 'io.ktor.serialization.kotlinx.json.*'
   ReturnCount:
-    max: 4
+    max: 3
     excludedFunctions: ['equals']
   ForbiddenComment:
-    active: false
+    active: true
 
 naming:
   FunctionNaming:
@@ -90,4 +87,4 @@ exceptions:
   TooGenericExceptionThrown:
     active: true
   SwallowedException:
-    active: false
+    active: true
