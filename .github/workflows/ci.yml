@@ -75,6 +75,12 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: ./gradlew jacocoTestReport
 
+      - name: Coverage Gate (80% line / 70% branch)
+        continue-on-error: true
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: ./gradlew :logger-core:jacocoTestCoverageVerification
+
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

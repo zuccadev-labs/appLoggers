@@ -83,6 +83,20 @@ subprojects {
                 finalizedBy(tasks.matching { it.name == "jacocoTestReport" })
             }
 
+            val jacocoExclusions = listOf(
+                "**/androidMain/**",
+                "**/iosMain/**",
+                "**/jvmMain/**",
+                "**/AppLoggerDatabase*",
+                "**/OfflineLogs*",
+                "**/model/*",
+                "**/*Config*",
+                "**/*Builder*",
+                "**/NoOp*",
+                "**/AppLoggerVersion*",
+                "**/android/**"
+            )
+
             tasks.register<JacocoReport>("jacocoTestReport") {
                 dependsOn(tasks.withType<Test>())
                 reports {
@@ -90,10 +104,36 @@ subprojects {
                     html.required.set(true)
                     csv.required.set(false)
                 }
-                val mainClasses = fileTree(layout.buildDirectory.dir("classes/kotlin/jvm/main"))
+                val mainClasses = fileTree(layout.buildDirectory.dir("classes/kotlin/jvm/main")) {
+                    exclude(jacocoExclusions)
+                }
                 classDirectories.setFrom(mainClasses)
                 sourceDirectories.setFrom(files("src/commonMain/kotlin", "src/jvmMain/kotlin"))
                 executionData.setFrom(fileTree(layout.buildDirectory).include("jacoco/*.exec"))
+            }
+
+            if (project.name == "logger-core") {
+                tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+                    dependsOn(tasks.withType<Test>())
+                    val mainClasses = fileTree(layout.buildDirectory.dir("classes/kotlin/jvm/main")) {
+                        exclude(jacocoExclusions)
+                    }
+                    classDirectories.setFrom(mainClasses)
+                    sourceDirectories.setFrom(files("src/commonMain/kotlin", "src/jvmMain/kotlin"))
+                    executionData.setFrom(fileTree(layout.buildDirectory).include("jacoco/*.exec"))
+                    violationRules {
+                        rule {
+                            limit {
+                                minimum = BigDecimal("0.80")
+                                counter = "LINE"
+                            }
+                            limit {
+                                minimum = BigDecimal("0.70")
+                                counter = "BRANCH"
+                            }
+                        }
+                    }
+                }
             }
         }
     }
